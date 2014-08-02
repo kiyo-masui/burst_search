@@ -10,6 +10,7 @@ import time
 import argparse
 import glob
 import multiprocessing
+import threading
 from os import path
 
 import yaml
@@ -33,31 +34,57 @@ parser.add_argument(
         )
 parser.add_argument(
         "--no-pre-existing",
-        help="Do search pre-existing files, just perform real-time search.",
+        help="Do not search pre-existing files, just do real-time search.",
         action='store_true',
         )
 
 
 # Function that processes a file.
-def process_file(filename, bunch, of, parameters, return_queue):
-    pass
+def process_file(filename, return_queue, **kwargs):
+    print "start: %s" % filename
+    time.sleep(2)
+    return_code = 0
+    return_queue.put((filename, return_code))
+
+
+# Driver function for thread that processes pre-existing files.
+def process_preexisting(file_pattern, ignore_files, return_queue, **kwargs):
+    files_to_search = glob.glob(file_pattern)
+    for filename in files_to_search:
+        filename = path.abspath(filename)
+        if filename in ignore_files:
+            continue
+        p = multiprocessing.Process(target=process_file,
+                args=(filename, return_queue,), kwargs=kwargs)
+        p.start()
+        p.join()
 
 
 # What to do with new files.
 class NewFileHandler(watchdog.events.PatternMatchingEventHandler):
     
-    def set_up(self, bandpass_filename, time_block, remove_noise_cal,
-               output_directory, process_queue, return_queue):
-        pass
+    def __init__(self, patterns=None, ignore_patterns=None,
+                 ignore_directories=False, case_sensitive=False,
+                 return_queue=None, **kwargs):
+        watchdog.events.PatternMatchingEventHandler.__init__(
+                self,
+                patterns=patterns,
+                ignore_patterns=ignore_patterns,
+                ignore_directories=ignore_directories,
+                case_sensitive=case_sensitive)
+
+        self._return_queue = return_queue
+        self._parameters = kwargs
 
     def on_created(self, event):
-        print "Here"
-        print event
         if event.is_directory:
             return
         filename = event.src_path
-        # process_file(...)
-
+        filename = path.abspath(filename)
+        p = multiprocessing.Process(target=process_file,
+                args=(filename, return_queue,), kwargs=self._parameters)
+        p.start()
+        p.join()
 
 
 if __name__ == "__main__":
@@ -71,29 +98,59 @@ if __name__ == "__main__":
     parameters["search_directory"] = path.expanduser(parameters["search_directory"])
     file_pattern = path.join(parameters['search_directory'],
                              parameters['filename_match_pattern'])
-    print file_pattern
 
+    # Return codes go here.
+    return_queue = multiprocessing.Queue()
+
+    log_filename = path.join(path.expanduser(parameters["output_directory"]),
+                             parameters['log_filename'])
+
+    # Read the log file if it exists to see what has already been processed.
+    if path.isfile(log_filename):
+        with open(log_filename) as f:
+            files_processed = yaml.safe_load(f.read())
+    else:
+        files_processed = {}
+
+    # Setup a thread to process any files that already exist in the directory.
+    if not args.no_pre_existing:
+        pre_existing_thread = threading.Thread(target=process_preexisting,
+                args=(file_pattern, files_processed.keys(), return_queue),
+                kwargs=parameters)
+    # Setup a watchdog thread to monitor for new files and process them as they
+    # appear.
     if not args.no_real_time:
-        process_queue = multiprocessing.Queue()
-        return_queue = multiprocessing.Queue()
         event_handler = NewFileHandler(patterns=[file_pattern],
-                                       case_sensitive=True)
+                                       case_sensitive=True, **parameters)
         # Set up and start new file monitor.
         observer = watchdog.observers.Observer()
         observer.schedule(event_handler, parameters['search_directory'],
                           recursive=False)
-        observer.start()
 
-    try:
+    with open(log_filename, 'a') as log_f:
+        # Start threads.
         if not args.no_pre_existing:
-            # First process all files that already exist in search directory.
-            files_to_search = glob.glob(file_pattern)
-
-        # Now enter holding loop until keyboard interupt.
-        while not args.no_real_time:
-            time.sleep(1)
-    except KeyboardInterrupt:
+            pre_existing_thread.start()
         if not args.no_real_time:
-            observer.stop()
-            observer.join()
+            observer.start()
+
+        try:
+            # Now enter holding loop until keyboard interrupt.
+            while True:
+                done_file, return_code = return_queue.get()
+                log_f.write("%s: %d\n" % (done_file, return_code))
+                # Don't wait for interrupt if not doing real-time search and all
+                # work is done.
+                no_work_left = args.no_real_time
+                no_work_left = no_work_left and (args.no_pre_existing
+                                        or not pre_existing_thread.is_alive())
+                no_work_left = no_work_left and return_queue.empty
+                if no_work_left:
+                    break
+        except KeyboardInterrupt:
+            if not args.no_real_time:
+                observer.stop()
+                observer.join()
+            if not args.no_pre_existing:
+                pre_existing_thread.join()
 
