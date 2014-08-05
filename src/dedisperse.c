@@ -17,15 +17,15 @@
 
 
 // For allocating output buffer.
-size_t get_num_dispersions(size_t nfreq, float freq0,
+size_t burst_get_num_dispersions(size_t nfreq, float freq0,
                            float delta_f, int depth);
 
 // Return minimum *depth* parameter required to achieve given maximum DM.
-int depth_for_max_dm(float max_dm, float delta_t, size_t nfreq, 
+int burst_depth_for_max_dm(float max_dm, float delta_t, size_t nfreq, 
                      float freq0, float delta_f);
 
 // *ntime2* is allowed to be 0.  Return number of valid dedispersed time samples,
 // (always less than, and usually equal to, *ntime1*).
-size_t dedisperse(float *indata1, float *indata2, float *outdata,
+size_t burst_dm_transform(float *indata1, float *indata2, float *outdata,
                   size_t ntime1, size_t ntime2, float delta_t,
                   size_t nfreq, float freq0, float delta_f, int depth);
