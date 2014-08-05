@@ -86,6 +86,9 @@ class NewFileHandler(watchdog.events.PatternMatchingEventHandler):
         p.start()
         p.join()
 
+# XXX Check that globbing and file matching will recurse directories.
+# XXX Provide list of search directories.
+
 
 if __name__ == "__main__":
     args = parser.parse_args()
