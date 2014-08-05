@@ -52,3 +52,9 @@ coverage.xml
 # Sphinx documentation
 docs/_build/
 
+
+# Editor backups.
+*.swp
+
+# Cython builds:
+burst_search/dedisperse.c
