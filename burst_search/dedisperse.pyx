@@ -66,3 +66,23 @@ def dm_transform(
     return out[:ntime_out,:]
 
 
+class DMTransform(object):
+    """Performs dispersion measure transforms."""
+
+    def __init__(self, delta_t, nfreq, freq0, delta_f, max_dm):
+        # Performs all initialization, packs everything into a struct and holds
+        # it for performing dispersion measure transforms.
+        # self._dm_workspace = stuff
+        pass
+
+    def __call__(self, data1, data2=None):
+        # ntime_out = burst_dm_transform(data1, data2, out, ntime1, ntime2,
+        #                                self._dm_workspace)
+        # return out[:ntime_out,:]
+
+        pass
+
+    def __del__(self):
+        # dealloc self._dm_workspace
+        pass
+
