@@ -36,14 +36,15 @@ ext_dedisperse = Extension(
 
 EXTENSIONS = [ext_dedisperse,]
 
+SCRIPTS = ["scripts/burst_guppi"]
+
 
 setup(
     name = 'burst_search',
     version = VERSION,
-
     packages = ['burst_search'],
-    scripts=[],
     ext_modules = EXTENSIONS,
+    scripts = SCRIPTS,
     cmdclass = {'build_ext': build_ext},
     install_requires = ['numpy', 'pyfits', 'Cython'],
 

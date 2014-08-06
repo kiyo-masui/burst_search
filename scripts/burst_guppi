@@ -2,7 +2,7 @@
 """Program to monitor directory for new data and search for fast radio bursts
 in GUPPI data.
 
-Processes all data found in the search directory
+Processes all data found in the search directory.
 
 """
 
@@ -16,6 +16,9 @@ from os import path
 import yaml
 import watchdog.observers
 import watchdog.events
+
+from burst_search import guppi
+
 
 # Command line arguments.
 parser = argparse.ArgumentParser(description='Search GUPPI data for FRBs.')
