@@ -43,4 +43,23 @@ def remove_periodic(data, period):
     return profile
 
 
+def noisecal_bandpass(data, cal_spectrum, cal_period):
+    """Remove noise-cal and use to bandpass calibrate.
+
+    Parameters
+    ----------
+    data : array with shape ``(ntime, nfreq)``
+        Data to be calibrated including time switched noise-cal.
+    cal_spectrum : array with shape ``(nfreq,)``
+        Calibrated spectrum of the noise cal.
+    cal_period : int
+        Noise cal switching period, Must be an integer number of samples.
+
+    """"
+
+    cal_profile = remove_periodic(data, cal_period)
+    # An *okay* estimate of the height of a square wave is twice the standard
+    # deviation.
+    cal_amplitude = 2 * np.std(cal_profile, 0)
+    data *= cal_spectrum / cal_amplitude
 
