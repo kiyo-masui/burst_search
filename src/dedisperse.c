@@ -25,13 +25,14 @@ size_t burst_get_num_dispersions(size_t nfreq, float freq0,
 // Return minimum *depth* parameter required to achieve given maximum DM.
 int burst_depth_for_max_dm(float max_dm, float delta_t, size_t nfreq, 
                      float freq0, float delta_f) {
-    return 10;
+    return 9;
 }
 
 // *ntime2* is allowed to be 0.  Return number of valid dedispersed time samples,
-// (always less than, and usually equal to, *ntime1*).
+// (always less than, and usually equal to, *ntime1*).  *delta_f* may be negative.
+// Frequencies are in Hz.
 size_t burst_dm_transform(float *indata1, float *indata2, float *outdata,
                   size_t ntime1, size_t ntime2, float delta_t,
                   size_t nfreq, float freq0, float delta_f, int depth) {
-    return 3;
+    return 8;
 }
