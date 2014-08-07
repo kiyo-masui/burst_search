@@ -67,3 +67,21 @@ def noisecal_bandpass(data, cal_spectrum, cal_period):
     data *= cal_spectrum / cal_amplitude
     data[:, bad_chans] = 0
 
+
+def remove_outliers(data, sigma_threshold):
+    """Flag outliers within frequency channels.
+
+    Replace outliers with that frequency's mean.
+
+    """
+
+    pass
+
+
+def remove_noisy_freq(data, sigma_threshold):
+    """Flag frequency channels with high variance.
+
+    To be effective, data should be bandpass calibrated.
+
+    """
+

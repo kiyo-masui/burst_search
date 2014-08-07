@@ -35,7 +35,8 @@ def search_file(filename):
     for ii in xrange(0, nrecords, nrecords_block):
         data = read_records(hdulist, ii, ii + nrecords_block)
         preprocess.noisecal_bandpass(data, 1., parameters['cal_period'])
-        # RFI flag?
+        preprocess.remove_outliers(data, 5)
+        preprocess.remove_noisy_freq(data, 3)
 
         # dedisperse.
 
