@@ -74,6 +74,23 @@ float **matrix(int n, int m)
   return mat;
 }
 /*--------------------------------------------------------------------------------*/
+int get_nchan_from_depth(int depth)
+{
+  int i=1;
+  return i<<depth;
+}
+
+/*--------------------------------------------------------------------------------*/
+float get_diagonal_dm_simple(float nu1, float nu2, float dt, int depth)
+{
+  float d1=1.0/nu1/nu1;
+  float d2=1.0/nu2/nu2;
+  int nchan=get_nchan_from_depth(depth);
+  float dm_max=dt/DM0/( (d2-d1)/nchan);
+  return fabs(dm_max);
+  
+}
+/*--------------------------------------------------------------------------------*/
 
 float get_diagonal_dm(Data *dat) {
   //diagonal DM is when the delay between adjacent channels
@@ -123,6 +140,9 @@ Data *read_gbt(const char *fname)
   free(mat);
   return dat;
 }
+
+
+/*--------------------------------------------------------------------------------*/
 
 /*--------------------------------------------------------------------------------*/
 Data *map_chans(Data *dat, int depth)
@@ -176,12 +196,6 @@ void remap_data( Data *dat)
       dat->data[ii][j]+=dat->raw_data[i][j];
   }
   printf("took %12.5f seconds to remap data.\n",omp_get_wtime()-t0);
-}
-/*--------------------------------------------------------------------------------*/
-int get_nchan_from_depth(int depth)
-{
-  int i=1;
-  return i<<depth;
 }
 /*--------------------------------------------------------------------------------*/
 
@@ -550,45 +564,55 @@ void copy_in_data(Data *dat, float *indata1, int ndata1, float *indata2, int nda
 }
 
 /*--------------------------------------------------------------------------------*/
-size_t burst_dm_transform(float *indata1, float *indata2, float *outdata,
-			  size_t ntime1, size_t ntime2, float delta_t,
-			  size_t nfreq, float freq0, float delta_f, int depth) {
+size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
+			     size_t ntime1, size_t ntime2, float delta_t,
+			     size_t nfreq, int *chan_map, int depth) 
+{
+  
 
-  static int firsttime=1;
-  static int ntime1_old;
-  static int ntime2_old;
-  static float *tmp;
-  static Data *dat;
-  static int depth_old;
 
   
-  if (firsttime) {
-    ntime1_old=ntime1;
-    ntime2_old=ntime2;    
-    dat=(Data *)calloc(1,sizeof(Data));
-    dat->raw_nchan=nfreq;
-    int nextra=get_nchan_from_depth(depth);
-    if (nextra>ntime2)
-      nextra=ntime2;
-    dat->ndata=ntime1+nextra;
-    dat->raw_data=matrix(dat->raw_nchan,dat->ndata);
-    assert(dat->ndata<=ntime1+ntime2);  //for now, make sure that the second chunk is long enough to deal with what we need.
-    dat->raw_chans=(float *)malloc(sizeof(float)*dat->raw_nchan);
-    dat->dt=delta_t;
-    for (int i=0;i<dat->raw_nchan;i++)
-      dat->raw_chans[i]=freq0+(0.5+i)*delta_f;
-    map_chans(dat,depth);
-    depth_old=depth;
-    firsttime=0;
-  }
+
+  Data *dat=(Data *)calloc(1,sizeof(Data));  
+  dat->raw_nchan=nfreq;
+  int nchan=get_nchan_from_depth(depth);
+  dat->nchan=nchan;
+  int nextra=nchan;
+  if (nextra>ntime2)
+    nextra=ntime2;
+  dat->ndata=ntime1+nextra;
+  dat->raw_data=matrix(dat->raw_nchan,dat->ndata);
+  dat->chan_map=chan_map;
+  dat->data=matrix(dat->nchan,dat->ndata);
+
+  //assert(dat->ndata<=ntime1+ntime2);  //for now, make sure that the second chunk is long enough to deal with what we need.
+
+  //dat->raw_chans=(float *)malloc(sizeof(float)*dat->raw_nchan);
+  //dat->dt=delta_t;
+  //for (int i=0;i<dat->raw_nchan;i++)
+  //dat->raw_chans[i]=freq0+(0.5+i)*delta_f;
+  //map_chans(dat,depth);
+  // depth_old=depth;
+  //firsttime=0;
+  //}
   
-  assert(depth_old==depth);
+
 
 
   copy_in_data(dat,indata1,ntime2,indata2,ntime2);
   clean_rows(dat);
   setup_data(dat);
   dedisperse_gbt(dat,outdata);
+
+  size_t ngood=dat->ndata-dat->nchan;
+  
+  free(dat->raw_data[0]);
+  free(dat->raw_data);
+  free(dat->data[0]);
+  free(dat->data);
+  free(dat);
+
+  return ngood;
 
 }
 
