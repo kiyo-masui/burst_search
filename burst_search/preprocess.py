@@ -55,11 +55,15 @@ def noisecal_bandpass(data, cal_spectrum, cal_period):
     cal_period : int
         Noise cal switching period, Must be an integer number of samples.
 
-    """"
+    """
 
     cal_profile = remove_periodic(data, cal_period)
     # An *okay* estimate of the height of a square wave is twice the standard
     # deviation.
     cal_amplitude = 2 * np.std(cal_profile, 0)
+    # Find frequencies with no data.
+    bad_chans = cal_amplitude < 1e-5 * np.median(cal_amplitude)
+    cal_amplitude[bad_chans] = 1.
     data *= cal_spectrum / cal_amplitude
+    data[:, bad_chans] = 0
 
