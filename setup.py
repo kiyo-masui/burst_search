@@ -36,7 +36,7 @@ ext_dedisperse = Extension(
 
 EXTENSIONS = [ext_dedisperse,]
 
-SCRIPTS = ["scripts/burst_guppi"]
+SCRIPTS = ["scripts/burst_guppi", "scripts/burst_watch_guppi"]
 
 
 setup(
