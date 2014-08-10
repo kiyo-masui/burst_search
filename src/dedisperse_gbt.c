@@ -10,6 +10,10 @@
 #define NOISE_PERIOD 64
 #define SIG_THRESH 3.0
 
+#include "dedisperse_gbt.h"
+
+#if 0
+
 typedef struct {
   //float dm_max;
   //float dm_offset;
@@ -27,6 +31,7 @@ typedef struct {
   //int icur;  //useful if we want to collapse the data after dedispersing
 } Data;
 
+#endif
 /*--------------------------------------------------------------------------------*/
 float *vector(int n)
 {
