@@ -28,6 +28,13 @@ int burst_depth_for_max_dm(float max_dm, float delta_t, size_t nfreq,
     return 9;
 }
 
+
+// If chan_map is an array of indeces, should it not be typed `size_t *`? -KM
+// Is the length of `chan_map` `nfreq` or `ndispersions`? -KM
+void burst_setup_channel_mapping(int *chan_map, size_t nfreq, float freq0,
+        float delta_f, int depth) {
+}
+
 // *ntime2* is allowed to be 0.  Return number of valid dedispersed time samples,
 // (always less than, and usually equal to, *ntime1*).  *delta_f* may be negative.
 // Frequencies are in Hz.
