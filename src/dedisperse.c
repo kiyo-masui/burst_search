@@ -40,8 +40,8 @@ int burst_depth_for_max_dm(float max_dm, size_t nfreq, float freq0,
     fprintf(stderr,"Failure in burst_depth_for_max_dm.  Did not reach requested DM of %12.4g at a depth of %d\n",max_dm,i);
     return 0;
   }
-
-    return depth;
+  
+  return depth;
 }
 
 
