@@ -12,13 +12,13 @@ def remove_periodic(data, period):
 
     Parameters
     ----------
-    data : array with shape ``(nfreq, ntime)``.
+    data : array with shape ``(ntime, nfreq)``.
     period : integer
         Must be greater than or equal to *ntime*.
 
     Returns
     -------
-    profile : array with shape ``(nfreq, period)``.
+    profile : array with shape ``(period, nfreq)``.
         Component removed from the data.
     """
 
@@ -26,21 +26,19 @@ def remove_periodic(data, period):
 
     if data.ndim != 2:
         raise ValueError("Expected 2D data.")
-    ntime = data.shape[1]
+    ntime = data.shape[0]
     if ntime < period:
         raise ValueError("Time axis must be more than one period.")
-    nfreq = data.shape[0]
+    nfreq = data.shape[1]
 
     ntime_trunk = ntime // period * period
-    data_trunk = data[:,:ntime_trunk]
-    data_trunk.shape = (nfreq, ntime_trunk // period, period)
+    data_trunk = data[:ntime_trunk,:]
+    data_trunk.shape = (ntime_trunk // period, period, nfreq)
 
-    profile =  np.mean(data_trunk, 1)
+    profile =  np.mean(data_trunk, 0)
 
-    for ii in xrange(0, ntime_trunk, period):
-        data[:,ii:ii + period] -= profile
-
-    data[:,ntime_trunk:] -= profile[:,:ntime - ntime_trunk]
+    data_trunk -= profile
+    data[ntime_trunk:,:] -= profile[:ntime - ntime_trunk,:]
 
     return profile
 
@@ -50,7 +48,7 @@ def noisecal_bandpass(data, cal_spectrum, cal_period):
 
     Parameters
     ----------
-    data : array with shape ``(nfreq, ntime)``
+    data : array with shape ``(ntime, nfreq)``
         Data to be calibrated including time switched noise-cal.
     cal_spectrum : array with shape ``(nfreq,)``
         Calibrated spectrum of the noise cal.
@@ -62,12 +60,12 @@ def noisecal_bandpass(data, cal_spectrum, cal_period):
     cal_profile = remove_periodic(data, cal_period)
     # An *okay* estimate of the height of a square wave is twice the standard
     # deviation.
-    cal_amplitude = 2 * np.std(cal_profile, 1)
+    cal_amplitude = 2 * np.std(cal_profile, 0)
     # Find frequencies with no data.
     bad_chans = cal_amplitude < 1e-5 * np.median(cal_amplitude)
     cal_amplitude[bad_chans] = 1.
-    data *= (cal_spectrum / cal_amplitude)[:,None]
-    data[bad_chans,:] = 0
+    data *= cal_spectrum / cal_amplitude
+    data[:, bad_chans] = 0
 
 
 def remove_outliers(data, sigma_threshold):
