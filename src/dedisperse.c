@@ -15,6 +15,9 @@
 #include <assert.h>
 #include <omp.h>
 
+#include "dedisperse_gbt.h"
+#include "dedisperse.h"
+
 
 // For allocating output buffer.
 size_t burst_get_num_dispersions(size_t nfreq, float freq0,
@@ -26,9 +29,18 @@ size_t burst_get_num_dispersions(size_t nfreq, float freq0,
 // Return minimum *depth* parameter required to achieve given maximum DM.
 int burst_depth_for_max_dm(float max_dm, size_t nfreq, float freq0,
                             float delta_f, float delta_t) {
-  int depth=1;
-  while (get_diagonal_dm_simple(freq0,freq0*nfreq*delta_f,delta_t,depth)<max_dm)
+  int depth=2;
+  int imax=20;
+  int i=0;
+  while ((get_diagonal_dm_simple(freq0,freq0+nfreq*delta_f,delta_t,depth)<max_dm)&&(i<imax)) {
     depth++;
+    i++;
+  }
+  if (i==imax) {
+    fprintf(stderr,"Failure in burst_depth_for_max_dm.  Did not reach requested DM of %12.4g at a depth of %d\n",max_dm,i);
+    return 0;
+  }
+
     return depth;
 }
 
@@ -82,6 +94,10 @@ void setup_channel_mapping(size_t nfreq, float freq0, float delta_f,int depth, i
 // Frequencies are in Hz.
 size_t burst_dm_transform(float *indata1, float *indata2, float *outdata,
                   size_t nfreq, float freq0, float delta_f,
-                  size_t ntime1, size_t ntime2, float delta_t, int depth) {
-    return 8;
+			  size_t ntime1, size_t ntime2, float delta_t, int depth) {
+  
+
+  //return my_burst_dm_transform(indata1,indata2,outdata,ntime1,ntime2,delta_t,nfreq,chan_map,depth);
+
+  return 8;
 }

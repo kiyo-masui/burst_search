@@ -12,26 +12,7 @@
 
 #include "dedisperse_gbt.h"
 
-#if 0
 
-typedef struct {
-  //float dm_max;
-  //float dm_offset;
-  int nchan;
-  int raw_nchan;
-  int ndata;
-  float *chans;  //delay in pixels is chan_map[i]*dm
-  float *raw_chans; 
-  float dt;
-
-  float **raw_data; //remap to float so we can do things like clean up data without worrying about overflow
-  float **data;
-  int *chan_map;
-
-  //int icur;  //useful if we want to collapse the data after dedispersing
-} Data;
-
-#endif
 /*--------------------------------------------------------------------------------*/
 float *vector(int n)
 {
@@ -55,8 +36,10 @@ long get_file_size(const char *fname)
 
 {
   struct stat buf;
-  stat(fname,&buf);
-  return (long)buf.st_size;
+  if (stat(fname,&buf)==0)
+    return (long)buf.st_size;
+  else
+    return 0;
 }
 /*--------------------------------------------------------------------------------*/
 char **cmatrix(int n, int m)
@@ -69,12 +52,12 @@ char **cmatrix(int n, int m)
   return mat;
 }
 /*--------------------------------------------------------------------------------*/
-float **matrix(int n, int m)
+float **matrix(long n, long m)
 {
 
   float *vec=(float *)malloc(n*m*sizeof(float));
   float **mat=(float **)malloc(n*sizeof(float *));
-  for (int i=0;i<n;i++) 
+  for (long i=0;i<n;i++) 
     mat[i]=vec+i*m;
   return mat;
 }
@@ -91,7 +74,10 @@ float get_diagonal_dm_simple(float nu1, float nu2, float dt, int depth)
   float d1=1.0/nu1/nu1;
   float d2=1.0/nu2/nu2;
   int nchan=get_nchan_from_depth(depth);
+  //printf("nchan is %d from %d\n",nchan,depth);
+  //printf("freqs are %12.4f %12.4f\n",nu1,nu2);
   float dm_max=dt/DM0/( (d2-d1)/nchan);
+  //printf("current dm is %12.4f\n",dm_max);
   return fabs(dm_max);
   
 }
@@ -115,6 +101,10 @@ Data *read_gbt(const char *fname)
   int nchan=4096;
   int npol=4;
   long ndat=get_file_size(fname);
+  if (ndat<=0) {
+    printf("FILE %s unavailable for reading.\n",fname);
+    return NULL;
+  }
   int nsamp=ndat/npol/nchan;
   printf("have %d samples.\n",nsamp);
   char **mat=cmatrix(nsamp,nchan);
@@ -339,7 +329,7 @@ void dedisperse_block_kernel_2pass(const float **in, float **out, int n, int m)
 void dedisperse_dual(float **inin, float **outout, int nchan,int ndat)
 {
   int npass=get_npass(nchan);
-  printf("need %d passes.\n",npass);
+  printf("need %d passes from %d channels..\n",npass,nchan);
   //npass=2;
   int bs=nchan;
   float **in=inin;
@@ -382,7 +372,7 @@ void dedisperse_gbt(Data *dat, float *outdata)
   //remap_data(dat);  
   //float **tmp=matrix(dat->nchan, dat->ndata);
   float **tmp=(float **)malloc(sizeof(float *)*dat->nchan);
-  for (int i=0;i<dat->nchan;dat++)
+  for (int i=0;i<dat->nchan;i++)
     tmp[i]=outdata+i*dat->ndata;
   memset(tmp[0],0,sizeof(tmp[0][0])*dat->ndata*dat->nchan);
   double t1=omp_get_wtime();
@@ -553,17 +543,26 @@ void setup_data(Data *dat)
 void copy_in_data(Data *dat, float *indata1, int ndata1, float *indata2, int ndata2)
 {
   int npad=dat->ndata-ndata1;
+  memset(dat->raw_data[0],0,dat->raw_nchan*dat->ndata*sizeof(float));
+  printf("npad is %d\n",npad);
   assert(ndata2>=npad);
+  
   for (int i=0;i<dat->raw_nchan;i++) {
     for (int j=0;j<ndata1;j++) {
       //this line changes depending on memory ordering of input data
       //dat->raw_data[i*dat->ndata+j]=indata1[i*ndata1+j];      
+      //dat->raw_data[i][j]=indata1[i*ndata1+j];      
+
       dat->raw_data[i][j]=indata1[j*dat->raw_nchan+i];
+      //dat->raw_data[i][j]=0;
     }
     for (int j=0;j<npad;j++) {
       //this line also changes depending on memory ordering of input data
       //dat->raw_data[i*dat->ndata+ndata1+j]=indata2[i*ndata2+j];
-      dat->raw_data[i][ndata1+j]=indata2[i+dat->raw_nchan*j];
+
+      //dat->raw_data[i][ndata1+j]=indata2[i+dat->raw_nchan*j];
+      dat->raw_data[i][ndata1+j]=indata2[i+j*dat->raw_nchan];
+      //dat->raw_data[i][ndata1+j]=0;
     }
   }
 }
@@ -581,11 +580,13 @@ size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
   Data *dat=(Data *)calloc(1,sizeof(Data));  
   dat->raw_nchan=nfreq;
   int nchan=get_nchan_from_depth(depth);
+  printf("expecting %d channels.\n",nchan);
   dat->nchan=nchan;
   int nextra=nchan;
   if (nextra>ntime2)
     nextra=ntime2;
   dat->ndata=ntime1+nextra;
+  printf("ndata is %d\n",dat->ndata);
   dat->raw_data=matrix(dat->raw_nchan,dat->ndata);
   dat->chan_map=chan_map;
   dat->data=matrix(dat->nchan,dat->ndata);
@@ -603,11 +604,16 @@ size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
   
 
 
-
-  copy_in_data(dat,indata1,ntime2,indata2,ntime2);
+  printf("copying in data %ld %ld %d.\n",ntime1,ntime2,dat->nchan);
+  copy_in_data(dat,indata1,ntime1,indata2,ntime2);
+  printf("copied.\n");
   clean_rows(dat);
+  printf("cleaned rows.\n");
   setup_data(dat);
+  printf("setup data.\n");
+  printf("nchan is now %d\n",dat->nchan);
   dedisperse_gbt(dat,outdata);
+  printf("dedispersed.\n");
 
   size_t ngood=dat->ndata-dat->nchan;
   
@@ -630,7 +636,7 @@ size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
 
 
 
-#if 1
+#if 0
 
 int main(int argc, char *argv[])
 {
