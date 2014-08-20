@@ -538,7 +538,17 @@ void setup_data(Data *dat)
   
 }
 
-
+/*--------------------------------------------------------------------------------*/
+size_t get_burst_nextra(size_t ndata2, int depth)
+{
+  size_t nchan=get_nchan_from_depth(depth);
+  size_t nextra=nchan;
+  if (nextra>ndata2)
+    nextra=ndata2;
+  
+  
+  return nextra;
+}
 /*--------------------------------------------------------------------------------*/
 void copy_in_data(Data *dat, float *indata1, int ndata1, float *indata2, int ndata2)
 {
@@ -582,9 +592,13 @@ size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
   int nchan=get_nchan_from_depth(depth);
   printf("expecting %d channels.\n",nchan);
   dat->nchan=nchan;
+#if 1
+  int nextra=get_burst_nextra(ntime2,depth);
+#else
   int nextra=nchan;
   if (nextra>ntime2)
     nextra=ntime2;
+#endif
   dat->ndata=ntime1+nextra;
   printf("ndata is %d\n",dat->ndata);
   dat->raw_data=matrix(dat->raw_nchan,dat->ndata);
