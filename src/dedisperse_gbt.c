@@ -578,6 +578,24 @@ void copy_in_data(Data *dat, float *indata1, int ndata1, float *indata2, int nda
 }
 
 /*--------------------------------------------------------------------------------*/
+Dat *put_data_into_burst_struct(float *indata1, float *indata2, size_t ntime1, size_t ntime2, size_t nfreq, int *chan_map, int depth)
+{
+  
+  Data *dat=(Data *)calloc(1,sizeof(Data));
+  dat->raw_nchan=nfreq;
+  int nchan=get_nchan_from_depth(depth);
+  printf("expecting %d channels.\n",nchan);
+  dat->nchan=nchan;
+  int nextra=get_burst_nextra(ntime2,depth);
+  dat->ndata=ntime1+nextra;
+  dat->raw_data=matrix(dat->raw_nchan,dat->ndata);
+  dat->chan_map=chan_map;
+  dat->data=matrix(dat->nchan,dat->ndata);
+  
+  
+}
+
+/*--------------------------------------------------------------------------------*/
 size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
 			     size_t ntime1, size_t ntime2, float delta_t,
 			     size_t nfreq, int *chan_map, int depth) 
