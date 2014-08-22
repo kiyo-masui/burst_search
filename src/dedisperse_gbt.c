@@ -111,7 +111,7 @@ Data *read_gbt(const char *fname)
   char *tmp=(char *)malloc(sizeof(char)*nchan*npol);
   FILE *infile=fopen(fname,"r");
   for (int i=0;i<nsamp;i++) {
-    fread(tmp,sizeof(char),nchan*npol,infile);
+    size_t nread=fread(tmp,sizeof(char),nchan*npol,infile);
     memcpy(mat[i],tmp,sizeof(char)*nchan);
   }
   fclose(infile);
@@ -144,7 +144,7 @@ Data *map_chans(Data *dat, int depth)
 {
   double t0=omp_get_wtime();
   int nchan=(1<<depth);
-  printf("expecting %d channels.\n",nchan);
+  //printf("expecting %d channels.\n",nchan);
   //Data *dat=(Data *)malloc(sizeof(Data));
   dat->nchan=nchan;
   dat->data=matrix(dat->nchan,dat->ndata);
@@ -190,7 +190,7 @@ void remap_data( Data *dat)
     for (int j=0;j<dat->ndata;j++)
       dat->data[ii][j]+=dat->raw_data[i][j];
   }
-  printf("took %12.5f seconds to remap data.\n",omp_get_wtime()-t0);
+  //printf("took %12.5f seconds to remap data.\n",omp_get_wtime()-t0);
 }
 /*--------------------------------------------------------------------------------*/
 
@@ -329,7 +329,7 @@ void dedisperse_block_kernel_2pass(const float **in, float **out, int n, int m)
 void dedisperse_dual(float **inin, float **outout, int nchan,int ndat)
 {
   int npass=get_npass(nchan);
-  printf("need %d passes from %d channels..\n",npass,nchan);
+  //printf("need %d passes from %d channels..\n",npass,nchan);
   //npass=2;
   int bs=nchan;
   float **in=inin;
@@ -352,7 +352,7 @@ void dedisperse_dual(float **inin, float **outout, int nchan,int ndat)
 
   if (npass%2==1) {
     //do a single step if we come in with odd depth
-    printf("doing final step for odd depth with block size %d.\n",bs);
+    //printf("doing final step for odd depth with block size %d.\n",bs);
 #pragma omp parallel for
     for (int j=0;j<nchan;j+=bs)
       dedisperse_kernel(in+j,out+j,bs,ndat);
@@ -374,10 +374,11 @@ void dedisperse_gbt(Data *dat, float *outdata)
   float **tmp=(float **)malloc(sizeof(float *)*dat->nchan);
   for (int i=0;i<dat->nchan;i++)
     tmp[i]=outdata+i*dat->ndata;
+  
   memset(tmp[0],0,sizeof(tmp[0][0])*dat->ndata*dat->nchan);
   double t1=omp_get_wtime();
   dedisperse_dual(dat->data,tmp,dat->nchan,dat->ndata);  
-  printf("took %12.4f seconds to dedisperse.\n",omp_get_wtime()-t1);
+  //printf("took %12.4f seconds to dedisperse.\n",omp_get_wtime()-t1);
   memcpy(outdata,dat->data[0],dat->nchan*dat->ndata*sizeof(outdata[0]));
   free(tmp);
 }
@@ -392,6 +393,37 @@ void clean_cols(Data *dat)
     for (int j=0;j<dat->ndata;j++)
       dat->raw_data[i][j]-=tot;
   }
+}
+/*--------------------------------------------------------------------------------*/
+void clean_rows_weighted(Data *dat,float *weights)
+{
+  float *tot=vector(dat->ndata);
+  memset(tot,0,sizeof(tot[0])*dat->ndata);
+#pragma omp parallel 
+  {
+    float *mytot=vector(dat->ndata);
+    memset(mytot,0,sizeof(mytot[0])*dat->ndata);
+#pragma omp for
+    for (int i=0;i<dat->raw_nchan;i++) {
+      for (int j=0;j<dat->ndata;j++) {
+	mytot[j]+=dat->raw_data[i][j]*weights[i];
+      }
+    }
+#pragma omp critical
+    for (int i=0;i<dat->ndata;i++)
+      tot[i]+=mytot[i];
+  }
+  float wt_sum=0;
+  for (int i=0;i<dat->raw_nchan;i++)
+    wt_sum+=weights[i];
+  for (int i=0;i<dat->ndata;i++)
+    tot[i]/=wt_sum;
+  
+  for (int i=0;i<dat->raw_nchan;i++)
+    for (int j=0;j<dat->ndata;j++)
+      dat->raw_data[i][j]-=tot[i];
+  free(tot);
+    
 }
 /*--------------------------------------------------------------------------------*/
 void clean_rows(Data *dat)
@@ -413,13 +445,67 @@ void clean_rows(Data *dat)
   
 }
 /*--------------------------------------------------------------------------------*/
-void remove_noisecal(Data *dat, int period)
+int find_cal_phase(float **dat, int nchan, int period)
+{
+  //find the phase of the noise cal.  Do it by summing across 
+  float *tot=vector(2*period);
+  memset(tot,0,sizeof(tot[0])*2*period);
+  for (int i=0;i<nchan;i++)
+    for (int j=0;j<period;j++) {
+      tot[j]+=dat[i][j];
+    }
+  for (int j=0;j<period;j++) {
+    tot[j+period]=tot[j];
+  }
+  FILE *outfile=fopen("noisecal.txt","w");
+  for (int i=0;i<2*period;i++) {
+    fprintf(outfile,"%14.5e\n",tot[i]);
+  }
+  fclose(outfile);
+  float max=-1e30;
+  int imax=0;
+  //find the peak by finding the maximum positive jump in the noise cal
+  for (int i=0;i<period;i++) {
+    float tmp=tot[i+1]-tot[i];
+    if (tmp>max) {
+      max=tmp;
+      imax=i;
+    }
+  }
+  //now check to see if the next sample is significantly higher.  If so, it's probably a better starting point.
+  if (tot[imax+2]-tot[imax+1]>0.5*(tot[imax+1]-tot[imax]))
+    imax++;
+  free(tot);
+  //printf("noise cal phase is %d\n",imax);
+  return imax;
+}
+/*--------------------------------------------------------------------------------*/
+void find_cals(float **tot, int nchan, int period, int phase, float *cal)
+{
+  for (int i=0;i<nchan;i++) {
+    cal[i]=0;
+    for (int j=0;j<period/2;j++) 
+      cal[i]+=tot[i][ (j+phase)%period];
+    for (int j=period/2;j<period;j++)
+      cal[i]-=tot[i][(j+phase)%period];
+  }
+  float norm=0;
+  for (int i=0;i<nchan;i++)
+    norm+=cal[i];
+  norm/=nchan;
+  for (int i=0;i<nchan;i++)
+    cal[i]/=norm;
+}
+/*--------------------------------------------------------------------------------*/
+void remove_noisecal(Data *dat, int period, int apply_calib) //, float *cal_facs)
 {
   double t1=omp_get_wtime();
   float **tot=matrix(dat->raw_nchan, period);
   float **nn=matrix(dat->raw_nchan, period);
-  memset(nn[0],0,sizeof(nn[0][0]*dat->raw_nchan*period));
-  memset(tot[0],0,sizeof(nn[0][0]*dat->raw_nchan*period));
+  memset(nn[0],0,sizeof(nn[0][0])*dat->raw_nchan*period);
+  memset(tot[0],0,sizeof(tot[0][0])*dat->raw_nchan*period);
+
+
 
 #pragma omp parallel for shared(tot,nn,dat,period) default(none)
   for (int i=0;i<dat->raw_nchan;i++) {
@@ -433,26 +519,64 @@ void remove_noisecal(Data *dat, int period)
 	jj=0;
     }
   }
+  
+
   for (int i=0;i<dat->raw_nchan;i++)
     for (int j=0;j<period;j++)
       tot[i][j]/=nn[i][j];
-
+  
+  
+  if (0)  {
+    FILE *outfile=fopen("noise_cal_template.txt","w");
+    for (int i=0;i<dat->raw_nchan;i++) {
+      for (int j=0;j<period;j++)
+	fprintf(outfile,"%14.6e ",tot[i][j]);
+      fprintf(outfile,"\n");
+    }
+    fclose(outfile);
+  }
+  
 #pragma omp parallel for shared(tot,dat,period) default(none)
   for (int i=0;i<dat->raw_nchan;i++) {
     int jj=0;
     for (int j=0;j<dat->ndata;j++) {
-      dat->raw_data[i][j]-=tot[i][j%period];
+      //dat->raw_data[i][j]-=tot[i][j%period];
+      dat->raw_data[i][j]-=tot[i][jj];
       jj++;
       if (jj==period)
 	jj=0;
     }
   }
+  
+  //if (cal_facs) {
+  if (apply_calib) {
+    //printf("doing calibration in remove_noisecal.\n");
+    int my_phase=find_cal_phase(tot,dat->raw_nchan,period);
+    float *calib=vector(dat->raw_nchan);
+    find_cals(tot,dat->raw_nchan,period,my_phase,calib);
+    //FILE *outfile=fopen("my_cals.txt","w");
+    //for (int i=0;i<dat->raw_nchan;i++)
+    //  fprintf(outfile,"%12.4e\n",calib[i]);
+    //fclose(outfile);
+#pragma omp parallel for
+    for (int i=0;i<dat->raw_nchan;i++) 
+      if (calib[i]>0)
+	for (int j=0;j<dat->ndata;j++)
+	  dat->raw_data[i][j]/=calib[i];
+    free(calib);
+    
+    //memset(cal_facs,0,sizeof(cal_facs[0]*dat->raw_nchan));
+    //for (int i=0;i<dat->raw_nchan;i++) {
+    //  for (int j=0;j<period/2;j++
+    //	   }
+  }
+
   free(nn[0]);
   free(nn);
   free(tot[0]);
   free(tot);
 
-  printf("removed noisecal in %12.4f seconds.\n",omp_get_wtime()-t1);
+  //printf("removed noisecal in %12.4f seconds.\n",omp_get_wtime()-t1);
 }
 /*--------------------------------------------------------------------------------*/
 float *find_sigmas(float **mat, int n, int m)
@@ -481,14 +605,17 @@ float *find_sigmas(float **mat, int n, int m)
   return sigs;
 }
 /*--------------------------------------------------------------------------------*/
-void clean_outliers(Data *dat, float sig_thresh)
+void clean_outliers(Data *dat, float sig_thresh, float *sigs_out)
 {
   //find all points greater than sig_thresh times the standard deviation and replace with zero
   //if noise cal has already been removed, mean should be zero coming into here.
   
   double t1=omp_get_wtime();
 
+
   float *sigs=find_sigmas(dat->raw_data,dat->raw_nchan,dat->ndata);
+  if (sigs_out)
+    memcpy(sigs_out,sigs,sizeof(sigs[0])*dat->raw_nchan);
   for (int i=0;i<dat->raw_nchan;i++)
     sigs[i]*=sig_thresh;
   
@@ -500,16 +627,16 @@ void clean_outliers(Data *dat, float sig_thresh)
     }
   
   free(sigs);
-  printf("took %12.4f seconds to clean outliers.\n",omp_get_wtime()-t1);
+  //printf("took %12.4f seconds to clean outliers.\n",omp_get_wtime()-t1);
 }
 /*--------------------------------------------------------------------------------*/
 void zap_bad_channels(Data *dat, char *fname)
 {
   FILE *infile=fopen(fname,"r");
   int nbad;
-  fread(&nbad,1,sizeof(nbad),infile);
+  size_t nread=fread(&nbad,1,sizeof(nbad),infile);
   int *bad=ivector(nbad);
-  fread(bad,nbad,sizeof(bad[0]),infile);
+  nread=fread(bad,nbad,sizeof(bad[0]),infile);
   fclose(infile);
   printf("zapping %d bad channels.\n",nbad);
   for (int i=0;i<nbad;i++) {
@@ -523,16 +650,55 @@ void zap_bad_channels(Data *dat, char *fname)
   free(bad);
 }
 /*--------------------------------------------------------------------------------*/
+void sigs2weights(float *sigs, int nchan, float thresh)
+//convert channel sigmas into weights, optionally cutting low-weight channels
+{
+  float tot=0;
+  for (int i=0;i<nchan;i++) {
+    if (sigs[i]>0) {
+      sigs[i]=1./sigs[i]/sigs[i];
+      tot+=sigs[i];
+    }
+  }
+  tot/=nchan;
+  if (thresh>0)
+    for (int i=0;i<nchan;i++)
+      if (sigs[i]<tot*thresh)
+	sigs[i]=0;
+  
+}
+/*--------------------------------------------------------------------------------*/
+void apply_weights(Data *dat, float *weights)
+{
+  #pragma omp parallel for
+  for (int i=0;i<dat->raw_nchan;i++)
+    for (int j=0;j<dat->ndata;j++)
+      dat->raw_data[i][j]*=weights[i];
+  
+}
+/*--------------------------------------------------------------------------------*/
 void setup_data(Data *dat)
 {
   //clean_cols(dat);
-  //clean_rows(dat);
+
   
-  remove_noisecal(dat,NOISE_PERIOD);
-  clean_outliers(dat,SIG_THRESH);
-  remove_noisecal(dat,NOISE_PERIOD);
-  zap_bad_channels(dat,"bad_chans.dat");
+  remove_noisecal(dat,NOISE_PERIOD,1);
   
+  float *sigs=vector(dat->raw_nchan);
+  clean_outliers(dat,SIG_THRESH,sigs);
+  sigs2weights(sigs,dat->raw_nchan,0.3);
+  clean_rows(dat);
+  apply_weights(dat,sigs);
+
+  free(sigs);
+
+  //remove_noisecal(dat,NOISE_PERIOD);
+
+
+  //zap_bad_channels(dat,"bad_chans.dat");
+  
+
+
   remap_data(dat);
 
   
@@ -554,7 +720,7 @@ void copy_in_data(Data *dat, float *indata1, int ndata1, float *indata2, int nda
 {
   int npad=dat->ndata-ndata1;
   memset(dat->raw_data[0],0,dat->raw_nchan*dat->ndata*sizeof(float));
-  printf("npad is %d\n",npad);
+  //printf("npad is %d\n",npad);
   assert(ndata2>=npad);
   
   for (int i=0;i<dat->raw_nchan;i++) {
@@ -578,21 +744,22 @@ void copy_in_data(Data *dat, float *indata1, int ndata1, float *indata2, int nda
 }
 
 /*--------------------------------------------------------------------------------*/
-Dat *put_data_into_burst_struct(float *indata1, float *indata2, size_t ntime1, size_t ntime2, size_t nfreq, int *chan_map, int depth)
+Data *put_data_into_burst_struct(float *indata1, float *indata2, size_t ntime1, size_t ntime2, size_t nfreq, int *chan_map, int depth)
 {
   
   Data *dat=(Data *)calloc(1,sizeof(Data));
   dat->raw_nchan=nfreq;
   int nchan=get_nchan_from_depth(depth);
-  printf("expecting %d channels.\n",nchan);
+  //printf("expecting %d channels.\n",nchan);
   dat->nchan=nchan;
   int nextra=get_burst_nextra(ntime2,depth);
   dat->ndata=ntime1+nextra;
   dat->raw_data=matrix(dat->raw_nchan,dat->ndata);
   dat->chan_map=chan_map;
   dat->data=matrix(dat->nchan,dat->ndata);
+  copy_in_data(dat,indata1,ntime1,indata2,ntime2);
   
-  
+  return dat;
 }
 
 /*--------------------------------------------------------------------------------*/
@@ -603,50 +770,16 @@ size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
   
 
 
-  
+  Data *dat=put_data_into_burst_struct(indata1,indata2,ntime1,ntime2,nfreq,chan_map,depth);
 
-  Data *dat=(Data *)calloc(1,sizeof(Data));  
-  dat->raw_nchan=nfreq;
-  int nchan=get_nchan_from_depth(depth);
-  printf("expecting %d channels.\n",nchan);
-  dat->nchan=nchan;
-#if 1
-  int nextra=get_burst_nextra(ntime2,depth);
-#else
-  int nextra=nchan;
-  if (nextra>ntime2)
-    nextra=ntime2;
-#endif
-  dat->ndata=ntime1+nextra;
-  printf("ndata is %d\n",dat->ndata);
-  dat->raw_data=matrix(dat->raw_nchan,dat->ndata);
-  dat->chan_map=chan_map;
-  dat->data=matrix(dat->nchan,dat->ndata);
-
-  //assert(dat->ndata<=ntime1+ntime2);  //for now, make sure that the second chunk is long enough to deal with what we need.
-
-  //dat->raw_chans=(float *)malloc(sizeof(float)*dat->raw_nchan);
-  //dat->dt=delta_t;
-  //for (int i=0;i<dat->raw_nchan;i++)
-  //dat->raw_chans[i]=freq0+(0.5+i)*delta_f;
-  //map_chans(dat,depth);
-  // depth_old=depth;
-  //firsttime=0;
-  //}
-  
-
-
-  printf("copying in data %ld %ld %d.\n",ntime1,ntime2,dat->nchan);
-  copy_in_data(dat,indata1,ntime1,indata2,ntime2);
-  printf("copied.\n");
-  clean_rows(dat);
-  printf("cleaned rows.\n");
+  //clean_rows(dat);
+  //printf("cleaned rows.\n");
   setup_data(dat);
-  printf("setup data.\n");
-  printf("nchan is now %d\n",dat->nchan);
+  //printf("setup data.\n");
+  //printf("nchan is now %d\n",dat->nchan);
   dedisperse_gbt(dat,outdata);
-  printf("dedispersed.\n");
-
+  //printf("dedispersed.\n");
+  
   size_t ngood=dat->ndata-dat->nchan;
   
   free(dat->raw_data[0]);
