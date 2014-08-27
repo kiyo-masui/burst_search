@@ -27,8 +27,8 @@ size_t burst_get_num_dispersions(size_t nfreq, float freq0,
 }
 
 // Return minimum *depth* parameter required to achieve given maximum DM.
-int burst_depth_for_max_dm(float max_dm, size_t nfreq, float freq0,
-        float delta_f, float delta_t) {
+int burst_depth_for_max_dm(float max_dm, float delta_t, size_t nfreq, float freq0,
+        float delta_f) {
   int depth=2;
   int imax=20;
   int i=0;
@@ -96,8 +96,8 @@ void burst_setup_channel_mapping(CM_DTYPE *chan_map, size_t nfreq, float freq0,
 // (always less than, and usually equal to, *ntime1*).  *delta_f* may be negative.
 // Frequencies are in Hz.
 size_t burst_dm_transform(DTYPE *indata1, DTYPE *indata2, CM_DTYPE *chan_map,
-        DTYPE *outdata, size_t nfreq, float freq0, float delta_f,
-        size_t ntime1, size_t ntime2, float delta_t, int depth) {
+        DTYPE *outdata, size_t ntime1, size_t ntime2, float delta_t, size_t nfreq,
+        float freq0, float delta_f, int depth) {
   
 
   //return my_burst_dm_transform(indata1,indata2,outdata,ntime1,ntime2,delta_t,nfreq,chan_map,depth);

@@ -24,9 +24,9 @@ def search_file(filename):
     hdulist = pyfits.open(filename, 'readonly')
 
     parameters = parameters_from_header(hdulist)
-    print parameters
+    #print parameters
 
-    Transform = dedisperse.DMTransform(
+    Transformer = dedisperse.DMTransform(
             parameters['delta_t'],
             parameters['nfreq'],
             parameters['freq0'],
@@ -40,13 +40,16 @@ def search_file(filename):
     nrecords = len(hdulist[1].data)
 
     for ii in xrange(0, nrecords, nrecords_block):
+        print ii,
+        # Read.
         data = read_records(hdulist, ii, ii + nrecords_block)
+        # Preprocess.
         preprocess.noisecal_bandpass(data, 1., parameters['cal_period'])
         preprocess.remove_outliers(data, 5)
         preprocess.remove_noisy_freq(data, 3)
 
-        # dedisperse.
-        dm_data = Transform(data)
+        # Dispersion measure transform.
+        dm_data = Transformer(data)
 
         # Search for events.
 
