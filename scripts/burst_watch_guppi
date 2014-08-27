@@ -26,7 +26,7 @@ parser.add_argument("parameter_file", metavar="parameter file", type=str,
                     help="YAML file with setup parameters.")
 parser.add_argument(
     "--search-dir",
-    nargs=1,
+    #nargs=1,
     help=("Directory containing data to be searched or for"
           " new data. Overrides the value provied in parameter file."),
     )
