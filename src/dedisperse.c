@@ -73,7 +73,7 @@ void burst_setup_channel_mapping(CM_DTYPE *chan_map, size_t nfreq, float freq0,
     out_chans[i]=l0+dl*i;
   
   for (i=0;i<nfreq;i++) {
-    float myl=1.0/(freq0+(0.5+i)*i);
+    float myl=1.0/(freq0+(0.5+i)*delta_f);
     myl=myl*myl;
     int jmin=-1;
     float minerr=1e30;
