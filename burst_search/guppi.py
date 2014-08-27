@@ -13,8 +13,9 @@ from . import dedisperse
 
 
 # XXX Eventually a parameter, seconds.
-#TIME_BLOCK = 30.
-TIME_BLOCK = 1.
+TIME_BLOCK = 30.
+
+MAX_DM = 4000.
 
 
 def search_file(filename):
@@ -23,9 +24,15 @@ def search_file(filename):
     hdulist = pyfits.open(filename, 'readonly')
 
     parameters = parameters_from_header(hdulist)
+    print parameters
 
-    # Would set up dedispersion class here using info from parameters
-    # dictionary.
+    Transform = dedisperse.DMTransform(
+            parameters['delta_t'],
+            parameters['nfreq'],
+            parameters['freq0'],
+            parameters['delta_f'],
+            MAX_DM,
+            )
 
     record_length = parameters['ntime_record'] * parameters['delta_t']
     nrecords_block = int(math.ceil(TIME_BLOCK / record_length))
@@ -39,6 +46,7 @@ def search_file(filename):
         preprocess.remove_noisy_freq(data, 3)
 
         # dedisperse.
+        dm_data = Transform(data)
 
         # Search for events.
 
@@ -64,8 +72,8 @@ def parameters_from_header(hdulist):
     parameters['cal_period'] = 64
     parameters['delta_t'] = 0.001024
     parameters['nfreq'] = 4096
-    parameters['freq0'] = 900e6
-    parameters['delta_f'] = -200e6 / 4096
+    parameters['freq0'] = 900.
+    parameters['delta_f'] = -200. / 4096
     parameters['npol'] = 4
 
     record0 = hdulist[1].data[0]
