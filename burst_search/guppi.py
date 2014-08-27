@@ -18,13 +18,24 @@ TIME_BLOCK = 30.
 MAX_DM = 4000.
 
 
-def search_file(filename):
+def search_file(filename, cal_spec=None):
     """Simple dirver function to search a GUPPI file."""
 
     hdulist = pyfits.open(filename, 'readonly')
 
     parameters = parameters_from_header(hdulist)
     #print parameters
+
+    nfreq = parameters['nfreq']
+    if not cal_spec is None:
+        # TODO Should really check that the frequency axes match exactly, or
+        # interpolate.
+        if len(cal_spec) != nfreq:
+            msg = "Noise cal spectrum frequncy axis does not match the data."
+            raise ValueError(msg)
+        cal_spec = cal_spec["cal_T"]
+    else:
+        cal_spec = 1.
 
     Transformer = dedisperse.DMTransform(
             parameters['delta_t'],
@@ -38,13 +49,17 @@ def search_file(filename):
     nrecords_block = int(math.ceil(TIME_BLOCK / record_length))
 
     nrecords = len(hdulist[1].data)
+    #nu = np.arange(nfreq) * parameters['delta_f'] + 900
 
     for ii in xrange(0, nrecords, nrecords_block):
         print ii,
         # Read.
         data = read_records(hdulist, ii, ii + nrecords_block)
         # Preprocess.
-        preprocess.noisecal_bandpass(data, 1., parameters['cal_period'])
+        #plt.plot(nu, np.std(data, 0) * nu)
+        preprocess.noisecal_bandpass(data, cal_spec, parameters['cal_period'])
+        #plt.plot(nu, np.std(data, 0) * nu)
+        #plt.show()
         preprocess.remove_outliers(data, 5)
         preprocess.remove_noisy_freq(data, 3)
 
