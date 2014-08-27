@@ -13,6 +13,7 @@ if VERSION_DEV:
 
 
 COMPILE_FLAGS = ['-Ofast', '-march=native', '-std=c99', '-fopenmp']
+LINK_FLAGS = ['-fopenmp']
 MACROS = [
     ('BURST_VERSION_MAJOR', VERSION_MAJOR),
     ('BURST_VERSION_MINOR', VERSION_MINOR),
@@ -25,11 +26,13 @@ INCLUDE_DIRS = []
 
 ext_dedisperse = Extension(
     "burst_search.dedisperse",
-    ["burst_search/dedisperse.pyx", "src/dedisperse.c",],
+    ["burst_search/dedisperse.pyx", "src/dedisperse.c",
+        "src/dedisperse_gbt.c"],
     include_dirs=INCLUDE_DIRS + [np.get_include(), "src/"],
     library_dirs = LIBRARY_DIRS,
-    #depends=["src/dedisperse.h",],
+    depends=["src/dedisperse.h", "dedisperse_gbt.h"],
     extra_compile_args=COMPILE_FLAGS,
+    extra_link_args=LINK_FLAGS,
     define_macros=MACROS,
     )
 

@@ -19,16 +19,16 @@
 #include "dedisperse.h"
 
 
+
 // For allocating output buffer.
 size_t burst_get_num_dispersions(size_t nfreq, float freq0,
-                           float delta_f, int depth) {
-  //return 10;
+        float delta_f, int depth) {
   return get_nchan_from_depth(depth);
 }
 
 // Return minimum *depth* parameter required to achieve given maximum DM.
 int burst_depth_for_max_dm(float max_dm, size_t nfreq, float freq0,
-                            float delta_f, float delta_t) {
+        float delta_f, float delta_t) {
   int depth=2;
   int imax=20;
   int i=0;
@@ -50,7 +50,9 @@ int burst_depth_for_max_dm(float max_dm, size_t nfreq, float freq0,
 //but is also static, pre-calculate it and put the mapping into chan_map.
 //chan_map should be pre-allocated, with at least 2**depth elements
 
-void setup_channel_mapping(size_t nfreq, float freq0, float delta_f,int depth, int *chan_map) 
+// If chan_map is an array of indeces, should it not be typed `size_t *`? -KM
+void burst_setup_channel_mapping(CM_DTYPE *chan_map, size_t nfreq, float freq0,
+        float delta_f, int depth)
 {
   int nchan=get_nchan_from_depth(depth);
   int i,j;
@@ -78,8 +80,8 @@ void setup_channel_mapping(size_t nfreq, float freq0, float delta_f,int depth, i
     for (j=0;j<nchan;j++) {
       float curerr=fabs(myl-out_chans[j]);
       if (curerr<minerr) {
-	minerr=curerr;
-	jmin=j;
+        minerr=curerr;
+        jmin=j;
       }
     }
     chan_map[i]=jmin;
@@ -89,21 +91,13 @@ void setup_channel_mapping(size_t nfreq, float freq0, float delta_f,int depth, i
 }
 
 
-<<<<<<< HEAD
-// If chan_map is an array of indeces, should it not be typed `size_t *`? -KM
-// Is the length of `chan_map` `nfreq` or `ndispersions`? -KM
-void burst_setup_channel_mapping(int *chan_map, size_t nfreq, float freq0,
-        float delta_f, int depth) {
-}
 
-=======
->>>>>>> master
 // *ntime2* is allowed to be 0.  Return number of valid dedispersed time samples,
 // (always less than, and usually equal to, *ntime1*).  *delta_f* may be negative.
 // Frequencies are in Hz.
-size_t burst_dm_transform(float *indata1, float *indata2, float *outdata,
-                  size_t nfreq, float freq0, float delta_f,
-			  size_t ntime1, size_t ntime2, float delta_t, int depth) {
+size_t burst_dm_transform(DTYPE *indata1, DTYPE *indata2, CM_DTYPE *chan_map,
+        DTYPE *outdata, size_t nfreq, float freq0, float delta_f,
+        size_t ntime1, size_t ntime2, float delta_t, int depth) {
   
 
   //return my_burst_dm_transform(indata1,indata2,outdata,ntime1,ntime2,delta_t,nfreq,chan_map,depth);
