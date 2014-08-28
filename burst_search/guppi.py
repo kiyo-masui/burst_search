@@ -55,22 +55,24 @@ def search_file(filename, cal_spec=None):
         print ii,
         # Read.
         data = read_records(hdulist, ii, ii + nrecords_block)
-        # Preprocess.
-        #plt.plot(nu, np.std(data, 0) * nu)
-        preprocess.noisecal_bandpass(data, cal_spec, parameters['cal_period'])
-        #plt.plot(nu, np.std(data, 0) * nu)
-        #plt.show()
-        preprocess.remove_outliers(data, 5)
-        preprocess.remove_noisy_freq(data, 3)
+        if (1):
+            # Preprocess.
+            #plt.plot(nu, np.std(data, 0) * nu)
+            preprocess.noisecal_bandpass(data, cal_spec, parameters['cal_period'])
+            #plt.plot(nu, np.std(data, 0) * nu)
+            #plt.show()
+            preprocess.remove_outliers(data, 5)
+            preprocess.remove_noisy_freq(data, 3)
+            
+            # Dispersion measure transform.
 
-        # Dispersion measure transform.
         dm_data = Transformer(data)
 
         # Search for events.
-
+        
 
     hdulist.close()
-
+    return dm_data
 
 def parameters_from_header(hdulist):
     """Get data acqusition parameters for psrfits file header.

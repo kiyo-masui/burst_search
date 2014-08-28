@@ -1,5 +1,6 @@
 
-#define CM_DTYPE int64_t
+#define CM_DTYPE size_t
+//#define CM_DTYPE int64_t
 #define DTYPE float
 
 size_t burst_get_num_dispersions(size_t nfreq, float freq0,float delta_f, int depth);
