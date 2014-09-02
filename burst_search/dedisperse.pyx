@@ -165,7 +165,7 @@ class DMTransform(object):
         chan_map = self._chan_map
 
         cdef np.ndarray[ndim=2, dtype=DTYPE_t] out
-        out = np.empty(shape=(ntime1, ndm), dtype=DTYPE)
+        out = np.empty(shape=(ndm, ntime1), dtype=DTYPE)
 
         cdef int ntime_out = burst_dm_transform(
                 <DTYPE_t *> data1.data,
@@ -181,7 +181,7 @@ class DMTransform(object):
                 depth,
                 )
 
-        return out[:ntime_out,:]
+        return np.ascontiguousarray(out[:,:ntime_out])
 
 
 

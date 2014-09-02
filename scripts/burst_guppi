@@ -38,6 +38,8 @@ if __name__ == "__main__":
         cal_spec = None
 
     for filename in args.files:
-        guppi.search_file(filename, cal_spec)
+        Searcher = guppi.FileSearch(filename)
+        Searcher.set_cal_spectrum(cal_spec)
+        Searcher.search_all_records()
 
 
