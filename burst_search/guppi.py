@@ -59,7 +59,9 @@ class FileSearch(object):
         self._cal_spec = cal_spec["cal_T"]
 
     def search_records(self, start_record, end_record):
+        dm_data = self.dm_transform_records(start_record, end_record)
 
+    def dm_transform_records(self, start_record, end_record):
         parameters = self._parameters
 
         hdulist = pyfits.open(self._filename, 'readonly')
@@ -92,7 +94,10 @@ class FileSearch(object):
         nrecords = self._nrecords
 
         for ii in xrange(0, nrecords, nrecords_block):
-            dm_data = self.search_records(ii, ii + nrecords_block)
+            # XXX
+            print ii
+
+            self.search_records(ii, ii + nrecords_block)
 
 
 def parameters_from_header(hdulist):
