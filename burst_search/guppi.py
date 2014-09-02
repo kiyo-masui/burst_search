@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 
 from . import preprocess
 from . import dedisperse
+from . import search
 
 
 # XXX Eventually a parameter, seconds.
@@ -39,6 +40,9 @@ class FileSearch(object):
         self._nrecords = len(hdulist[1].data)
         self._cal_spec = 1.
 
+        self.set_search_method()
+        self.set_trigger_action()
+
         hdulist.close()
 
     def set_cal_spectrum(self, cal_spec):
@@ -58,8 +62,26 @@ class FileSearch(object):
             raise ValueError(msg)
         self._cal_spec = cal_spec["cal_T"]
 
+    def set_search_method(self, method='basic', **kwargs):
+        if method == 'basic':
+            self._search = lambda dm_data : search.basic(dm_data)
+        else:
+            msg = "Unrecognized search method."
+            raise ValueError(msg)
+
+    def set_trigger_action(self, action='print', **kwargs):
+        if action == 'print':
+            def action_fun(triggers, dm_data):
+                print triggers
+            self._action = action_fun
+        else:
+            msg = "Unrecognized trigger action."
+            raise ValueError(msg)
+
     def search_records(self, start_record, end_record):
         dm_data = self.dm_transform_records(start_record, end_record)
+        triggers = self._search(dm_data)
+        self._action(triggers, dm_data)
 
     def dm_transform_records(self, start_record, end_record):
         parameters = self._parameters
