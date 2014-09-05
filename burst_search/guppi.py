@@ -79,9 +79,9 @@ class FileSearch(object):
             raise ValueError(msg)
 
     def search_records(self, start_record, end_record):
-        dm_data = self.dm_transform_records(start_record, end_record)
-        triggers = self._search(dm_data)
-        self._action(triggers, dm_data)
+        data = self.dm_transform_records(start_record, end_record)
+        triggers = self._search(data)
+        self._action(triggers, data)
 
     def dm_transform_records(self, start_record, end_record):
         parameters = self._parameters

@@ -80,6 +80,71 @@ def dm_transform(
     return out[:ntime_out,:]
 
 
+class DMData(object):
+    """Container for spectra and DM space data.
+
+    """
+
+    @property
+    def spec_data(self):
+        return self._spec_data
+
+    @property
+    def dm_data(self):
+        return self._dm_data
+
+    @property
+    def delta_t(self):
+        return self._delta_t
+
+    @property
+    def freq0(self):
+        return self._freq0
+
+    @property
+    def delta_f(self):
+        return self._delta_f
+
+    @property
+    def dm0(self):
+        return self._dm0
+
+    @property
+    def delta_dm(self):
+        return self._delta_dm
+
+    def __init__(self, spec_data, dm_data, delta_t, freq0, delta_f, dm0, delta_dm):
+        self._spec_data = spec_data
+        self._dm_data = dm_data
+        self._delta_t = delta_t
+        self._freq0 = freq0
+        self._delta_f = delta_f
+        self._dm0 = dm0
+        self._delta_dm = delta_dm
+
+    @classmethod
+    def from_hdf5(cls, group):
+        delta_t = group.attrs['delta_t']
+        freq0 = group.attrs['freq0']
+        delta_f = group.attrs['delta_f']
+        dm0 = group.attrs['dm0']
+        delta_dm = group.attrs['delta_dm']
+        spec_data = group['spec_data'][:]
+        dm_data = group['dm_data'][:]
+        return cls(spec_data, dm_data, delta_t, freq0, delta_f, dm0, delta_dm)
+
+
+    def to_hdf5(self, group):
+        group.attrs['delta_t'] = self.delta_t
+        group.attrs['freq0'] = self.freq0
+        group.attrs['delta_f'] = self.delta_f
+        group.attrs['dm0'] = self.dm0
+        group.attrs['delta_dm'] = self.delta_dm
+        group.create_dataset('spec_data', data=self.spec_data)
+        group.create_dataset('dm_data', data=self.dm_data)
+
+
+
 class DMTransform(object):
     """Performs dispersion measure transforms."""
 
@@ -181,7 +246,17 @@ class DMTransform(object):
                 depth,
                 )
 
-        return np.ascontiguousarray(out[:,:ntime_out])
+        dm_data = np.ascontiguousarray(out[:,:ntime_out])
+        spec_data = np.ascontiguousarray(data1[:ntime_out, :])
+
+        # XXX Probably not exactly right.
+        dm0 = 0
+        delta_dm = self.max_dm / ndm
+
+        out_cont = DMData(spec_data, dm_data, delta_t, freq0, delta_f, dm0,
+                          delta_dm)
+
+        return out_cont
 
 
 
