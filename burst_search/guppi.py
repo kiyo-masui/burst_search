@@ -71,15 +71,24 @@ class FileSearch(object):
 
     def set_trigger_action(self, action='print', **kwargs):
         if action == 'print':
-            def action_fun(triggers, dm_data):
+            def action_fun(triggers, data):
                 print triggers
             self._action = action_fun
         else:
             msg = "Unrecognized trigger action."
             raise ValueError(msg)
 
+    def set_dedispersed_h5(self, group=None):
+        """Set h5py group to which to write dedispersed data."""
+
+        self._dedispersed_out_group = group
+
     def search_records(self, start_record, end_record):
         data = self.dm_transform_records(start_record, end_record)
+        if self._dedispersed_out_group:
+            g = self._dedispersed_out_group.create_group("%d-%d"
+                    % (start_record, end_record))
+            data.to_hdf5(g)
         triggers = self._search(data)
         self._action(triggers, data)
 
