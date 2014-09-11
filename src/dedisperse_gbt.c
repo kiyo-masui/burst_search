@@ -8,7 +8,7 @@
 
 #define DM0 4000.0
 #define NOISE_PERIOD 64
-#define SIG_THRESH 3.0
+#define SIG_THRESH 30.0
 
 #include "dedisperse_gbt.h"
 
@@ -27,6 +27,15 @@ int *ivector(int n)
   int *vec=(int *)malloc(sizeof(int)*n);
   assert(vec);
   memset(vec,0,n*sizeof(int));
+  return vec;
+}
+
+/*--------------------------------------------------------------------------------*/
+size_t *stvector(int n)
+{
+  size_t *vec=(size_t *)malloc(sizeof(size_t)*n);
+  assert(vec);
+  memset(vec,0,n*sizeof(size_t));
   return vec;
 }
 
@@ -160,7 +169,7 @@ Data *map_chans(Data *dat, int depth)
     //dat->chans[i]=1.0/sqrt(l1+(double)i*dlam);
     dat->chans[i]=1.0/sqrt(l2-(double)i*dlam);
   }
-  dat->chan_map=ivector(dat->raw_nchan);
+  dat->chan_map=stvector(dat->raw_nchan);
   
   for (int i=0;i<dat->raw_nchan;i++)  {
     float min_err=1e30;
@@ -184,7 +193,7 @@ void remap_data( Data *dat)
 {						
   double t0=omp_get_wtime();
   assert(dat->chan_map);
-  memset(dat->data[0],0,sizeof(dat->data[0][0])*dat->nchan*dat->ndata);
+  memset(dat->data[0],0,sizeof(dat->data[0][0])*dat->nchan*dat->ndata);  
   for (int i=0;i<dat->raw_nchan;i++) {
     int ii=dat->chan_map[i];
     for (int j=0;j<dat->ndata;j++)
@@ -323,7 +332,30 @@ void dedisperse_block_kernel_2pass(const float **in, float **out, int n, int m)
     }
   }
 }
+/*--------------------------------------------------------------------------------*/
 
+void dedisperse_single(float **inin, float **outout, int nchan,int ndat)
+{
+  int npass=get_npass(nchan);
+  //printf("need %d passes.\n",npass);
+  //npass=2;
+  int bs=nchan;
+  float **in=inin;
+  float **out=outout;
+
+  for (int i=0;i<npass;i++) {    
+#pragma omp parallel for
+    for (int j=0;j<nchan;j+=bs) {
+      dedisperse_kernel(in+j,out+j,bs,ndat);
+    }
+    bs/=2;
+    float **tmp=in;
+    in=out;
+    out=tmp;
+  }
+  memcpy(out[0],in[0],nchan*ndat*sizeof(float));
+  
+}
 /*--------------------------------------------------------------------------------*/
 
 void dedisperse_dual(float **inin, float **outout, int nchan,int ndat)
@@ -377,10 +409,23 @@ void dedisperse_gbt(Data *dat, float *outdata)
   
   memset(tmp[0],0,sizeof(tmp[0][0])*dat->ndata*dat->nchan);
   double t1=omp_get_wtime();
-  dedisperse_dual(dat->data,tmp,dat->nchan,dat->ndata);  
+  //dedisperse_dual(dat->data,tmp,dat->nchan,dat->ndata);  
+  dedisperse_single(dat->data,tmp,dat->nchan,dat->ndata);  
+  
   //printf("took %12.4f seconds to dedisperse.\n",omp_get_wtime()-t1);
   memcpy(outdata,dat->data[0],dat->nchan*dat->ndata*sizeof(outdata[0]));
+
+
   free(tmp);
+
+  if (0) {
+    printf("element 500,300 is %12.5e\n",dat->data[500][300]);
+    FILE *outfile=fopen("burst_dump.dat","w");
+    fwrite(&(dat->nchan),sizeof(dat->nchan),1,outfile);
+    fwrite(&(dat->ndata),sizeof(dat->ndata),1,outfile);
+    fwrite(outdata,sizeof(outdata[0]),dat->nchan*dat->ndata,outfile);
+    fclose(outfile);
+  }
 }
 /*--------------------------------------------------------------------------------*/
 void clean_cols(Data *dat)
@@ -623,7 +668,7 @@ void clean_outliers(Data *dat, float sig_thresh, float *sigs_out)
   for (int i=0;i<dat->raw_nchan;i++)
     for (int j=0;j<dat->ndata;j++) {
       if (dat->raw_data[i][j]>sigs[i])
-	dat->raw_data[i][j]=0;
+	dat->raw_data[i][j]=0;       
     }
   
   free(sigs);
@@ -684,14 +729,15 @@ void setup_data(Data *dat)
   
   remove_noisecal(dat,NOISE_PERIOD,1);
   
-  float *sigs=vector(dat->raw_nchan);
-  clean_outliers(dat,SIG_THRESH,sigs);
-  sigs2weights(sigs,dat->raw_nchan,0.3);
-  clean_rows(dat);
-  apply_weights(dat,sigs);
-
-  free(sigs);
-
+  if (1) {
+    float *sigs=vector(dat->raw_nchan);
+    clean_outliers(dat,SIG_THRESH,sigs);
+    sigs2weights(sigs,dat->raw_nchan,0.3);
+    clean_rows(dat);
+    apply_weights(dat,sigs);
+    
+    free(sigs);
+  }
   //remove_noisecal(dat,NOISE_PERIOD);
 
 
@@ -727,24 +773,29 @@ void copy_in_data(Data *dat, float *indata1, int ndata1, float *indata2, int nda
     for (int j=0;j<ndata1;j++) {
       //this line changes depending on memory ordering of input data
       //dat->raw_data[i*dat->ndata+j]=indata1[i*ndata1+j];      
-      //dat->raw_data[i][j]=indata1[i*ndata1+j];      
 
+
+      //dat->raw_data[i][j]=indata1[i*ndata1+j];      
       dat->raw_data[i][j]=indata1[j*dat->raw_nchan+i];
+
+
       //dat->raw_data[i][j]=0;
     }
     for (int j=0;j<npad;j++) {
       //this line also changes depending on memory ordering of input data
       //dat->raw_data[i*dat->ndata+ndata1+j]=indata2[i*ndata2+j];
 
-      //dat->raw_data[i][ndata1+j]=indata2[i+dat->raw_nchan*j];
+
+      //dat->raw_data[i][ndata1+j]=indata2[i*ndata2+j];
       dat->raw_data[i][ndata1+j]=indata2[i+j*dat->raw_nchan];
-      //dat->raw_data[i][ndata1+j]=0;
+      
     }
   }
+  //printf("data are put inside.\n");
 }
 
 /*--------------------------------------------------------------------------------*/
-Data *put_data_into_burst_struct(float *indata1, float *indata2, size_t ntime1, size_t ntime2, size_t nfreq, int *chan_map, int depth)
+Data *put_data_into_burst_struct(float *indata1, float *indata2, size_t ntime1, size_t ntime2, size_t nfreq, size_t *chan_map, int depth)
 {
   
   Data *dat=(Data *)calloc(1,sizeof(Data));
@@ -765,21 +816,24 @@ Data *put_data_into_burst_struct(float *indata1, float *indata2, size_t ntime1, 
 /*--------------------------------------------------------------------------------*/
 size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
 			     size_t ntime1, size_t ntime2, float delta_t,
-			     size_t nfreq, int *chan_map, int depth) 
+			     size_t nfreq, size_t *chan_map, int depth) 
 {
-  
 
-
+  double t1=omp_get_wtime();
   Data *dat=put_data_into_burst_struct(indata1,indata2,ntime1,ntime2,nfreq,chan_map,depth);
-
-  //clean_rows(dat);
-  //printf("cleaned rows.\n");
-  setup_data(dat);
-  //printf("setup data.\n");
-  //printf("nchan is now %d\n",dat->nchan);
-  dedisperse_gbt(dat,outdata);
-  //printf("dedispersed.\n");
   
+
+  //setup_data does a bunch of cleaning, like removal of noise-cal, glitch finding, 
+  //calibration off the noise cal, channel weighting...  If that has been done, just
+  //call remap_data which will copy the data to where it needs to go.
+
+  //setup_data(dat);
+  remap_data(dat);
+
+
+
+  dedisperse_gbt(dat,outdata);
+
   size_t ngood=dat->ndata-dat->nchan;
   
   free(dat->raw_data[0]);
@@ -788,7 +842,8 @@ size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
   free(dat->data);
   free(dat);
 
-  return ngood;
+  //return ngood;
+  return dat->ndata;
 
 }
 

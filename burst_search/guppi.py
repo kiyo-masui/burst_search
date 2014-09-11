@@ -40,7 +40,8 @@ def search_file(filename):
     nrecords = len(hdulist[1].data)
 
     for ii in xrange(0, nrecords, nrecords_block):
-        print ii,
+        #print ii,
+        print(ii)
         # Read.
         data = read_records(hdulist, ii, ii + nrecords_block)
         # Preprocess.

@@ -100,7 +100,14 @@ size_t burst_dm_transform(DTYPE *indata1, DTYPE *indata2, CM_DTYPE *chan_map,
         float freq0, float delta_f, int depth) {
   
 
-  //return my_burst_dm_transform(indata1,indata2,outdata,ntime1,ntime2,delta_t,nfreq,chan_map,depth);
+  //printf("hello! %d\n",nfreq);
+  //printf("depth is %d\n",depth);
+  //for (int i=0;i<3;i++)
+  //  printf("chan_map[%2d]=%d\n",i,chan_map[i]);
+  //for (int i=nfreq-3;i<nfreq;i++)
+  //  printf("chan_map[%2d]=%d\n",i,chan_map[i]);
+  
+  return my_burst_dm_transform(indata1,indata2,outdata,ntime1,ntime2,delta_t,nfreq,chan_map,depth);
 
-  return 8;
+  //return 8;
 }
