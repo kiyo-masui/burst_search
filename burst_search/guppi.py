@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 
 from . import preprocess
 from . import dedisperse
+from . import search
 
 
 # XXX Eventually a parameter, seconds.
@@ -18,44 +19,116 @@ TIME_BLOCK = 30.
 MAX_DM = 4000.
 
 
-def search_file(filename):
-    """Simple dirver function to search a GUPPI file."""
+class FileSearch(object):
 
-    hdulist = pyfits.open(filename, 'readonly')
+    def __init__(self, filename):
+        self._filename = filename
+        hdulist = pyfits.open(filename, 'readonly')
 
-    parameters = parameters_from_header(hdulist)
-    #print parameters
+        parameters = parameters_from_header(hdulist)
+        #print parameters
+        self._parameters = parameters
 
-    Transformer = dedisperse.DMTransform(
-            parameters['delta_t'],
-            parameters['nfreq'],
-            parameters['freq0'],
-            parameters['delta_f'],
-            MAX_DM,
-            )
+        self._Transformer = dedisperse.DMTransform(
+                parameters['delta_t'],
+                parameters['nfreq'],
+                parameters['freq0'],
+                parameters['delta_f'],
+                MAX_DM,
+                )
 
-    record_length = parameters['ntime_record'] * parameters['delta_t']
-    nrecords_block = int(math.ceil(TIME_BLOCK / record_length))
+        self._nrecords = len(hdulist[1].data)
+        self._cal_spec = 1.
 
-    nrecords = len(hdulist[1].data)
+        self.set_search_method()
+        self.set_trigger_action()
 
-    for ii in xrange(0, nrecords, nrecords_block):
-        #print ii,
-        print(ii)
-        # Read.
-        data = read_records(hdulist, ii, ii + nrecords_block)
-        # Preprocess.
-        preprocess.noisecal_bandpass(data, 1., parameters['cal_period'])
-        preprocess.remove_outliers(data, 5)
-        preprocess.remove_noisy_freq(data, 3)
+        hdulist.close()
+
+    def set_cal_spectrum(self, cal_spec):
+        """Set spectrum of the noise-cal for band-pass calibration.
+
+        Parameters
+        ----------
+        cal_spec : 1D record array with records 'freq' and 'cal_T'.
+
+        """
+
+        nfreq = self._parameters['nfreq']
+        # TODO Should really check that the frequency axes match exactly, or
+        # interpolate/extrapolate.
+        if len(cal_spec) != nfreq:
+            msg = "Noise cal spectrum frequncy axis does not match the data."
+            raise ValueError(msg)
+        self._cal_spec = cal_spec["cal_T"]
+
+    def set_search_method(self, method='basic', **kwargs):
+        if method == 'basic':
+            self._search = lambda dm_data : search.basic(dm_data)
+        else:
+            msg = "Unrecognized search method."
+            raise ValueError(msg)
+
+    def set_trigger_action(self, action='print', **kwargs):
+        if action == 'print':
+            def action_fun(triggers, data):
+                print triggers
+            self._action = action_fun
+        else:
+            msg = "Unrecognized trigger action."
+            raise ValueError(msg)
+
+    def set_dedispersed_h5(self, group=None):
+        """Set h5py group to which to write dedispersed data."""
+
+        self._dedispersed_out_group = group
+
+    def search_records(self, start_record, end_record):
+        data = self.dm_transform_records(start_record, end_record)
+        if self._dedispersed_out_group:
+            g = self._dedispersed_out_group.create_group("%d-%d"
+                    % (start_record, end_record))
+            data.to_hdf5(g)
+        triggers = self._search(data)
+        self._action(triggers, data)
+
+    def dm_transform_records(self, start_record, end_record):
+        parameters = self._parameters
+
+        hdulist = pyfits.open(self._filename, 'readonly')
+        data = read_records(hdulist, start_record, end_record)
+        hdulist.close()
+
+        if (True):
+            # Preprocess.
+            #plt.plot(nu, np.std(data, 0) * nu)
+            preprocess.noisecal_bandpass(data, self._cal_spec,
+                                         parameters['cal_period'])
+            #plt.plot(nu, np.std(data, 0) * nu)
+            #plt.show()
+
+            # Place holder for functions that do things.
+            preprocess.remove_outliers(data, 5)
+            preprocess.remove_noisy_freq(data, 3)
 
         # Dispersion measure transform.
-        dm_data = Transformer(data)
+        dm_data = self._Transformer(data)
 
-        # Search for events.
+        return dm_data
 
+    def search_all_records(self, time_block=TIME_BLOCK):
 
-    hdulist.close()
+        parameters = self._parameters
+
+        record_length = (parameters['ntime_record'] * parameters['delta_t'])
+        nrecords_block = int(math.ceil(time_block / record_length))
+        nrecords = self._nrecords
+
+        for ii in xrange(0, nrecords, nrecords_block):
+            # XXX
+            print ii
+
+            self.search_records(ii, ii + nrecords_block)
 
 
 def parameters_from_header(hdulist):
@@ -113,8 +186,3 @@ def read_records(hdulist, start_record=0, end_record=None):
     return out_data
 
 
-
-
-# This wants to be a class for sure.
-def monitor_file(filename, time_block):
-    """Monitor GUPPI file for new data and process in chunks."""

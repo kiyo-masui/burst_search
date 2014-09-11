@@ -830,8 +830,6 @@ size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
   //setup_data(dat);
   remap_data(dat);
 
-
-
   dedisperse_gbt(dat,outdata);
 
   size_t ngood=dat->ndata-dat->nchan;
