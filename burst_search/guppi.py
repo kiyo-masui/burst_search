@@ -147,13 +147,14 @@ def parameters_from_header(hdulist):
 
     # XXX For now just fake it.
     parameters['cal_period'] = 64
-    parameters['delta_t'] = 0.001024
+    parameters['delta_t'] = hdulist[1].header['TBIN']
     parameters['nfreq'] = 4096
     parameters['freq0'] = 900.
     parameters['delta_f'] = -200. / 4096
     parameters['npol'] = 4
 
     record0 = hdulist[1].data[0]
+    #print record0
     data0 = record0["DATA"]
     #freq = record0["DAT_FREQ"]
     ntime_record, npol, nfreq, one = data0.shape
