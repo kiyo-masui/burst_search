@@ -814,6 +814,233 @@ Data *put_data_into_burst_struct(float *indata1, float *indata2, size_t ntime1, 
 }
 
 /*--------------------------------------------------------------------------------*/
+
+void find_4567_peaks_wnoise(float *vec, int nsamp, Peak *peak4, Peak *peak5, Peak *peak6, Peak *peak7)
+{
+  float s4=0,s5=0,s6=0,s7=0;
+  float v4=0,v5=0,v6=0,v7=0;
+  peak4->ind=0;
+  peak5->ind=0;
+  peak6->ind=0;
+  peak7->ind=0;
+  float cur4=vec[2]+vec[3]+vec[4]+vec[5];
+  peak4->peak=cur4;
+  peak5->peak=cur4+vec[6];
+  float cur6=vec[0]+vec[1]+cur4;
+  peak6->peak=cur6;
+  peak7->peak=cur6+vec[6];
+  for (int i=6;i<nsamp;i++) {
+    cur4=cur4+vec[i];
+    s5+=cur4;
+    v5+=cur4*cur4;
+    if (cur4>peak5->peak) {
+      peak5->peak=cur4;
+      peak5->ind=i;
+    }
+
+    cur4=cur4-vec[i-4];
+    s4+=cur4;
+    v4+=cur4*cur4;
+    if (cur4>peak4->peak) {
+      peak4->peak=cur4;
+      peak4->ind=i;
+    }
+
+    cur6=cur6+vec[i];
+    s7+=cur6;
+    v7+=cur6*cur6;
+    if (cur6>peak7->peak) {
+      peak7->peak=cur6;
+      peak7->ind=i;
+    }
+
+    cur6=cur6-vec[i-6];
+    s6+=cur6;
+    v6+=cur6*cur6;
+    if (cur6>peak6->peak) {
+      peak6->peak=cur6;
+      peak6->ind=i;
+    }
+
+  }
+  float n4,n5,n6,n7;
+  s4/=(nsamp-7);
+  s5/=(nsamp-7);
+  s6/=(nsamp-7);
+  s7/=(nsamp-7);
+  v4/=(nsamp-7);
+  v5/=(nsamp-7);
+  v6/=(nsamp-7);
+  v7/=(nsamp-7);
+
+  n4=sqrt(v4-s4*s4);
+  n5=sqrt(v5-s5*s5);
+  n6=sqrt(v6-s6*s6);
+  n7=sqrt(v7-s7*s7);
+
+  peak4->snr=(peak4->peak-s4)/n4;
+  peak5->snr=(peak5->peak-s5)/n5;
+  peak6->snr=(peak6->peak-s6)/n6;
+  peak7->snr=(peak7->peak-s7)/n7;
+
+  peak4->noise=n4;
+  peak5->noise=n5;
+  peak6->noise=n6;
+  peak7->noise=n7;
+}
+
+/*--------------------------------------------------------------------------------*/
+
+
+Peak find_peaks_wnoise_onedm(float *vec, int nsamples, int max_depth, int cur_depth)
+{
+
+  int wt=1<<cur_depth;
+
+
+
+  Peak best;  
+  best.snr=0;
+  best.peak=0;
+  //do the 1/2/3 sample case on the first pass through
+  if (cur_depth==0) {
+    float best1=0;
+    float best2=0;
+    float best3=0;
+    float s1=0,s2=0,s3=0;
+    float v1=0,v2=0,v3=0;
+    int i1=0,i2=0,i3=0;
+    float tmp=vec[0]+vec[1];
+    best1=vec[0];
+    if (vec[1]>best1)
+      best1=vec[1];
+    for (int i=2;i<nsamples;i++) {
+      if (vec[i]>best1) {
+	best1=vec[i];
+	i1=i;
+      }
+      s1+=vec[i];
+      v1+=vec[i]*vec[i];
+      tmp+=vec[i];
+      if (tmp>best3) {
+	best3=tmp;
+	i3=i;
+      }
+      s3+=tmp;
+      v3+=tmp*tmp;
+      tmp-=vec[i-2];
+      if (tmp>best2) {
+	best2=tmp;
+	i2=i;
+      }
+      s2+=tmp;
+      v2+=tmp*tmp;
+    }
+    s1/=nsamples-2;
+    s2/=nsamples-2;
+    s3/=nsamples-2;
+    v1/=nsamples-2;
+    v2/=nsamples-2;
+    v3/=nsamples-2;
+    v1=sqrt(v1-s1*s1);
+    v2=sqrt(v2-s2*s2);
+    v3=sqrt(v3-s3*s3);
+    float snr1=(best1-s1)/v1;
+    float snr2=(best2-s2)/v2;
+    float snr3=(best3-s3)/v3;
+    if (snr1>best.snr) {
+      best.snr=snr1;
+      best.peak=best1;
+      best.ind=i1;
+      best.depth=0;
+      best.noise=v1;
+    }
+    if (snr2>best.snr) {
+      best.snr=snr2;
+      best.peak=best2;
+      best.ind=i2;
+      best.depth=0;
+      best.noise=v2;
+    }
+    if (snr3>best.snr) {
+      best.snr=snr3;
+      best.peak=best3;
+      best.ind=i3;
+      best.depth=0;
+      best.noise=v3;
+    }
+    
+    
+    
+  }
+  
+  
+  
+  Peak peak4,peak5,peak6,peak7;
+  find_4567_peaks_wnoise(vec,nsamples,&peak4,&peak5,&peak6,&peak7);
+
+  //peak4=peak4/sqrt(4*wt);                                                                                                               
+  //peak5=peak5/sqrt(5*wt);                                                                                                               
+  //peak6=peak6/sqrt(6*wt);                                                                                                               
+  //peak7=peak7/sqrt(7*wt);                                                                                                               
+
+
+
+
+
+  if (peak4.snr>best.snr)
+    best=peak4;
+  if (peak5.snr>best.snr)
+    best=peak5;
+  if (peak6.snr>best.snr)
+    best=peak6;
+  if (peak7.snr>best.snr)
+    best=peak7;
+  best.depth=cur_depth;
+  //printf("peaks are %12.5g %12.5g %12.5g %12.5g\n",peak4,peak5,peak6,peak7);                                                            
+
+  if (cur_depth<max_depth) {
+    int nn=nsamples/2;
+    float *vv=(float *)malloc(sizeof(float)*nn);
+    for (int i=0;i<nn;i++)
+      vv[i]=vec[2*i]+vec[2*i+1];
+    Peak new_best=find_peaks_wnoise_onedm(vv,nn,max_depth,cur_depth+1);
+    free(vv);
+    if (new_best.snr>best.snr)
+      best=new_best;
+  }
+
+  return best;
+}
+
+/*--------------------------------------------------------------------------------*/
+Peak find_peak(Data *dat)
+{
+  int max_depth=8;
+  Peak best;
+  best.snr=0;
+#pragma omp parallel
+  {
+    Peak mybest;
+    mybest.snr=0;
+#pragma omp for
+    for (int i=0;i<dat->nchan;i++) {
+      Peak dm_best=find_peaks_wnoise_onedm(dat->data[i],dat->ndata-dat->nchan,max_depth,0);
+      if (dm_best.snr>mybest.snr) {
+	mybest=dm_best;
+	mybest.dm_channel=i;
+      }
+    }
+#pragma omp critical
+    {
+      if (mybest.snr>best.snr)
+	best=mybest;
+    }
+  }
+  return best;
+}
+
+/*--------------------------------------------------------------------------------*/
 size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
 			     size_t ntime1, size_t ntime2, float delta_t,
 			     size_t nfreq, size_t *chan_map, int depth) 
@@ -831,6 +1058,10 @@ size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
   remap_data(dat);
 
   dedisperse_gbt(dat,outdata);
+  double t2=omp_get_wtime();
+  Peak best=find_peak(dat);
+  double t3=omp_get_wtime();
+  printf("times are %12.5f %12.5f, peak is %12.3f\n",t2-t1,t3-t2,best.snr);
 
   size_t ngood=dat->ndata-dat->nchan;
   

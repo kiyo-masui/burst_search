@@ -16,6 +16,21 @@ typedef struct {
   //int icur;  //useful if we want to collapse the data after dedispersing
 } Data;
 
+/*--------------------------------------------------------------------------------*/
+
+typedef struct {
+  float snr;
+  float peak;
+  int ind;
+  int depth;
+  float noise;
+  int dm_channel;
+} Peak;
+
+/*--------------------------------------------------------------------------------*/
+
+
+
 int get_nchan_from_depth(int depth);
 float get_diagonal_dm_simple(float nu1, float nu2, float dt, int depth);
 int *ivector(int n);
