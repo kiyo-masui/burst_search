@@ -17,6 +17,8 @@ from . import search
 TIME_BLOCK = 30.
 
 MAX_DM = 4000.
+# For DM=4000, 13s delay across the band, so overlap searches by ~15s.
+OVERLAP = 15.
 
 
 class FileSearch(object):
@@ -116,15 +118,16 @@ class FileSearch(object):
 
         return dm_data
 
-    def search_all_records(self, time_block=TIME_BLOCK):
+    def search_all_records(self, time_block=TIME_BLOCK, overlap=OVERLAP):
 
         parameters = self._parameters
 
         record_length = (parameters['ntime_record'] * parameters['delta_t'])
         nrecords_block = int(math.ceil(time_block / record_length))
+        nrecords_overlap = int(math.ceil(overlap / record_length))
         nrecords = self._nrecords
 
-        for ii in xrange(0, nrecords, nrecords_block):
+        for ii in xrange(0, nrecords, nrecords_block - nrecords_overlap):
             # XXX
             print ii
 
