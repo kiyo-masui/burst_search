@@ -25,6 +25,7 @@ typedef struct {
   int depth;
   float noise;
   int dm_channel;
+  int duration;
 } Peak;
 
 /*--------------------------------------------------------------------------------*/
@@ -37,6 +38,7 @@ int *ivector(int n);
 size_t get_burst_nextra(size_t ndata2, int depth);
 Data *put_data_into_burst_struct(float *indata1, float *indata2, size_t ntime1, size_t ntime2, size_t nfreq, size_t *chan_map, int depth);
 size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,size_t ntime1, size_t ntime2, float delta_t,size_t nfreq, size_t *chan_map, int depth);
+size_t find_peak_wrapper(float *data, int nchan, int ndata, float *peak_snr, int *peak_channel, int *peak_sample, int *peak_duration);
 void clean_rows(Data *dat);
 void setup_data(Data *dat);
 void remove_noisecal(Data *dat, int period,int apply_calib);
