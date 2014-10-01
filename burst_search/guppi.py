@@ -17,10 +17,13 @@ from . import search
 #TIME_BLOCK = 30.
 TIME_BLOCK = 30.
 
-MAX_DM = 4000.
+#MAX_DM = 4000.
+MAX_DM = 1000.
 # For DM=4000, 13s delay across the band, so overlap searches by ~15s.
 #OVERLAP = 15.
 OVERLAP = 0.
+
+DEV_PLOTS = False
 
 
 class FileSearch(object):
@@ -107,25 +110,35 @@ class FileSearch(object):
 
         if (True):
             # Preprocess.
-            
-            #plt.plot(np.mean(data, 0))
+
             preprocess.noisecal_bandpass(data, self._cal_spec,
                                          parameters['cal_period'])
-            #plt.plot(np.mean(data, 0))
-            #plt.show()
+
+            if DEV_PLOTS:
+                plt.figure()
+                plt.imshow(data[:2000,0:2000].copy())
+                plt.colorbar()
+                plt.figure()
+                plt.plot(np.mean(data[:1000], 0))
 
             # Place holder for functions that do things.
             preprocess.remove_outliers(data, 5)
             preprocess.remove_noisy_freq(data, 3)
+            preprocess.remove_achromatic(data)
 
         # Dispersion measure transform.
         dm_data = self._Transformer(data)
-        
-        # XXX
-        plt.imshow(dm_data.spec_data[:,0:2000].copy())
-        plt.figure()
-        plt.imshow(dm_data.dm_data[:,0:2000].copy())
-        plt.show()
+
+        if DEV_PLOTS:
+            plt.figure()
+            plt.imshow(dm_data.spec_data[:2000,0:2000].copy())
+            plt.colorbar()
+            plt.figure()
+            plt.imshow(dm_data.dm_data[:,0:2000].copy())
+            plt.colorbar()
+            plt.figure()
+            plt.plot(np.mean(dm_data.spec_data[:1000], 0))
+            plt.show()
 
         return dm_data
 

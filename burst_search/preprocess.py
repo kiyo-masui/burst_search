@@ -77,7 +77,16 @@ def remove_outliers(data, sigma_threshold):
 
     """
 
-    pass
+    nfreq = data.shape[0]
+    ntime = data.shape[1]
+
+    # To optimize cache usage, process one frequency at a time.
+    for ii in range(nfreq):
+        this_freq_data = data[ii,:]
+        mean = np.mean(this_freq_data)
+        std = np.std(this_freq_data)
+        outliers = abs(this_freq_data) > sigma_threshold * std
+        this_freq_data[outliers] = mean
 
 
 def remove_noisy_freq(data, sigma_threshold):
@@ -86,4 +95,49 @@ def remove_noisy_freq(data, sigma_threshold):
     To be effective, data should be bandpass calibrated.
 
     """
+
+    nfreq = data.shape[0]
+    ntime = data.shape[1]
+
+    # Calculate variances without making full data copy (as numpy does).
+    var = np.empty(nfreq, dtype=np.float64)
+    for ii in range(nfreq):
+        var[ii] = np.var(data[ii,:])
+    # Find the bad channels.
+    bad_chans = var > sigma_threshold * np.mean(var)
+    # Iterate twice, lest bad channels contaminate the mean.
+    var[bad_chans] = np.mean(var)
+    bad_chans_2 = var > sigma_threshold * np.mean(var)
+    bad_chans = np.logical_or(bad_chans, bad_chans_2)
+
+    data[bad_chans,:] = 0
+
+
+def remove_achromatic(data):
+    """Calculates a contiuum template and removes it from the data.
+
+    Also removes the time mean from each channel.
+
+    """
+
+    nfreq = data.shape[0]
+    ntime = data.shape[1]
+
+    # Remove the time mean.
+    data -= np.mean(data, 1)[:,None]
+
+    # Efficiently calculate the continuum template. Numpy internal looping
+    # makes np.mean/np.sum inefficient.
+    continuum = 0.
+    for ii in range(nfreq):
+        continuum += data[ii]
+
+    # Normalize.
+    continuum /= np.sqrt(np.sum(continuum**2))
+
+    # Subtract out the template.
+    for ii in range(nfreq):
+        data[ii] -= np.sum(data[ii] * continuum) * continuum
+
+
 
