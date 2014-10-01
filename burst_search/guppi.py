@@ -46,6 +46,7 @@ class FileSearch(object):
 
         self._nrecords = len(hdulist[1].data)
         self._cal_spec = 1.
+        self._dedispersed_out_group = None
 
         self.set_search_method()
         self.set_trigger_action()
@@ -82,6 +83,13 @@ class FileSearch(object):
         if action == 'print':
             def action_fun(triggers, data):
                 print triggers
+            self._action = action_fun
+        elif action == 'plot_dm':
+            def action_fun(triggers, data):
+                for t in triggers:
+                    plt.figure()
+                    t.plot_dm()
+                plt.show()
             self._action = action_fun
         else:
             msg = "Unrecognized trigger action."
