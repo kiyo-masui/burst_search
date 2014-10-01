@@ -771,12 +771,14 @@ void copy_in_data(Data *dat, float *indata1, int ndata1, float *indata2, int nda
   
   for (int i=0;i<dat->raw_nchan;i++) {
     for (int j=0;j<ndata1;j++) {
+
       //this line changes depending on memory ordering of input data
       //dat->raw_data[i*dat->ndata+j]=indata1[i*ndata1+j];      
-
-
-      //dat->raw_data[i][j]=indata1[i*ndata1+j];      
+#ifdef BURST_DM_NOTRANSPOSE
+      dat->raw_data[i][j]=indata1[i*ndata1+j];      
+#else
       dat->raw_data[i][j]=indata1[j*dat->raw_nchan+i];
+#endif
 
 
       //dat->raw_data[i][j]=0;
@@ -785,9 +787,11 @@ void copy_in_data(Data *dat, float *indata1, int ndata1, float *indata2, int nda
       //this line also changes depending on memory ordering of input data
       //dat->raw_data[i*dat->ndata+ndata1+j]=indata2[i*ndata2+j];
 
-
-      //dat->raw_data[i][ndata1+j]=indata2[i*ndata2+j];
+#ifdef BURST_DM_NOTRANSPOSE
+      dat->raw_data[i][ndata1+j]=indata2[i*ndata2+j];
+#else
       dat->raw_data[i][ndata1+j]=indata2[i+j*dat->raw_nchan];
+#endif
       
     }
   }
@@ -823,6 +827,11 @@ void find_4567_peaks_wnoise(float *vec, int nsamp, Peak *peak4, Peak *peak5, Pea
   peak5->ind=0;
   peak6->ind=0;
   peak7->ind=0;
+  peak4->duration=4;
+  peak5->duration=5;
+  peak6->duration=6;
+  peak7->duration=7;
+
   float cur4=vec[2]+vec[3]+vec[4]+vec[5];
   peak4->peak=cur4;
   peak5->peak=cur4+vec[6];
@@ -954,6 +963,7 @@ Peak find_peaks_wnoise_onedm(float *vec, int nsamples, int max_depth, int cur_de
       best.ind=i1;
       best.depth=0;
       best.noise=v1;
+      best.duration=1;
     }
     if (snr2>best.snr) {
       best.snr=snr2;
@@ -961,6 +971,7 @@ Peak find_peaks_wnoise_onedm(float *vec, int nsamples, int max_depth, int cur_de
       best.ind=i2;
       best.depth=0;
       best.noise=v2;
+      best.duration=2;
     }
     if (snr3>best.snr) {
       best.snr=snr3;
@@ -968,6 +979,7 @@ Peak find_peaks_wnoise_onedm(float *vec, int nsamples, int max_depth, int cur_de
       best.ind=i3;
       best.depth=0;
       best.noise=v3;
+      best.duration=3;
     }
     
     
@@ -978,7 +990,7 @@ Peak find_peaks_wnoise_onedm(float *vec, int nsamples, int max_depth, int cur_de
   
   Peak peak4,peak5,peak6,peak7;
   find_4567_peaks_wnoise(vec,nsamples,&peak4,&peak5,&peak6,&peak7);
-
+  
   //peak4=peak4/sqrt(4*wt);                                                                                                               
   //peak5=peak5/sqrt(5*wt);                                                                                                               
   //peak6=peak6/sqrt(6*wt);                                                                                                               
@@ -1009,7 +1021,7 @@ Peak find_peaks_wnoise_onedm(float *vec, int nsamples, int max_depth, int cur_de
     if (new_best.snr>best.snr)
       best=new_best;
   }
-
+  
   return best;
 }
 
@@ -1039,7 +1051,27 @@ Peak find_peak(Data *dat)
   }
   return best;
 }
+/*--------------------------------------------------------------------------------*/
+size_t find_peak_wrapper(float *data, int nchan, int ndata, float *peak_snr, int *peak_channel, int *peak_sample, int *peak_duration)
+{
+  Data dat;
+  float **mat=(float **)malloc(sizeof(float *)*nchan);
+  for (int i=0;i<nchan;i++)
+    mat[i]=data+i*ndata;
+  dat.data=mat;
+  dat.ndata=ndata;
+  dat.nchan=nchan;
+  Peak best=find_peak(&dat);
+  free(dat.data); //get rid of the pointer array
+  *peak_snr=best.snr;
+  *peak_channel=best.dm_channel;
+  //starting sample of the burst
+  *peak_sample=best.ind*(1<<best.depth);
+  *peak_duration=best.duration*(1<<best.depth);
+  return 0;
+  
 
+}
 /*--------------------------------------------------------------------------------*/
 size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
 			     size_t ntime1, size_t ntime2, float delta_t,
@@ -1059,9 +1091,11 @@ size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
 
   dedisperse_gbt(dat,outdata);
   double t2=omp_get_wtime();
-  Peak best=find_peak(dat);
+  //Peak best=find_peak(dat);
+  Peak best;
+  find_peak_wrapper(dat->data[0],dat->nchan,dat->ndata,&best.snr,&best.dm_channel,&best.ind,&best.duration);
   double t3=omp_get_wtime();
-  printf("times are %12.5f %12.5f, peak is %12.3f\n",t2-t1,t3-t2,best.snr);
+  printf("times are %12.5f %12.5f, peak is %12.3f with channel %d at sample %d and duration %d\n",t2-t1,t3-t2,best.snr,best.dm_channel,best.ind,best.duration);
 
   size_t ngood=dat->ndata-dat->nchan;
   
