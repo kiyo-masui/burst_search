@@ -14,9 +14,13 @@ from . import search
 
 
 # XXX Eventually a parameter, seconds.
+#TIME_BLOCK = 30.
 TIME_BLOCK = 30.
 
 MAX_DM = 4000.
+# For DM=4000, 13s delay across the band, so overlap searches by ~15s.
+#OVERLAP = 15.
+OVERLAP = 0.
 
 
 class FileSearch(object):
@@ -60,7 +64,9 @@ class FileSearch(object):
         if len(cal_spec) != nfreq:
             msg = "Noise cal spectrum frequncy axis does not match the data."
             raise ValueError(msg)
-        self._cal_spec = cal_spec["cal_T"]
+        spec = cal_spec["cal_T"]
+        spec[np.logical_not(np.isfinite(spec))] = 0
+        self._cal_spec = spec
 
     def set_search_method(self, method='basic', **kwargs):
         if method == 'basic':
@@ -101,10 +107,11 @@ class FileSearch(object):
 
         if (True):
             # Preprocess.
-            #plt.plot(nu, np.std(data, 0) * nu)
+            
+            #plt.plot(np.mean(data, 0))
             preprocess.noisecal_bandpass(data, self._cal_spec,
                                          parameters['cal_period'])
-            #plt.plot(nu, np.std(data, 0) * nu)
+            #plt.plot(np.mean(data, 0))
             #plt.show()
 
             # Place holder for functions that do things.
@@ -113,18 +120,25 @@ class FileSearch(object):
 
         # Dispersion measure transform.
         dm_data = self._Transformer(data)
+        
+        # XXX
+        plt.imshow(dm_data.spec_data[:,0:2000].copy())
+        plt.figure()
+        plt.imshow(dm_data.dm_data[:,0:2000].copy())
+        plt.show()
 
         return dm_data
 
-    def search_all_records(self, time_block=TIME_BLOCK):
+    def search_all_records(self, time_block=TIME_BLOCK, overlap=OVERLAP):
 
         parameters = self._parameters
 
         record_length = (parameters['ntime_record'] * parameters['delta_t'])
         nrecords_block = int(math.ceil(time_block / record_length))
+        nrecords_overlap = int(math.ceil(overlap / record_length))
         nrecords = self._nrecords
 
-        for ii in xrange(0, nrecords, nrecords_block):
+        for ii in xrange(0, nrecords, nrecords_block - nrecords_overlap):
             # XXX
             print ii
 
@@ -174,15 +188,15 @@ def read_records(hdulist, start_record=0, end_record=None):
     nrecords_read = end_record - start_record
     ntime_record, npol, nfreq, one = hdulist[1].data[0]["DATA"].shape
 
-    out_data = np.empty((nrecords_read, ntime_record, nfreq), dtype=np.float32)
+    out_data = np.empty((nfreq, nrecords_read, ntime_record), dtype=np.float32)
     for ii in xrange(nrecords_read):
         # Read the record.
         record = hdulist[1].data[start_record + ii]["DATA"]
         # Interpret as unsigned int (for Stokes I only).
         record = record.view(dtype=np.uint8)
         # Select stokes I and copy.
-        out_data[ii,...] = record[:,0,:,0]
-    out_data.shape = (nrecords_read * ntime_record, nfreq)
+        out_data[:,ii,:] = np.transpose(record[:,0,:,0])
+    out_data.shape = (nfreq, nrecords_read * ntime_record)
 
     return out_data
 
