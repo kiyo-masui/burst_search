@@ -113,4 +113,31 @@ def remove_noisy_freq(data, sigma_threshold):
     data[bad_chans,:] = 0
 
 
+def remove_achromatic(data):
+    """Calculates a contiuum template and removes it from the data.
+
+    Also removes the time mean from each channel.
+
+    """
+
+    nfreq = data.shape[0]
+    ntime = data.shape[1]
+
+    # Remove the time mean.
+    data -= np.mean(data, 1)[:,None]
+
+    # Efficiently calculate the continuum template. Numpy internal looping
+    # makes np.mean/np.sum inefficient.
+    continuum = 0.
+    for ii in range(nfreq):
+        continuum += data[ii]
+
+    # Normalize.
+    continuum /= np.sqrt(np.sum(continuum**2))
+
+    # Subtract out the template.
+    for ii in range(nfreq):
+        data[ii] -= np.sum(data[ii] * continuum) * continuum
+
+
 
