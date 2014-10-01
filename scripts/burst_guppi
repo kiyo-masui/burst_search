@@ -41,11 +41,13 @@ if __name__ == "__main__":
     for filename in args.files:
         Searcher = guppi.FileSearch(filename)
         Searcher.set_cal_spectrum(cal_spec)
+        Searcher.set_trigger_action('plot_dm')
+        #Searcher.set_trigger_action('print')
 
         # To write dedispered data to disk.
-        out_filename = path.splitext(path.basename(filename))[0] + ".h5"
-        out_file = h5py.File(out_filename)
-        Searcher.set_dedispersed_h5(out_file)
+        #out_filename = path.splitext(path.basename(filename))[0] + ".h5"
+        #out_file = h5py.File(out_filename)
+        #Searcher.set_dedispersed_h5(out_file)
 
         Searcher.search_all_records()
         out_file.close()
