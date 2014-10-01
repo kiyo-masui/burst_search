@@ -14,9 +14,11 @@ from . import search
 
 
 # XXX Eventually a parameter, seconds.
-TIME_BLOCK = 30.
+#TIME_BLOCK = 30.
+TIME_BLOCK = 15.
 
-MAX_DM = 4000.
+#MAX_DM = 4000.
+MAX_DM = 1000.
 # For DM=4000, 13s delay across the band, so overlap searches by ~15s.
 OVERLAP = 15.
 
