@@ -108,12 +108,17 @@ class FileSearch(object):
 
         if (True):
             # Preprocess.
-            
+
             #plt.plot(np.mean(data, 0))
             preprocess.noisecal_bandpass(data, self._cal_spec,
                                          parameters['cal_period'])
             #plt.plot(np.mean(data, 0))
             #plt.show()
+
+            # XXX
+            plt.figure()
+            plt.imshow(data[:500,0:500].copy())
+            plt.colorbar()
 
             # Place holder for functions that do things.
             preprocess.remove_outliers(data, 5)
@@ -121,11 +126,14 @@ class FileSearch(object):
 
         # Dispersion measure transform.
         dm_data = self._Transformer(data)
-        
+
         # XXX
-        plt.imshow(dm_data.spec_data[:,0:2000].copy())
         plt.figure()
-        plt.imshow(dm_data.dm_data[:,0:2000].copy())
+        plt.imshow(dm_data.spec_data[:500,0:500].copy())
+        plt.colorbar()
+        plt.figure()
+        plt.imshow(dm_data.dm_data[:,0:500].copy())
+        plt.colorbar()
         plt.show()
 
         return dm_data
