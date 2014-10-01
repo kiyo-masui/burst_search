@@ -38,17 +38,17 @@ def dm_transform(
         float delta_f,
         ):
 
-    cdef int nfreq = data1.shape[1]
+    cdef int nfreq = data1.shape[0]
 
     if data2 is None:
-        data2 = np.empty(shape=(0, nfreq), dtype=DTYPE)
+        data2 = np.empty(shape=(nfreq, 0), dtype=DTYPE)
 
-    if data1.shape[1] != data2.shape[1]:
+    if data1.shape[0] != data2.shape[0]:
         msg = "Input data arrays must have same length frequency axes."
         raise ValueError(msg)
 
-    cdef int ntime1 = data1.shape[0]
-    cdef int ntime2 = data2.shape[0]
+    cdef int ntime1 = data1.shape[1]
+    cdef int ntime2 = data2.shape[1]
 
     cdef int depth = burst_depth_for_max_dm(max_dm, delta_t, nfreq, freq0,
                                             delta_f)
@@ -61,7 +61,7 @@ def dm_transform(
             delta_f, depth)
 
     cdef np.ndarray[ndim=2, dtype=DTYPE_t] out
-    out = np.empty(shape=(ntime1, ndm), dtype=DTYPE)
+    out = np.empty(shape=(ndm, ntime1), dtype=DTYPE)
 
     cdef int ntime_out = burst_dm_transform(
             <DTYPE_t *> data1.data,
@@ -77,7 +77,9 @@ def dm_transform(
             depth,
             )
 
-    return out[:ntime_out,:]
+    our = np.ascontiguousarray(out[:,:ntime_out])
+
+    return out
 
 
 class DMData(object):
@@ -210,15 +212,15 @@ class DMTransform(object):
         cdef int nfreq = self.nfreq
 
         if data2 is None:
-            data2 = np.empty(shape=(0, nfreq), dtype=DTYPE)
+            data2 = np.empty(shape=(nfreq, 0), dtype=DTYPE)
 
-        if data1.shape[1] != data2.shape[1] or data1.shape[1] != self.nfreq:
+        if data1.shape[0] != data2.shape[0] or data1.shape[0] != self.nfreq:
             msg = ("Input data arrays must have frequency axes with length"
                    " nfreq=%d." % self.nfreq)
             raise ValueError(msg)
 
-        cdef int ntime1 = data1.shape[0]
-        cdef int ntime2 = data2.shape[0]
+        cdef int ntime1 = data1.shape[1]
+        cdef int ntime2 = data2.shape[1]
 
         cdef float delta_t = self.delta_t
         cdef float freq0 = self.freq0
@@ -247,7 +249,7 @@ class DMTransform(object):
                 )
 
         dm_data = np.ascontiguousarray(out[:,:ntime_out])
-        spec_data = np.ascontiguousarray(data1[:ntime_out, :])
+        spec_data = np.ascontiguousarray(data1[:, :ntime_out])
 
         # XXX Probably not exactly right.
         dm0 = 0
