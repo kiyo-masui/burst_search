@@ -117,7 +117,7 @@ class FileSearch(object):
 
             # XXX
             plt.figure()
-            plt.imshow(data[:500,0:500].copy())
+            plt.imshow(data[:2000,0:2000].copy())
             plt.colorbar()
 
             # Place holder for functions that do things.
@@ -129,10 +129,10 @@ class FileSearch(object):
 
         # XXX
         plt.figure()
-        plt.imshow(dm_data.spec_data[:500,0:500].copy())
+        plt.imshow(dm_data.spec_data[:2000,0:2000].copy())
         plt.colorbar()
         plt.figure()
-        plt.imshow(dm_data.dm_data[:,0:500].copy())
+        plt.imshow(dm_data.dm_data[:,0:2000].copy())
         plt.colorbar()
         plt.show()
 
