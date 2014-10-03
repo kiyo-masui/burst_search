@@ -50,5 +50,5 @@ if __name__ == "__main__":
         #Searcher.set_dedispersed_h5(out_file)
 
         Searcher.search_all_records()
-        out_file.close()
+        #out_file.close()
 
