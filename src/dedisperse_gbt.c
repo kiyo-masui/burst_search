@@ -1110,7 +1110,9 @@ size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
 
 }
 
-
+void burst_preprocess_something(float *data, int nfreq, int ntime)
+{
+}
 
 
 

@@ -6,6 +6,8 @@ This module contains, bandpass calibration, RFI flagging, etc.
 
 import numpy as np
 
+from _preprocess import preprocess_sievers
+
 
 def remove_periodic(data, period):
     """Remove periodic time compenent from data.

@@ -133,6 +133,7 @@ class FileSearch(object):
             preprocess.remove_outliers(data, 5)
             preprocess.remove_noisy_freq(data, 3)
             preprocess.remove_continuum(data)
+            preprocess.preprocess_sievers(data)
 
         # Dispersion measure transform.
         dm_data = self._Transformer(data)
