@@ -74,7 +74,7 @@ class FileSearch(object):
 
     def set_search_method(self, method='basic', **kwargs):
         if method == 'basic':
-            # XXX snr of 8 more appropriate?
+            # XXX snr of 10 more appropriate?
             self._search = lambda dm_data : search.basic(dm_data, 8.)
         else:
             msg = "Unrecognized search method."
@@ -132,7 +132,7 @@ class FileSearch(object):
 
             preprocess.remove_outliers(data, 5)
             preprocess.remove_noisy_freq(data, 3)
-            preprocess.remove_achromatic(data)
+            preprocess.remove_continuum(data)
 
         # Dispersion measure transform.
         dm_data = self._Transformer(data)
