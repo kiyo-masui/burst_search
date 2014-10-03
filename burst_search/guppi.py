@@ -74,7 +74,8 @@ class FileSearch(object):
 
     def set_search_method(self, method='basic', **kwargs):
         if method == 'basic':
-            self._search = lambda dm_data : search.basic(dm_data)
+            # XXX snr of 8 more appropriate?
+            self._search = lambda dm_data : search.basic(dm_data, 8.)
         else:
             msg = "Unrecognized search method."
             raise ValueError(msg)
@@ -129,7 +130,6 @@ class FileSearch(object):
                 plt.figure()
                 plt.plot(np.mean(data[:1000], 0))
 
-            # Place holder for functions that do things.
             preprocess.remove_outliers(data, 5)
             preprocess.remove_noisy_freq(data, 3)
             preprocess.remove_achromatic(data)
