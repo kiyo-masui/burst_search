@@ -1,8 +1,11 @@
 """Search DM space data for events."""
 
+
+import numpy as np
+import matplotlib.pyplot as plt
+
 import _search
 
-import matplotlib.pyplot as plt
 
 
 class Trigger(object):
@@ -29,12 +32,17 @@ class Trigger(object):
         return str(self.centre)
 
     def plot_dm(self):
-        ti = self._time_ind
+        di, ti = self.centre
         tside = 500
+        dside = 300
         start_ti = max(0, ti - tside)
         end_ti = min(self.data.dm_data.shape[1], ti + tside)
+        start_di = max(0, di - dside)
+        end_di = min(self.data.dm_data.shape[0], di + dside)
         print self
-        plt.imshow(self.data.dm_data[:,start_ti:end_ti])
+        plt.imshow(self.data.dm_data[start_di:end_di,start_ti:end_ti],
+                   extent=[start_ti, end_ti, start_di, end_di])
+        plt.colorbar()
 
 
 
