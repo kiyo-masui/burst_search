@@ -50,6 +50,10 @@ def process_file(filename, return_queue, **kwargs):
     return_queue.put((filename, return_code))
 
 
+def monitor_file(filename, return_code, **kwargs):
+    pass
+
+
 # Driver function for thread that processes pre-existing files.
 def process_preexisting(file_pattern, ignore_files, return_queue, **kwargs):
     files_to_search = glob.glob(file_pattern)
@@ -84,8 +88,8 @@ class NewFileHandler(watchdog.events.PatternMatchingEventHandler):
             return
         filename = event.src_path
         filename = path.abspath(filename)
-        p = multiprocessing.Process(target=process_file,
-                args=(filename, return_queue,), kwargs=self._parameters)
+        p = multiprocessing.Process(target=monitor_file,
+                args=(filename, self._return_queue,), kwargs=self._parameters)
         p.start()
         p.join()
 
@@ -127,7 +131,8 @@ if __name__ == "__main__":
     # appear.
     if not args.no_real_time:
         event_handler = NewFileHandler(patterns=[file_pattern],
-                                       case_sensitive=True, **parameters)
+                                       case_sensitive=True, **parameters,
+                                       return_queue=return_queue)
         # Set up and start new file monitor.
         observer = watchdog.observers.Observer()
         observer.schedule(event_handler, parameters['search_directory'],
