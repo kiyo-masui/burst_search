@@ -17,7 +17,7 @@ from . import search
 #TIME_BLOCK = 30.
 TIME_BLOCK = 30.
 
-MAX_DM = 4000.
+MAX_DM = 2000.
 #MAX_DM = 1000.
 # For DM=4000, 13s delay across the band, so overlap searches by ~15s.
 #OVERLAP = 15.
@@ -75,7 +75,7 @@ class FileSearch(object):
     def set_search_method(self, method='basic', **kwargs):
         if method == 'basic':
             # XXX snr of 10 more appropriate?
-            self._search = lambda dm_data : search.basic(dm_data, 8.)
+            self._search = lambda dm_data : search.basic(dm_data, 6.)
         else:
             msg = "Unrecognized search method."
             raise ValueError(msg)
@@ -132,8 +132,13 @@ class FileSearch(object):
 
             preprocess.remove_outliers(data, 5)
             preprocess.remove_noisy_freq(data, 3)
-            preprocess.remove_continuum(data)
-            preprocess.preprocess_sievers(data)
+            #preprocess.remove_continuum(data)
+            preprocess.remove_continuum_v2(data)
+
+            # Second round RFI flagging post continuum removal?
+            # Doesn't seem to help.
+            #preprocess.remove_outliers(data, 5)
+            #preprocess.remove_noisy_freq(data, 3)
 
         # Dispersion measure transform.
         dm_data = self._Transformer(data)
