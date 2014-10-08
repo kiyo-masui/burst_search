@@ -1293,8 +1293,6 @@ size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
 
 
 
-
-
 /*================================================================================*/
 
 

@@ -26,10 +26,10 @@ class Trigger(object):
         return (self._dm_ind, self._time_ind)
 
     def __str__(self):
-        return str(self.centre)
+        return str((self._snr, self.centre))
 
     def __repr__(self):
-        return str(self.centre)
+        return str((self._snr, self.centre))
 
     def plot_dm(self):
         di, ti = self.centre
