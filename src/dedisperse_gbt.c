@@ -490,6 +490,173 @@ void clean_rows(Data *dat)
   
 }
 /*--------------------------------------------------------------------------------*/
+void get_omp_iminmax(int n,  int *imin, int *imax)
+{
+  int nthreads=omp_get_num_threads();
+  int myid=omp_get_thread_num();
+  int bs=n/nthreads;
+  *imin=myid*bs;
+  *imax=(myid+1)*bs;
+  if (*imax>n)
+    *imax=n;
+
+}
+/*--------------------------------------------------------------------------------*/
+void clean_rows_2pass(float *vec, size_t nchan, size_t ndata)
+{
+  float **dat=(float **)malloc(sizeof(float *)*nchan);
+  for (int i=0;i<nchan;i++)
+    dat[i]=vec+i*ndata;
+  
+  float *tot=vector(ndata);
+  memset(tot,0,sizeof(tot[0])*ndata);
+
+  //find the common mode based on averaging over channels.
+  //inner loop is the natural one to parallelize over, but for some
+  //architectures/compilers doing so with a omp for is slow, hence
+  //rolling my own.
+#pragma omp parallel shared(ndata,nchan,dat,tot) default(none)
+  {
+    int imin,imax;
+    get_omp_iminmax(ndata,&imin,&imax);
+    
+    for (int i=0;i<nchan;i++)
+      for (int j=imin;j<imax;j++)
+	tot[j]+=dat[i][j];
+    
+    for (int j=imin;j<imax;j++)
+      tot[j]/=nchan;
+  }
+  //#define BURST_DUMP_DEBUG
+#ifdef BURST_DUMP_DEBUG
+  FILE *outfile=fopen("common_mode_1.dat","w");
+  fwrite(tot,sizeof(float),ndata,outfile);
+  fclose(outfile);
+#endif
+
+  float *amps=vector(nchan);
+  memset(amps,0,sizeof(amps[0])*nchan);
+  float totsqr=0;
+  for (int i=0;i<ndata;i++)
+    totsqr+=tot[i]*tot[i];
+
+  //find the best-fit amplitude for each channel
+#pragma omp parallel for shared(ndata,nchan,dat,tot,amps,totsqr) default(none)
+  for (int i=0;i<nchan;i++) {
+    float myamp=0;
+    for (int j=0;j<ndata;j++)
+      myamp+=dat[i][j]*tot[j];
+    myamp/=totsqr;
+    //for (int j=0;j<ndata;j++)
+    //   dat[i][j]-=tot[j]*myamp;
+    amps[i]=myamp;    
+  }
+
+#ifdef BURST_DUMP_DEBUG
+  outfile=fopen("mean_responses1.txt","w");
+  for (int i=0;i<nchan;i++)
+    fprintf(outfile,"%12.4f\n",amps[i]);
+  fclose(outfile);
+#endif
+
+  //decide that channels with amplitude between 0.5 and 1.5 are the good ones.
+  //recalculate the common mode based on those guys, with appropriate calibration
+  memset(tot,0,sizeof(tot[0])*ndata);
+  float amp_min=0.5;
+  float amp_max=1.5;
+#pragma omp parallel shared(ndata,nchan,amps,dat,tot,amp_min,amp_max) default(none)
+  {
+    int imin,imax;
+    get_omp_iminmax(ndata,&imin,&imax);
+
+    for (int i=0;i<nchan;i++) {
+      if ((amps[i]>amp_min)&&(amps[i]<amp_max))
+	for (int j=imin;j<imax;j++)
+	  tot[j]+=dat[i][j]/amps[i];
+    }
+  }
+  float tot_sum=0;
+  for (int i=0;i<nchan;i++)
+    if ((amps[i]>amp_min)&&(amps[i]<amp_max))
+      tot_sum+=1./amps[i];
+  totsqr=0;
+  for (int i=0;i<ndata;i++) {
+    tot[i]/=tot_sum;
+    totsqr+=tot[i]*tot[i];
+  }
+  
+#ifdef BURST_DUMP_DEBUG
+  outfile=fopen("common_mode_2.dat","w");
+  fwrite(tot,sizeof(float),ndata,outfile);
+  fclose(outfile);
+
+  {
+    float *chansum=vector(nchan);
+    float *chansumsqr=vector(nchan);
+#pragma omp parallel for
+    for (int i=0;i<nchan;i++)
+      for (int j=0;j<ndata;j++) {
+	chansum[i]+=dat[i][j];
+	chansumsqr[i]+=dat[i][j]*dat[i][j];
+      }
+    outfile=fopen("chan_variances_pre.txt","w");
+    for (int i=0;i<nchan;i++)
+      fprintf(outfile,"%12.6e\n",sqrt(chansumsqr[i]-chansum[i]*chansum[i]/ndata));
+    fclose(outfile);
+    free(chansum);
+    free(chansumsqr);
+  }
+#endif
+
+
+
+  memset(amps,0,sizeof(amps[0])*nchan);
+#pragma omp parallel for shared(ndata,nchan,amps,dat,tot,totsqr) default(none)
+  for (int i=0;i<nchan;i++) {
+    float myamp=0;
+    for (int j=0;j<ndata;j++) 
+      myamp+=dat[i][j]*tot[j];
+    myamp/=totsqr;
+    amps[i]=myamp;
+    for (int j=0;j<ndata;j++)
+      dat[i][j]-=tot[j]*myamp;
+  }
+  
+#ifdef BURST_DUMP_DEBUG
+  outfile=fopen("mean_responses2.txt","w");
+  for (int i=0;i<nchan;i++)
+    fprintf(outfile,"%12.4f\n",amps[i]);
+  fclose(outfile);
+
+
+  {
+    float *chansum=vector(nchan);
+    float *chansumsqr=vector(nchan);
+#pragma omp parallel for
+    for (int i=0;i<nchan;i++)
+      for (int j=0;j<ndata;j++) {
+	chansum[i]+=dat[i][j];
+	chansumsqr[i]+=dat[i][j]*dat[i][j];
+      }
+    outfile=fopen("chan_variances_post.txt","w");
+    for (int i=0;i<nchan;i++)
+      fprintf(outfile,"%12.6e\n",sqrt(chansumsqr[i]-chansum[i]*chansum[i]/ndata));
+    fclose(outfile);
+    free(chansum);
+    free(chansumsqr);
+  }
+
+
+  #endif
+  
+  
+
+
+  free(amps);
+  free(tot);
+  
+}
+/*--------------------------------------------------------------------------------*/
 int find_cal_phase(float **dat, int nchan, int period)
 {
   //find the phase of the noise cal.  Do it by summing across 
@@ -1079,6 +1246,13 @@ size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
 {
 
   double t1=omp_get_wtime();
+
+  //clean_rows_2pass(indata1,nfreq,ntime1);
+  //if (ntime2>0)
+  //  clean_rows_2pass(indata2,nfreq,ntime2);
+  //printf("did row cleaning in %12.5f seconds.\n",omp_get_wtime()-t1);
+
+  //t1=omp_get_wtime();
   Data *dat=put_data_into_burst_struct(indata1,indata2,ntime1,ntime2,nfreq,chan_map,depth);
   
 
@@ -1092,10 +1266,17 @@ size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
   dedisperse_gbt(dat,outdata);
   double t2=omp_get_wtime();
   //Peak best=find_peak(dat);
+
+#if 0
   Peak best;
   find_peak_wrapper(dat->data[0],dat->nchan,dat->ndata,&best.snr,&best.dm_channel,&best.ind,&best.duration);
   double t3=omp_get_wtime();
   printf("times are %12.5f %12.5f, peak is %12.3f with channel %d at sample %d and duration %d\n",t2-t1,t3-t2,best.snr,best.dm_channel,best.ind,best.duration);
+  
+  int nskip=100;
+  find_peak_wrapper(dat->data[nskip],dat->nchan-nskip,dat->ndata,&best.snr,&best.dm_channel,&best.ind,&best.duration);
+  printf("times are %12.5f %12.5f, peak is %12.3f with channel %d at sample %d and duration %d\n",t2-t1,t3-t2,best.snr,best.dm_channel+nskip,best.ind,best.duration);
+#endif
 
   size_t ngood=dat->ndata-dat->nchan;
   
