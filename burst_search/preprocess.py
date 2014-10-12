@@ -6,6 +6,8 @@ This module contains, bandpass calibration, RFI flagging, etc.
 
 import numpy as np
 
+from _preprocess import remove_continuum_v2
+
 
 def remove_periodic(data, period):
     """Remove periodic time compenent from data.
@@ -113,7 +115,7 @@ def remove_noisy_freq(data, sigma_threshold):
     data[bad_chans,:] = 0
 
 
-def remove_achromatic(data):
+def remove_continuum(data):
     """Calculates a contiuum template and removes it from the data.
 
     Also removes the time mean from each channel.

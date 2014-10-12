@@ -40,6 +40,7 @@ Data *put_data_into_burst_struct(float *indata1, float *indata2, size_t ntime1, 
 size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,size_t ntime1, size_t ntime2, float delta_t,size_t nfreq, size_t *chan_map, int depth);
 size_t find_peak_wrapper(float *data, int nchan, int ndata, float *peak_snr, int *peak_channel, int *peak_sample, int *peak_duration);
 void clean_rows(Data *dat);
+void clean_rows_2pass(float *vec, size_t nchan, size_t ndata);
 void setup_data(Data *dat);
 void remove_noisecal(Data *dat, int period,int apply_calib);
 Data *read_gbt(const char *fname);
