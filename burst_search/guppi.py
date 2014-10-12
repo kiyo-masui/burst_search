@@ -3,6 +3,7 @@
 """
 
 import math
+from os import path
 
 import numpy as np
 import pyfits
@@ -75,7 +76,7 @@ class FileSearch(object):
     def set_search_method(self, method='basic', **kwargs):
         if method == 'basic':
             # XXX snr of 10 more appropriate?
-            self._search = lambda dm_data : search.basic(dm_data, 6.)
+            self._search = lambda dm_data : search.basic(dm_data, 8.)
         else:
             msg = "Unrecognized search method."
             raise ValueError(msg)
@@ -85,12 +86,26 @@ class FileSearch(object):
             def action_fun(triggers, data):
                 print triggers
             self._action = action_fun
-        elif action == 'plot_dm':
+        elif action == 'show_plot_dm':
             def action_fun(triggers, data):
                 for t in triggers:
                     plt.figure()
                     t.plot_dm()
                 plt.show()
+            self._action = action_fun
+        elif action == 'save_plot_dm':
+            def action_fun(triggers, data):
+                for t in triggers:
+                    parameters = self._parameters
+                    t_offset = (parameters['ntime_record'] * data.start_record)
+                    t_offset += t.centre[1]
+                    t_offset *= parameters['delta_t']
+                    f = plt.figure()
+                    t.plot_dm()
+                    out_filename = path.splitext(path.basename(self._filename))[0]
+                    out_filename += "+%06.2fs.png" % t_offset
+                    plt.savefig(out_filename, bbox_inches='tight')
+                    plt.close(f)
             self._action = action_fun
         else:
             msg = "Unrecognized trigger action."
@@ -121,7 +136,7 @@ class FileSearch(object):
             # Preprocess.
 
             preprocess.noisecal_bandpass(data, self._cal_spec,
-                                         parameters['cal_period'])
+                                         parameters['cal_period_samples'])
 
             if DEV_PLOTS:
                 plt.figure()
@@ -142,6 +157,7 @@ class FileSearch(object):
 
         # Dispersion measure transform.
         dm_data = self._Transformer(data)
+        dm_data.start_record = start_record
 
         if DEV_PLOTS:
             plt.figure()
@@ -168,7 +184,6 @@ class FileSearch(object):
         for ii in xrange(0, nrecords, nrecords_block - nrecords_overlap):
             # XXX
             print ii
-
             self.search_records(ii, ii + nrecords_block)
 
 
@@ -184,21 +199,24 @@ def parameters_from_header(hdulist):
     parameters = {}
 
     #print repr(hdulist[0].header)
+    #print
     #print repr(hdulist[1].header)
+    mheader = hdulist[0].header
+    dheader = hdulist[1].header
 
-    # XXX For now just fake it.
-    parameters['cal_period'] = 64
-    parameters['delta_t'] = hdulist[1].header['TBIN']
-    parameters['nfreq'] = 4096
-    parameters['freq0'] = 900.
-    parameters['delta_f'] = -200. / 4096
-    parameters['npol'] = 4
+    cal_period = 1. / mheader['CAL_FREQ']
+    parameters['cal_period_samples'] = int(round(cal_period / dheader['TBIN']))
+    parameters['delta_t'] = dheader['TBIN']
+    parameters['nfreq'] = dheader['NCHAN']
+    parameters['freq0'] = mheader['OBSFREQ'] - mheader['OBSBW'] / 2.
+    parameters['delta_f'] = dheader['CHAN_BW']
 
     record0 = hdulist[1].data[0]
     #print record0
     data0 = record0["DATA"]
     #freq = record0["DAT_FREQ"]
     ntime_record, npol, nfreq, one = data0.shape
+    parameters['npol'] = npol
 
     parameters['ntime_record'] = ntime_record
     parameters['dtype'] = data0.dtype

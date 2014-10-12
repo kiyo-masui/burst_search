@@ -41,7 +41,7 @@ if __name__ == "__main__":
     for filename in args.files:
         Searcher = guppi.FileSearch(filename)
         Searcher.set_cal_spectrum(cal_spec)
-        Searcher.set_trigger_action('plot_dm')
+        Searcher.set_trigger_action('save_plot_dm')
         #Searcher.set_trigger_action('print')
 
         # To write dedispered data to disk.
