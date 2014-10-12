@@ -75,7 +75,7 @@ class FileSearch(object):
     def set_search_method(self, method='basic', **kwargs):
         if method == 'basic':
             # XXX snr of 10 more appropriate?
-            self._search = lambda dm_data : search.basic(dm_data, 6.)
+            self._search = lambda dm_data : search.basic(dm_data, 8.)
         else:
             msg = "Unrecognized search method."
             raise ValueError(msg)
@@ -121,7 +121,7 @@ class FileSearch(object):
             # Preprocess.
 
             preprocess.noisecal_bandpass(data, self._cal_spec,
-                                         parameters['cal_period'])
+                                         parameters['cal_period_samples'])
 
             if DEV_PLOTS:
                 plt.figure()
@@ -184,21 +184,24 @@ def parameters_from_header(hdulist):
     parameters = {}
 
     #print repr(hdulist[0].header)
+    #print
     #print repr(hdulist[1].header)
+    mheader = hdulist[0].header
+    dheader = hdulist[1].header
 
-    # XXX For now just fake it.
-    parameters['cal_period'] = 64
-    parameters['delta_t'] = hdulist[1].header['TBIN']
-    parameters['nfreq'] = 4096
-    parameters['freq0'] = 900.
-    parameters['delta_f'] = -200. / 4096
-    parameters['npol'] = 4
+    cal_period = 1. / mheader['CAL_FREQ']
+    parameters['cal_period_samples'] = int(round(cal_period / dheader['TBIN']))
+    parameters['delta_t'] = dheader['TBIN']
+    parameters['nfreq'] = dheader['NCHAN']
+    parameters['freq0'] = mheader['OBSFREQ'] - mheader['OBSBW'] / 2.
+    parameters['delta_f'] = dheader['CHAN_BW']
 
     record0 = hdulist[1].data[0]
     #print record0
     data0 = record0["DATA"]
     #freq = record0["DAT_FREQ"]
     ntime_record, npol, nfreq, one = data0.shape
+    parameters['npol'] = npol
 
     parameters['ntime_record'] = ntime_record
     parameters['dtype'] = data0.dtype
