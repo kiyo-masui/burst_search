@@ -22,7 +22,7 @@ MAX_DM = 2000.
 #MAX_DM = 1000.
 # For DM=4000, 13s delay across the band, so overlap searches by ~15s.
 #OVERLAP = 15.
-OVERLAP = 0.
+OVERLAP = 8.
 
 DEV_PLOTS = False
 
