@@ -3,6 +3,7 @@
 """
 
 import math
+from os import path
 
 import numpy as np
 import pyfits
@@ -85,12 +86,26 @@ class FileSearch(object):
             def action_fun(triggers, data):
                 print triggers
             self._action = action_fun
-        elif action == 'plot_dm':
+        elif action == 'show_plot_dm':
             def action_fun(triggers, data):
                 for t in triggers:
                     plt.figure()
                     t.plot_dm()
                 plt.show()
+            self._action = action_fun
+        elif action == 'save_plot_dm':
+            def action_fun(triggers, data):
+                for t in triggers:
+                    parameters = self._parameters
+                    t_offset = (parameters['ntime_record'] * data.start_record)
+                    t_offset += t.centre[1]
+                    t_offset *= parameters['delta_t']
+                    f = plt.figure()
+                    t.plot_dm()
+                    out_filename = path.splitext(path.basename(self._filename))[0]
+                    out_filename += "+%06.2fs.png" % t_offset
+                    plt.savefig(out_filename, bbox_inches='tight')
+                    plt.close(f)
             self._action = action_fun
         else:
             msg = "Unrecognized trigger action."
@@ -142,6 +157,7 @@ class FileSearch(object):
 
         # Dispersion measure transform.
         dm_data = self._Transformer(data)
+        dm_data.start_record = start_record
 
         if DEV_PLOTS:
             plt.figure()
@@ -168,7 +184,6 @@ class FileSearch(object):
         for ii in xrange(0, nrecords, nrecords_block - nrecords_overlap):
             # XXX
             print ii
-
             self.search_records(ii, ii + nrecords_block)
 
 

@@ -35,13 +35,19 @@ class Trigger(object):
         di, ti = self.centre
         tside = 500
         dside = 300
+        delta_t = self.data.delta_t
+        delta_dm = self.data.delta_dm
         start_ti = max(0, ti - tside)
         end_ti = min(self.data.dm_data.shape[1], ti + tside)
         start_di = max(0, di - dside)
         end_di = min(self.data.dm_data.shape[0], di + dside)
-        print self
         plt.imshow(self.data.dm_data[start_di:end_di,start_ti:end_ti],
-                   extent=[start_ti, end_ti, start_di, end_di])
+                   extent=[start_ti * delta_t, end_ti * delta_t,
+                           start_di * delta_dm, end_di * delta_dm],
+                   aspect='auto',
+                   )
+        plt.xlabel("time (s)")
+        plt.ylabel("DM (Pc/cm^3)")
         plt.colorbar()
 
 
