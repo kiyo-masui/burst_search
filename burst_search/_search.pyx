@@ -17,7 +17,7 @@ cdef extern size_t find_peak_wrapper(float *data, int nchan, int ndata,
         float *peak_snr, int *peak_channel, int *peak_sample, int *peak_duration)
 
 
-def sievers_find_peak(data, exclude_0=True):
+def sievers_find_peak(data, low_dm_exclude=1):
 
     cdef np.ndarray[ndim=2, dtype=DTYPE_t] dm_data
     cdef int ndm = data.dm_data.shape[0]
@@ -28,11 +28,8 @@ def sievers_find_peak(data, exclude_0=True):
     cdef int peak_time
     cdef int peak_duration
 
-    if exclude_0:
-        dm_data = data.dm_data[1:,:]
-        ndm -= 1
-    else:
-        dm_data = data.dm_data
+    dm_data = data.dm_data[low_dm_exclude:,:]
+    ndm -= low_dm_exclude
 
     cdef size_t ret = find_peak_wrapper(
             <DTYPE_t *> dm_data.data,
@@ -44,7 +41,6 @@ def sievers_find_peak(data, exclude_0=True):
             &peak_duration,
             )
 
-    if exclude_0:
-        peak_dm += 1
+    peak_dm += low_dm_exclude
 
     return peak_snr, (peak_dm, peak_time), peak_duration

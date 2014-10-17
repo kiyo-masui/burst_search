@@ -52,7 +52,7 @@ class Trigger(object):
 
 
 
-def basic(data, snr_threshold=5.):
+def basic(data, snr_threshold=5., min_dm=50.):
     """Simple event search of DM data.
 
     Returns
@@ -65,7 +65,12 @@ def basic(data, snr_threshold=5.):
 
     # Sievers' code breaks of number of channels exceeds number of samples.
     if data.dm_data.shape[0] < data.dm_data.shape[1]:
-        snr, sample, duration = _search.sievers_find_peak(data)
+        # Find the index of the *min_dm*.
+        min_dm_ind = (min_dm - data.dm0) / data.delta_dm
+        min_dm_ind = int(round(min_dm_ind))
+        min_dm_ind = max(0, min_dm_ind)
+
+        snr, sample, duration = _search.sievers_find_peak(data, min_dm_ind)
 
         if snr > snr_threshold:
             triggers.append(Trigger(data, sample, snr))
