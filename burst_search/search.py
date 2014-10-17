@@ -63,9 +63,11 @@ def basic(data, snr_threshold=5.):
 
     triggers = []
 
-    snr, sample, duration = _search.sievers_find_peak(data)
+    # Sievers' code breaks of number of channels exceeds number of samples.
+    if data.dm_data.shape[0] < data.dm_data.shape[1]:
+        snr, sample, duration = _search.sievers_find_peak(data)
 
-    if snr > snr_threshold:
-        triggers.append(Trigger(data, sample, snr))
+        if snr > snr_threshold:
+            triggers.append(Trigger(data, sample, snr))
 
     return triggers
