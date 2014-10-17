@@ -7,6 +7,8 @@ from os import path
 
 import numpy as np
 import pyfits
+import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 
 from . import preprocess
@@ -23,6 +25,8 @@ MAX_DM = 2000.
 # For DM=4000, 13s delay across the band, so overlap searches by ~15s.
 #OVERLAP = 15.
 OVERLAP = 8.
+
+THRESH_SNR = 8.
 
 DEV_PLOTS = False
 
@@ -75,8 +79,7 @@ class FileSearch(object):
 
     def set_search_method(self, method='basic', **kwargs):
         if method == 'basic':
-            # XXX snr of 10 more appropriate?
-            self._search = lambda dm_data : search.basic(dm_data, 8.)
+            self._search = lambda dm_data : search.basic(dm_data, THRESH_SNR)
         else:
             msg = "Unrecognized search method."
             raise ValueError(msg)
