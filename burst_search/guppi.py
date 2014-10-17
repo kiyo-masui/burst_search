@@ -183,7 +183,7 @@ class FileSearch(object):
 
         for ii in xrange(0, nrecords, nrecords_block - nrecords_overlap):
             # XXX
-            print ii
+            print "Block starting with record: %d" % ii
             self.search_records(ii, ii + nrecords_block)
 
 
