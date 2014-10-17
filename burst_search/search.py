@@ -43,7 +43,7 @@ class Trigger(object):
         end_di = min(self.data.dm_data.shape[0], di + dside)
         plt.imshow(self.data.dm_data[start_di:end_di,start_ti:end_ti],
                    extent=[start_ti * delta_t, end_ti * delta_t,
-                           start_di * delta_dm, end_di * delta_dm],
+                           end_di * delta_dm, start_di * delta_dm],
                    aspect='auto',
                    )
         plt.xlabel("time (s)")
