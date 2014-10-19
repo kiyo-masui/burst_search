@@ -216,13 +216,13 @@ def parameters_from_header(hdulist):
 
     record0 = hdulist[1].data[0]
     #print record0
-    data0 = record0["DATA"]
+    #data0 = record0["DATA"]
     #freq = record0["DAT_FREQ"]
-    ntime_record, npol, nfreq, one = data0.shape
+    ntime_record, npol, nfreq, one = eval(dheader["TDIM17"])[::-1]
     parameters['npol'] = npol
 
     parameters['ntime_record'] = ntime_record
-    parameters['dtype'] = data0.dtype
+    parameters['dtype'] = np.uint8
 
     return parameters
 
