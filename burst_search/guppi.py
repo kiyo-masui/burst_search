@@ -4,6 +4,7 @@
 
 import math
 from os import path
+import time
 
 import numpy as np
 import pyfits
@@ -189,6 +190,36 @@ class FileSearch(object):
             print "Block starting with record: %d" % ii
             self.search_records(ii, ii + nrecords_block)
 
+    def search_real_time(self, time_block=TIME_BLOCK, overlap=OVERLAP):
+        parameters = self._parameters
+
+        record_length = (parameters['ntime_record'] * parameters['delta_t'])
+        nrecords_block = int(math.ceil(time_block / record_length))
+        nrecords_overlap = int(math.ceil(overlap / record_length))
+
+        wait_time = float(time_block - overlap) / 5
+        max_wait_iterations = 10
+
+        # Enter holding loop, processing records in blocks as they become
+        # available.
+        current_start_record = 0
+        wait_iterations = 0
+        while wait_iterations < max_wait_iterations:
+            nrecords = get_nrecords(self._filename)
+            if nrecords - current_start_record >= nrecords_block:
+                print "Block starting with record: %d" % current_start_record
+                self.search_records(current_start_record,
+                                    current_start_record + nrecords_block)
+                current_start_record += nrecords_block - nrecords_overlap
+                wait_iterations = 0
+            else:
+                time.sleep(wait_time)
+                wait_iterations += 1
+        # Precess any leftovers that don't fill out a whole block.
+        self.search_records(current_start_record, 
+                            current_start_record + nrecords_block)
+
+
 
 def parameters_from_header(hdulist):
     """Get data acqusition parameters for psrfits file header.
@@ -216,13 +247,13 @@ def parameters_from_header(hdulist):
 
     record0 = hdulist[1].data[0]
     #print record0
-    data0 = record0["DATA"]
+    #data0 = record0["DATA"]
     #freq = record0["DAT_FREQ"]
-    ntime_record, npol, nfreq, one = data0.shape
+    ntime_record, npol, nfreq, one = eval(dheader["TDIM17"])[::-1]
     parameters['npol'] = npol
 
     parameters['ntime_record'] = ntime_record
-    parameters['dtype'] = data0.dtype
+    parameters['dtype'] = np.uint8
 
     return parameters
 
@@ -247,5 +278,12 @@ def read_records(hdulist, start_record=0, end_record=None):
     out_data.shape = (nfreq, nrecords_read * ntime_record)
 
     return out_data
+
+
+def get_nrecords(filename):
+    hdulist = pyfits.open(filename, 'readonly')
+    nrecords = len(hdulist[1].data)
+    hdulist.close()
+    return nrecords
 
 

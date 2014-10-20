@@ -13,6 +13,7 @@ import multiprocessing
 import threading
 from os import path
 
+import numpy as np
 import yaml
 import watchdog.observers
 import watchdog.events
@@ -42,10 +43,33 @@ parser.add_argument(
         )
 
 
+def configure_search(filename, **kwargs):
+    searcher = guppi.FileSearch(filename)
+    searcher.set_cal_spectrum(kwargs["cal_spec"])
+    searcher.set_trigger_action('save_plot_dm')
+    return searcher
+
+
 # Function that processes a file.
 def process_file(filename, return_queue, **kwargs):
-    print "start: %s" % filename
-    time.sleep(2)
+    print "Pre-existing file: %s" % filename
+
+    searcher = configure_search(filename, **kwargs)
+    searcher.search_all_records()
+
+    return_code = 0
+    return_queue.put((filename, return_code))
+
+
+def monitor_file(filename, return_queue, **kwargs):
+
+    print "File created: %s" % filename
+    # Give it some time to make sure the header is written.
+    time.sleep(10.)
+    searcher = configure_search(filename, **kwargs)
+
+    searcher.search_real_time()
+
     return_code = 0
     return_queue.put((filename, return_code))
 
@@ -84,8 +108,8 @@ class NewFileHandler(watchdog.events.PatternMatchingEventHandler):
             return
         filename = event.src_path
         filename = path.abspath(filename)
-        p = multiprocessing.Process(target=process_file,
-                args=(filename, return_queue,), kwargs=self._parameters)
+        p = multiprocessing.Process(target=monitor_file,
+                args=(filename, self._return_queue,), kwargs=self._parameters)
         p.start()
         p.join()
 
@@ -111,6 +135,14 @@ if __name__ == "__main__":
     log_filename = path.join(path.expanduser(parameters["output_directory"]),
                              parameters['log_filename'])
 
+    # Load the noise cal/band-pass spectrum, if provided.
+    if "cal_spec_filename" in parameters:
+        cal_filename = path.expanduser(parameters["cal_spec_filename"])
+        cal_spec = np.load(cal_filename)
+    else:
+        cal_spec = None
+    parameters['cal_spec'] = cal_spec
+
     # Read the log file if it exists to see what has already been processed.
     if path.isfile(log_filename):
         with open(log_filename) as f:
@@ -127,11 +159,13 @@ if __name__ == "__main__":
     # appear.
     if not args.no_real_time:
         event_handler = NewFileHandler(patterns=[file_pattern],
-                                       case_sensitive=True, **parameters)
+                                       case_sensitive=True, 
+                                       return_queue=return_queue,
+                                       **parameters)
         # Set up and start new file monitor.
         observer = watchdog.observers.Observer()
         observer.schedule(event_handler, parameters['search_directory'],
-                          recursive=False)
+                          recursive=True)
 
     with open(log_filename, 'a') as log_f:
         # Start threads.
