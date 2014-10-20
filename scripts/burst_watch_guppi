@@ -42,16 +42,37 @@ parser.add_argument(
         )
 
 
+def configure_search(**kwargs):
+        searcher = guppi.FileSearch(filename)
+        searcher.set_cal_spectrum(cal_spec)
+        searcher.set_trigger_action('save_plot_dm')
+
+        return searcher
+
+
+
 # Function that processes a file.
 def process_file(filename, return_queue, **kwargs):
-    print "start: %s" % filename
-    time.sleep(2)
+    #print "start: %s" % filename
+
+    searcher = configure_search(**kwargs)
+    searcher.search_all_records()
+
     return_code = 0
     return_queue.put((filename, return_code))
 
 
-def monitor_file(filename, return_code, **kwargs):
-    pass
+def monitor_file(filename, return_queue, **kwargs):
+
+    # Give it some time to make sure the header is written.
+    time.sleep(10.)
+    searcher = configure_search(**kwargs)
+
+    searcher.search_real_time()
+
+    return_code = 0
+    return_queue.put((filename, return_code))
+
 
 
 # Driver function for thread that processes pre-existing files.
