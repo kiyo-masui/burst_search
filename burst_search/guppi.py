@@ -207,6 +207,7 @@ class FileSearch(object):
         while wait_iterations < max_wait_iterations:
             nrecords = get_nrecords(self._filename)
             if nrecords - current_start_record >= nrecords_block:
+                print "Block starting with record: %d" % current_start_record
                 self.search_records(current_start_record,
                                     current_start_record + nrecords_block)
                 current_start_record += nrecords_block - nrecords_overlap
