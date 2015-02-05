@@ -45,7 +45,8 @@ parser.add_argument(
 
 def configure_search(filename, **kwargs):
     searcher = guppi.FileSearch(filename)
-    searcher.set_cal_spectrum(kwargs["cal_spec"])
+    if not kwargs["cal_spec"] is None:
+        searcher.set_cal_spectrum(kwargs["cal_spec"])
     searcher.set_trigger_action('save_plot_dm')
     return searcher
 
