@@ -13,8 +13,8 @@ class TestPeriodic(unittest.TestCase):
         ntime = 200
         nfreq = 7
         data = np.sin(np.arange(ntime) / period * 2 * np.pi) + 5
-        data = data[:,None] * np.arange(1, 1 + nfreq)
-        right_profile = data[:period,:].copy()
+        data = data[:] * np.arange(1, 1 + nfreq)[:,None]
+        right_profile = data[:,:period].copy()
 
         profile = preprocess.remove_periodic(data, period)
         self.assertTrue(np.allclose(data, 0))

@@ -139,8 +139,9 @@ class FileSearch(object):
         if (True):
             # Preprocess.
 
-            preprocess.noisecal_bandpass(data, self._cal_spec,
-                                         parameters['cal_period_samples'])
+            if parameters['cal_period_samples']:
+                preprocess.noisecal_bandpass(data, self._cal_spec,
+                                             parameters['cal_period_samples'])
 
             if DEV_PLOTS:
                 plt.figure()
@@ -238,8 +239,11 @@ def parameters_from_header(hdulist):
     mheader = hdulist[0].header
     dheader = hdulist[1].header
 
-    cal_period = 1. / mheader['CAL_FREQ']
-    parameters['cal_period_samples'] = int(round(cal_period / dheader['TBIN']))
+    if mheader['CAL_FREQ']:
+        cal_period = 1. / mheader['CAL_FREQ']
+        parameters['cal_period_samples'] = int(round(cal_period / dheader['TBIN']))
+    else:
+        parameters['cal_period_samples'] = 0
     parameters['delta_t'] = dheader['TBIN']
     parameters['nfreq'] = dheader['NCHAN']
     parameters['freq0'] = mheader['OBSFREQ'] - mheader['OBSBW'] / 2.
