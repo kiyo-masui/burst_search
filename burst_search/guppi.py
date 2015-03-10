@@ -19,13 +19,16 @@ from . import search
 
 # XXX Eventually a parameter, seconds.
 #TIME_BLOCK = 30.
-TIME_BLOCK = 30.
 
-MAX_DM = 2000.
-#MAX_DM = 1000.
+#Additions:
+MIN_SEARCH_DM = 1
+
+TIME_BLOCK = 0.1
+
+MAX_DM = 10
 # For DM=4000, 13s delay across the band, so overlap searches by ~15s.
 #OVERLAP = 15.
-OVERLAP = 8.
+OVERLAP = 0.
 
 THRESH_SNR = 8.
 
@@ -80,7 +83,7 @@ class FileSearch(object):
 
     def set_search_method(self, method='basic', **kwargs):
         if method == 'basic':
-            self._search = lambda dm_data : search.basic(dm_data, THRESH_SNR)
+            self._search = lambda dm_data : search.basic(dm_data, THRESH_SNR, MIN_SEARCH_DM)
         else:
             msg = "Unrecognized search method."
             raise ValueError(msg)
