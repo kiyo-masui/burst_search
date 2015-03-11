@@ -37,6 +37,7 @@ DEV_PLOTS = False
 
 SIMULATE = True
 sim_rate = 1.0/6000.0
+f_m = 1400
 
 
 
@@ -59,13 +60,16 @@ class FileSearch(object):
                 MAX_DM,
                 )
 
+        self._record_length = (parameters['ntime_record'] * parameters['delta_t'])
+        self._nrecords_block = int(math.ceil(time_block / record_length))
+        self._nrecords_overlap = int(math.ceil(overlap / record_length))
         self._nrecords = len(hdulist[1].data)
         #also insert to parameters dict to keep things concise (sim code wants this)
         self._parameters['nrecords'] = self._nrecords
 
         #initialize sim object, if there are to be simulated events
         if SIMULATE:
-            self._sim_source = simulate.RandSource(event_rate=sim_rate,file_params=self._parameters,OVERLAP)
+            self._sim_source = simulate.RandSource(event_rate=sim_rate,file_params=self._parameters,OVERLAP,self._nrecords_block)
 
         self._cal_spec = 1.
         self._dedispersed_out_group = None
@@ -152,6 +156,10 @@ class FileSearch(object):
         data = read_records(hdulist, start_record, end_record)
         hdulist.close()
 
+        block_ind = start_record/self.nrecords_block
+        #inefficient
+
+
         if (True):
             # Preprocess.
 
@@ -159,7 +167,9 @@ class FileSearch(object):
                 preprocess.noisecal_bandpass(data, self._cal_spec,
                                              parameters['cal_period_samples'])
 
-            #sim code goes here
+            if block_in in self._sim_source.coarse_event_schedule():
+                #do simulation
+                data += self._sim_source.generate_events(block_ind)
 
             if DEV_PLOTS:
                 plt.figure()
