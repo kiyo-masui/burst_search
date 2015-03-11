@@ -32,7 +32,7 @@ parser.add_argument(
 
 if __name__ == "__main__":
     args = parser.parse_args()
-
+    
     if args.cal_spec_file:
         cal_spec = np.load(args.cal_spec_file)
     else:

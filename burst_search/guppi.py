@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from . import preprocess
 from . import dedisperse
 from . import search
+from simulate import *
 
 
 # XXX Eventually a parameter, seconds.
@@ -23,9 +24,9 @@ from . import search
 #Additions:
 MIN_SEARCH_DM = 1
 
-TIME_BLOCK = 0.1
+TIME_BLOCK = 0.6
 
-MAX_DM = 10
+MAX_DM = 100
 # For DM=4000, 13s delay across the band, so overlap searches by ~15s.
 #OVERLAP = 15.
 OVERLAP = 0.
@@ -34,10 +35,15 @@ THRESH_SNR = 8.
 
 DEV_PLOTS = False
 
+SIMULATE = True
+sim_rate = 1.0/6000.0
+
+
 
 class FileSearch(object):
 
     def __init__(self, filename):
+
         self._filename = filename
         hdulist = pyfits.open(filename, 'readonly')
 
@@ -54,6 +60,13 @@ class FileSearch(object):
                 )
 
         self._nrecords = len(hdulist[1].data)
+        #also insert to parameters dict to keep things concise (sim code wants this)
+        self._parameters['nrecords'] = self._nrecords
+
+        #initialize sim object, if there are to be simulated events
+        if SIMULATE:
+            self._sim_source = simulate.RandSource(event_rate=sim_rate,file_params=self._parameters,OVERLAP)
+
         self._cal_spec = 1.
         self._dedispersed_out_group = None
 
@@ -145,6 +158,8 @@ class FileSearch(object):
             if parameters['cal_period_samples']:
                 preprocess.noisecal_bandpass(data, self._cal_spec,
                                              parameters['cal_period_samples'])
+
+            #sim code goes here
 
             if DEV_PLOTS:
                 plt.figure()
