@@ -1,6 +1,22 @@
-"""Preprocessing data for fast radio burst searches.
+"""
+Preprocessing data for fast radio burst searches.
+
+.. currentmodule:: burst_search.preprocess
 
 This module contains, bandpass calibration, RFI flagging, etc.
+
+Functions
+=========
+
+.. autosummary::
+   :toctree: generated/
+    
+    remove_periodic
+    remove_noisy_freq
+    noisecal_bandpass
+    remove_outliers
+    remove_continuum
+
 
 """
 
