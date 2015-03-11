@@ -291,3 +291,22 @@ def get_nrecords(filename):
     return nrecords
 
 
+
+def get_mean_spectrum(filename):
+    self._filename = filename
+    hdulist = pyfits.open(filename, 'readonly')
+
+    parameters = parameters_from_header(hdulist)
+    nrecords = len(hdulist[1].data)
+    data = read_records(hdulist, 0, nrecords)
+    hdulist.close()
+
+    P_over_P_cal = preprocess.p_over_p_cal(data, self._cal_spec,
+                                 parameters['cal_period_samples'])
+
+    return P_over_P_cal
+
+
+
+
+

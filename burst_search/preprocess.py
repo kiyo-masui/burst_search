@@ -71,6 +71,21 @@ def noisecal_bandpass(data, cal_spectrum, cal_period):
     data *= (cal_spectrum / cal_amplitude)[:,None]
     data[bad_chans,:] = 0
 
+def p_over_p_cal(data, cal_period):
+    
+    data = data.copy()
+    mean_spec = np.mean(data, 1)
+    cal_profile = remove_periodic(data, cal_period)
+    # An *okay* estimate of the height of a square wave is twice the standard
+    # deviation.
+    cal_amplitude = 2 * np.std(cal_profile, 1)
+    # Find frequencies with no data.
+    bad_chans = cal_amplitude < 1e-5 * np.median(cal_amplitude)
+    cal_amplitude[bad_chans] = 1.
+    p_pcal = mean_spec / cal_amplitude
+    p_pcal[bad_chans] = 0
+    return p_pcal
+
 
 def remove_outliers(data, sigma_threshold):
     """Flag outliers within frequency channels.
