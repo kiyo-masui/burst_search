@@ -1,0 +1,55 @@
+#! /usr/bin/python
+"""Search guppi files for fast radio bursts.
+
+"""
+
+import time
+import argparse
+from os import path
+
+import numpy as np
+import h5py
+
+from burst_search import guppi
+
+
+# Command line arguments.
+parser = argparse.ArgumentParser(description='Search GUPPI data for FRBs.')
+parser.add_argument(
+        "files",
+        metavar="GUPPI_files",
+        type=str,
+        nargs='+',
+        help="GUPPI PSRFITS files to search.",
+        )
+parser.add_argument(
+        '-c', '--cal-spec-file',
+        help=('.npy file containing the noise-cal spectrum for bandpass'
+              ' calibration.'),
+        )
+
+
+
+if __name__ == "__main__":
+    args = parser.parse_args()
+    
+    if args.cal_spec_file:
+        cal_spec = np.load(args.cal_spec_file)
+    else:
+        cal_spec = None
+
+    for filename in args.files:
+        Searcher = guppi.FileSearch(filename)
+        if not cal_spec is None:
+            Searcher.set_cal_spectrum(cal_spec)
+        Searcher.set_trigger_action('save_plot_dm, print')
+        #Searcher.set_trigger_action('print')
+
+        # To write dedispered data to disk.
+        #out_filename = path.splitext(path.basename(filename))[0] + ".h5"
+        #out_file = h5py.File(out_filename)
+        #Searcher.set_dedispersed_h5(out_file)
+
+        Searcher.search_all_records()
+        #out_file.close()
+
