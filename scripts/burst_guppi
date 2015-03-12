@@ -52,7 +52,7 @@ parser.add_argument(
 
 if __name__ == "__main__":
     args = parser.parse_args()
-
+    
     if args.cal_spec_file:
         cal_spec = np.load(args.cal_spec_file)
     else:
@@ -67,7 +67,7 @@ if __name__ == "__main__":
         Searcher = guppi.FileSearch(filename)
         if not cal_spec is None:
             Searcher.set_cal_spectrum(cal_spec)
-        Searcher.set_trigger_action('save_plot_dm')
+        Searcher.set_trigger_action('save_plot_dm, print')
         #Searcher.set_trigger_action('print')
 
         # To write dedispered data to disk.

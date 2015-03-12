@@ -15,26 +15,49 @@ import matplotlib.pyplot as plt
 from . import preprocess
 from . import dedisperse
 from . import search
+from . import simulate
+from simulate import *
 
 
 # XXX Eventually a parameter, seconds.
 #TIME_BLOCK = 30.
-TIME_BLOCK = 30.
 
-MAX_DM = 2000.
-#MAX_DM = 1000.
+#Additions:
+MIN_SEARCH_DM = 500
+
+TIME_BLOCK = 10.0
+
+MAX_DM = 1000
 # For DM=4000, 13s delay across the band, so overlap searches by ~15s.
 #OVERLAP = 15.
-OVERLAP = 8.
+OVERLAP = 0.
 
-THRESH_SNR = 8.
+THRESH_SNR = 8.0
 
-DEV_PLOTS = False
+DEV_PLOTS = True
+
+#Event simulation params, speculative/contrived
+SIMULATE = False
+sim_rate = 100*1.0/6000.0
+f_m = 800
+f_sd = 50
+bw_m = 200
+bw_sd = 50
+t_m = 0.003
+t_sd = 0.002
+s_m = 0.6
+s_sd = 0.1
+dm_m = 600
+dm_sd = 100
+
+
+
 
 
 class FileSearch(object):
 
     def __init__(self, filename):
+
         self._filename = filename
         hdulist = pyfits.open(filename, 'readonly')
 
@@ -50,7 +73,19 @@ class FileSearch(object):
                 MAX_DM,
                 )
 
+        self._record_length = (parameters['ntime_record'] * parameters['delta_t'])
+        self._nrecords_block = int(math.ceil(TIME_BLOCK / self._record_length))
+        self._nrecords_overlap = int(math.ceil(OVERLAP / self._record_length))
         self._nrecords = len(hdulist[1].data)
+        #also insert to parameters dict to keep things concise (sim code wants this)
+        self._parameters['nrecords'] = self._nrecords
+
+        #initialize sim object, if there are to be simulated events
+        if SIMULATE:
+            self._sim_source = simulate.RandSource(f_m=f_m,f_sd=f_sd,bw_m=bw_m,bw_sd=bw_sd,t_m=t_m,
+                t_sd=t_sd,s_m=s_m,s_sd=s_sd,dm_m=dm_m,dm_sd=dm_sd,
+                event_rate=sim_rate,file_params=self._parameters,t_overlap=OVERLAP,nrecords_block=self._nrecords_block)
+
         self._cal_spec = 1.
         self._dedispersed_out_group = None
 
@@ -80,15 +115,23 @@ class FileSearch(object):
 
     def set_search_method(self, method='basic', **kwargs):
         if method == 'basic':
-            self._search = lambda dm_data : search.basic(dm_data, THRESH_SNR)
+            self._search = lambda dm_data : search.basic(dm_data, THRESH_SNR, MIN_SEARCH_DM)
         else:
             msg = "Unrecognized search method."
             raise ValueError(msg)
 
     def set_trigger_action(self, action='print', **kwargs):
+        actions = [self._get_trigger_action(s.strip()) for s in action.split(',')]
+        def action_fun(triggers,data):
+            for a in actions:
+                a(triggers,data) 
+        self._action = action_fun
+
+    def _get_trigger_action(self,action):
         if action == 'print':
             def action_fun(triggers, data):
                 print triggers
+            return action_fun
             self._action = action_fun
         elif action == 'show_plot_dm':
             def action_fun(triggers, data):
@@ -96,7 +139,7 @@ class FileSearch(object):
                     plt.figure()
                     t.plot_dm()
                 plt.show()
-            self._action = action_fun
+            return action_fun
         elif action == 'save_plot_dm':
             def action_fun(triggers, data):
                 for t in triggers:
@@ -110,7 +153,7 @@ class FileSearch(object):
                     out_filename += "+%06.2fs.png" % t_offset
                     plt.savefig(out_filename, bbox_inches='tight')
                     plt.close(f)
-            self._action = action_fun
+            return action_fun
         else:
             msg = "Unrecognized trigger action."
             raise ValueError(msg)
@@ -136,12 +179,18 @@ class FileSearch(object):
         data = read_records(hdulist, start_record, end_record)
         hdulist.close()
 
+        block_ind = start_record/self._nrecords_block
+
         if (True):
             # Preprocess.
 
             if parameters['cal_period_samples']:
                 preprocess.noisecal_bandpass(data, self._cal_spec,
                                              parameters['cal_period_samples'])
+
+            if SIMULATE and block_ind in self._sim_source.coarse_event_schedule():
+                #do simulation
+                data += self._sim_source.generate_events(block_ind)
 
             if DEV_PLOTS:
                 plt.figure()
@@ -188,7 +237,8 @@ class FileSearch(object):
 
         for ii in xrange(0, nrecords, nrecords_block - nrecords_overlap):
             # XXX
-            print "Block starting with record: %d" % ii
+            print "Block starting with record: {0} of {1}".format(ii,nrecords)
+            #print "Progress: {0}".format(float(ii)/float(nrecords))
             self.search_records(ii, ii + nrecords_block)
 
     def search_real_time(self, time_block=TIME_BLOCK, overlap=OVERLAP):
