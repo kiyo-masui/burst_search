@@ -38,14 +38,14 @@ DEV_PLOTS = True
 
 #Event simulation params, totally speculative
 SIMULATE = True
-sim_rate = 600*1.0/6000.0
+sim_rate = 100*1.0/6000.0
 f_m = 800
 f_sd = 50
 bw_m = 200
 bw_sd = 50
 t_m = 0.003
 t_sd = 0.002
-s_m = 0.6
+s_m = 0.9
 s_sd = 0.1
 dm_m = 600
 dm_sd = 100

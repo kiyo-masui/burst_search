@@ -74,9 +74,10 @@ class RandSource(object):
 		self.ntime_record = self.file_params['ntime_record']
 		self.delta_t = self.file_params['delta_t']
 		self.nfreq = self.file_params['nfreq']
+		self.nrecords = self.file_params['nrecords']
 
 		#derived quantities
-		self.file_time = self.file_params['nrecords']*self.file_params['ntime_record']*self.file_params['delta_t']
+		self.file_time = self.nrecords*self.ntime_record*self.file_params['delta_t']
 		self.nevents = self.event_rate*self.file_time
 		self.record_time = self.ntime_record*self.delta_t
 		self.ntime_block = self.ntime_record*self.nrecords_block
@@ -135,7 +136,7 @@ class RandSource(object):
 				sim_dat[j,0:nt_disp] = 0.0
 
 			#rudamentary for eval
-			print "Sim Event {0} at  t = {1} s with dm {2} s_max {3}".format(i,i*delta_t,dm,params['s_max'])
+			print "Sim Event {0} at  t = {1} s block time = {4} with dm {2} s_max {3}".format(i,i*delta_t,dm,params['s_max'],(i%ntime_block)*delta_t)
 
 		return sim_dat
 	def make_event_schedule(self):
@@ -146,7 +147,7 @@ class RandSource(object):
 		"""
 		#compute the time-index-unit exclusion radius about each event 
 		delta_t = self.delta_t
-		exclusion_radius = int(math.ceil(exclusion_sd*self.t_sd/delta_t))
+		exclusion_radius = max(max(int(math.ceil(exclusion_sd*self.t_sd/delta_t)),int(math.ceil(1.2*self.max_twidth_event/delta_t))),self.ntime_block)
 
 		#this line requires that we must have a constant number of records per block
 		overlap_threshold = self.ntime_block - int(math.ceil((self.t_overlap + self.max_twidth_event)/delta_t))
@@ -164,7 +165,10 @@ class RandSource(object):
 		# needs to be updated
 		while i < len(self.event_schedule):
 			#print 'loop no action'
-			event_ind = int(random.random()*self.file_time/delta_t)
+			ntime_file = self.ntime_record*self.nrecords
+			neffective_file_time = int(round(float(ntime_file) - (self.ntime_block - overlap_threshold)*float(self.nrecords)/float(self.nrecords_block)))
+			effective_ind = int(random.random()*(neffective_file_time))
+			event_ind = effective_ind + (self.ntime_block - overlap_threshold)*(effective_ind - effective_ind%overlap_threshold)/effective_ind
 			#print 'event_ind: {0}, overlap_threshold: {1}, ntime_block: {2}'.format(event_ind%self.ntime_block,overlap_threshold,self.ntime_block)
 			#print map(lambda x: abs(x - event_ind) < exclusion_radius, self.event_schedule[0:i])
 			if event_ind%self.ntime_block < overlap_threshold and (i < 1 or not True in map(lambda x: abs(x - event_ind) < exclusion_radius , self.event_schedule[0:i])):
