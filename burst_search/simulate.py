@@ -3,6 +3,12 @@ import math
 import uuid
 import numpy as np
 
+# the number of t_sd's apart each simulated event must be, at a minimum
+exclusion_sd =  100
+
+#needs to be included in some telescope/dataset parameter file
+gain = 2.000 # K/Jy
+
 class RandSource(object):
 	"""
 	An object to generate uniformly distributed random f-t data with dispersion.
@@ -11,14 +17,9 @@ class RandSource(object):
 	with properties each evenly distributed within a range that is determined at instantiation.
 	"""
 
-	# the number of t_sd's apart each simulated event must be, at a minimum
-	exclusion_sd =  100
+	
 
-	#needs to be included in some telescope/dataset parameter file
-	gain = 2.000 # K/Jy
-
-	def __init__(self,event_rate,f_m,f_sd,bw_m,bw_sd,t_m,t_sd,s_m,s_sd,dm_m,dm_sd,
-		file_params,t_overlap,nrecords_block):
+	def __init__(self,**kwargs):
 		"""
 		Initialize a RandSource object
 
@@ -51,20 +52,23 @@ class RandSource(object):
 		t_overlap : float (s)
 			Frame overlap time, as per guppi.py.
 		nrecords_block : int
-			Size of a block in records.
+			Number of records per block.
 		"""
 		#user-provided
-		self.event_rate = event_rate
-		self.f_m = f_m
-		self.f_sd = f_sd
-		self.bw_m = bw_m
-		self.bw_sd = bw_sd
-		self.t_m = t_m
-		self.t_sd = t_sd
-		self.s_m = s_m
-		self.s_sd = s_sd
-		self.file_params = file_params
-		self.nrecords_block = nrecords_block
+		self.event_rate = kwargs['event_rate']
+		self.f_m = kwargs['f_m']
+		self.f_sd = kwargs['f_sd']
+		self.bw_m = kwargs['bw_m']
+		self.bw_sd = kwargs['bw_sd']
+		self.t_m = kwargs['t_m']
+		self.t_sd = kwargs['t_sd']
+		self.s_m = kwargs['s_m']
+		self.s_sd = kwargs['s_sd']
+		self.dm_m = kwargs['dm_m']
+		self.dm_sd = kwargs['dm_sd']
+		self.file_params = kwargs['file_params']
+		self.t_overlap = kwargs['t_overlap']
+		self.nrecords_block = kwargs['nrecords_block']
 
 		#for convenience
 		self.ntime_record = self.file_params['ntime_record']
@@ -79,10 +83,11 @@ class RandSource(object):
 
 		#Note that this line depends on the stat model used to generate simulated params. Right now things are simple with defined extremal values
 		#for all params
-		self.max_twidth_event = disp_delay(f_m - f_sd - 0.5*(bw_m + bw_sd),dm_m + dm_sd) - disp_delay(f_m + f_sd + 0.5*(bw_m + bw_sd),dm_m - dm_sd)
+		self.max_twidth_event = disp_delay(self.f_m - self.f_sd - 0.5*(self.bw_m + self.bw_sd),self.dm_m + self.dm_sd) \
+		- disp_delay(self.f_m + self.f_sd + 0.5*(self.bw_m + self.bw_sd),self.dm_m - self.dm_sd)
 
 		#create the schedule of events, in terms of time index (absolute from start of file)
-		make_event_schedule()
+		self.make_event_schedule()
 
 	def generate_params(self):
 		"""Generate the parameters for a given burst using an evenly distributed probability density function"""
@@ -96,15 +101,12 @@ class RandSource(object):
 
 		return params
 
-	def uniform_range(center, halfwidth):
-		return random.uniform(center - halfwidth, center + halfwidth)
-
 	def generate_events(self, block_ind):
 		"""
 		Generates events in a given block.
 		Returns a numpy matrix that can be added to the real, callibrated data
 		"""
-		block_events = self.event_schedule[self.ntime_block*block_ind < self.event_schedule < self.ntime_block*(block_ind + 1)]
+		block_events = filter(lambda event: self.ntime_block*block_ind < event < self.ntime_block*(block_ind + 1), self.event_schedule)
 		sim_dat = np.zeros((self.nfreq,self.ntime_block),dtype=np.float32)
 
 		for i in block_events:
@@ -119,17 +121,21 @@ class RandSource(object):
 			f_max = params['f_center'] + 0.5*params['bw']
 			delta_t = self.file_params['delta_t']
 			nt_width = int(math.ceil(params['t_width']/delta_t))
-			nf_min = int(round((f_min - f0)/delta_f))
+			#note that nf_min > nf_max since this is the index corresponding to min freq
+			nf_min = int(round((f_min - f0/delta_f)))
 			nf_max = int(round((f_max - f0)/delta_f))
 			dm = params['dm']
-			#fill rectangular region
-			sim_dat[nf_min:nf_max,t_start, t_start + nt_width] = params['s_max']
+			#fill rectangular region (with endpoint considerations if sim signal is cutoff)
+			sim_dat[max(0,nf_max):min(nf_min,sim_dat.shape[0]),t_start:t_start + nt_width] = params['s_max']
 
-			#disperse data
-			for i in xrange(0,data.shape[0]):
-				nt_disp = round(disp_delay(f0 + i*delta_f,dm)/delta_t)
-				sim_data[i,nt_disp:ntime_block] = sim_data[i,0:ntime_block - nt_disp]
-				sim_data[i,0:nt_disp] = 0.0
+			#disperse data in time
+			for j in xrange(0,sim_dat.shape[0]):
+				nt_disp = round(disp_delay(f0 + j*delta_f,dm)/delta_t)
+				sim_dat[j,nt_disp:ntime_block] = sim_dat[j,0:ntime_block - nt_disp]
+				sim_dat[j,0:nt_disp] = 0.0
+
+			#rudamentary for eval
+			print "Sim Event {0} at  t = {1} s with dm {2} s_max {3}".format(i,i*delta_t,dm,params['s_max'])
 
 		return sim_dat
 	def make_event_schedule(self):
@@ -144,20 +150,37 @@ class RandSource(object):
 
 		#this line requires that we must have a constant number of records per block
 		overlap_threshold = self.ntime_block - int(math.ceil((self.t_overlap + self.max_twidth_event)/delta_t))
+		#print int(math.ceil(self.event_rate*self.file_time))
+		#print self.max_twidth_event
+		#print self.ntime_block*delta_t
 
-		self.event_schedule = [None]*self.n_events
+		if overlap_threshold <= 0:
+			raise ValueError('Sim event parameters chosen such that events are too large to fit in a block.')
+
+		self.event_schedule = [None]*int(math.ceil(self.event_rate*self.file_time))
 		i = 0
+
+		# this structure is very inefficient when the dispersed length (time) is close to the size of the block
+		# needs to be updated
 		while i < len(self.event_schedule):
+			#print 'loop no action'
 			event_ind = int(random.random()*self.file_time/delta_t)
-			if event_ind%self.ntime_block < overlap_threshold and (i < 1 or not True in filter(lambda x: abs(x - event_ind) < exclusion_radius , self.event_schedule[0:i + 1])):
+			#print 'event_ind: {0}, overlap_threshold: {1}, ntime_block: {2}'.format(event_ind%self.ntime_block,overlap_threshold,self.ntime_block)
+			#print map(lambda x: abs(x - event_ind) < exclusion_radius, self.event_schedule[0:i])
+			if event_ind%self.ntime_block < overlap_threshold and (i < 1 or not True in map(lambda x: abs(x - event_ind) < exclusion_radius , self.event_schedule[0:i])):
 				self.event_schedule[i] = event_ind
 				i += 1
+				#print 'loop {0}'.format(i)
+		#didn't really take advantage of sorted list... yet
 		self.event_schedule = sorted(self.event_schedule)
 		return
 	def coarse_event_schedule(self):
 		"""Return the block index for all blocks with scheduled events"""
-		return set(filter(lambda ind: int(ind/self.ntime_block), self.event_schedule))
+		return set(map(lambda ind: int(ind/self.ntime_block), self.event_schedule))
 
 def disp_delay(f,dm):
 	"""Compute the dispersion delay (s) as a function of frequency (MHz)"""
 	return 4.149*dm*(10.0**3)/(f**2)
+
+def uniform_range(center, halfwidth):
+	return random.uniform(center - halfwidth, center + halfwidth)
