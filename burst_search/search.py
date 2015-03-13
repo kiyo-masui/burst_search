@@ -10,12 +10,14 @@ import _search
 
 class Trigger(object):
 
-    def __init__(self, data, centre, snr=0.):
+    def __init__(self, data, centre, snr=0.,ra=None,dec=None):
 
         self._data = data
         self._dm_ind = centre[0]
         self._time_ind = centre[1]
         self._snr = snr
+        self._ra = ra
+        self._dec = dec
 
     @property
     def data(self):
@@ -25,11 +27,20 @@ class Trigger(object):
     def centre(self):
         return (self._dm_ind, self._time_ind)
 
+    @property
+    def right_ascension(self):
+        return (self._ra)
+
+    @property 
+    def declination(self):
+        return (self._dec)
+
+
     def __str__(self):
-        return str((self._snr, self.centre))
+        return str((self._snr, self.centre,(ra,dec)))
 
     def __repr__(self):
-        return str((self._snr, self.centre))
+        return str((self._snr, self.centre,(ra,dec)))
 
     def plot_dm(self):
         di, ti = self.centre

@@ -22,6 +22,7 @@ class Catalog(object):
 		
 		self._meta_file = h5py.File(md_name,'rw')
 		self._data_file = h5py.File(d_name,'rw')
+		structure_check()
 		self._search = None
 		self._last_record = 0
 		self._md_lock = Lock()
@@ -39,9 +40,16 @@ class Catalog(object):
 
 	def advance_search(self,record):
 
-	def add_sim_event(self,sim_event_params)
+	def add_sim_event(self,sim_event_params):
 
 	#------------------------------------------
+
+	def structure_check(self):
+		"""Verify that the metadata and data files are of correct format. Add format if the files are new"""
+		#Metadata
+
+
+		#Data
 
 
 	def write_datum(self,datum):
@@ -65,4 +73,5 @@ class Catalog(object):
 		self._search = search
 
 class Search(object):
-	def __init__(self)
+	def __init__(self):
+		
