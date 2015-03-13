@@ -47,7 +47,7 @@ class Catalog(object):
 	def structure_check(self):
 		"""Verify that the metadata and data files are of correct format. Add format if the files are new"""
 		#Metadata
-
+			
 
 		#Data
 
@@ -68,10 +68,15 @@ class Catalog(object):
 			#do write
 		self._md_lock.release()
 
-
 	def set_search(self,search):
 		self._search = search
 
+class Catalogable(object):
+	def dtype(self):
+        		raise NotImplementedError()
+
+        	def row_value(self):
+        		raise NotImplementedError()
+
 class Search(object):
 	def __init__(self):
-		

@@ -6,9 +6,11 @@ import matplotlib.pyplot as plt
 
 import _search
 
+from catalog import Catalogable
 
 
-class Trigger(object):
+
+class Trigger(Catalogable):
 
     def __init__(self, data, centre, snr=0.,ra=None,dec=None):
 
@@ -35,6 +37,11 @@ class Trigger(object):
     def declination(self):
         return (self._dec)
 
+    def dtype(self):
+        return np.dtype([('primary_key',np.long), ('snr', np.float32), ('dm', np.float32), ('time_ind', np.float32), ('right_ascension', np.float32), ('declination', np.float32)])
+
+    def row_value(self):
+        return np.array([long(-1), self._snr, self._dm, self._time_ind, self._ra, self._dec])
 
     def __str__(self):
         return str((self._snr, self.centre,(ra,dec)))
