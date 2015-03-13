@@ -2,12 +2,16 @@ import random
 import math
 import uuid
 import numpy as np
+from catalog import Catalogable
 
 # the number of t_sd's apart each simulated event must be, at a minimum
 exclusion_sd =  100
 
 #needs to be included in some telescope/dataset parameter file
 gain = 2.000 # K/Jy
+
+class SimEvent(Catalogable):
+	
 
 class RandSource(object):
 	"""

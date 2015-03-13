@@ -12,6 +12,8 @@ from catalog import Catalogable
 
 class Trigger(Catalogable):
 
+    dtype = np.dtype([('primary_key',np.long), ('snr', np.float32), ('dm', np.float32), ('time_ind', np.float32), ('right_ascension', np.float32), ('declination', np.float32)])
+
     def __init__(self, data, centre, snr=0.,ra=None,dec=None):
 
         self._data = data
@@ -38,10 +40,10 @@ class Trigger(Catalogable):
         return (self._dec)
 
     def dtype(self):
-        return np.dtype([('primary_key',np.long), ('snr', np.float32), ('dm', np.float32), ('time_ind', np.float32), ('right_ascension', np.float32), ('declination', np.float32)])
+        return dt
 
     def row_value(self):
-        return np.array([long(-1), self._snr, self._dm, self._time_ind, self._ra, self._dec])
+        return np.matrix([(long(-1), self._snr, self._dm, self._time_ind, self._ra, self._dec)], self.dtype())[0]
 
     def __str__(self):
         return str((self._snr, self.centre,(ra,dec)))
@@ -68,7 +70,9 @@ class Trigger(Catalogable):
         plt.ylabel("DM (Pc/cm^3)")
         plt.colorbar()
 
-
+class SearchSpec(Catalogable):
+    def speak():
+        print "words"
 
 def basic(data, snr_threshold=5., min_dm=50.):
     """Simple event search of DM data.
