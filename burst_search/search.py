@@ -70,10 +70,6 @@ class Trigger(Catalogable):
         plt.ylabel("DM (Pc/cm^3)")
         plt.colorbar()
 
-class SearchSpec(Catalogable):
-    def speak():
-        print "words"
-
 def basic(data, snr_threshold=5., min_dm=50.):
     """Simple event search of DM data.
 

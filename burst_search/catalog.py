@@ -1,9 +1,12 @@
 import h5py
 import numpy as np
 from multiprocessing import Pool, Lock
+import hashlib
 import os.path
 from search import Trigger
-from search import SearchSpec
+#probably not good organaization
+from guppi import SearchSpec
+from guppi import FileSpec
 from simulate import SimEvent
 
 class Catalog(object):
@@ -19,12 +22,11 @@ class Catalog(object):
 	# the key set of this dict must be a subset of the key set of the metafile
 	# in future, could/should load from a configuration file or even a hosted file specifying standards/versions
 	# of our internal-use hdf5 structure
-	_md_structure = {'/triggers':('dset',{'shape':(None,), 'dtype':Trigger.dtype},{}), '/sim_events':('dset',{'shape':(None,), 'dtype':SimEvent.dtype},{}),
-					'/searches':('dset',{'shape':(None,), 'dtype':SearchSpec.dtype},{})}
+	_md_structure = {'/triggers':('dset',{'maxshape':(None,), 'dtype':Trigger.dtype},{}), '/sim_events':('dset',{'maxshape':(None,), 'dtype':SimEvent.dtype},{}),
+					'/searches':('dset',{'maxshape':(None,), 'dtype':SearchSpec.dtype},{}),'/files':('dset',{'maxshape':(None,), 'dtype':FileSpec.dtype})}
 	#_d_structure = 
 
 	def __init__(self, base_path=None):
-		exists = os.path.exists()
 		md_name = 'gbt_frb_metadata.hdf5'
 		d_name = 'gbt_frb_data.hdf5'
 		if base_path != None:
@@ -37,8 +39,9 @@ class Catalog(object):
 		self._data_file = h5py.File(d_name,'rw')
 		self._search = None
 		self._last_record = 0
-		self._md_lock = Lock()
-		self._d_lock = Lock()
+		self._locks = {_meta_file:Lock(),_data_file:Lock()}
+		#self._md_lock = Lock()
+		#self._d_lock = Lock()
 
 		structure_check()
 
@@ -61,8 +64,7 @@ class Catalog(object):
 
 	def structure_check(self):
 		"""Verify that the metadata and data files are of correct format. Add format if the files are new."""
-		self._md_lock.acquire()
-		self._d_lock.acquire()
+		for l in self.locks: l.acquire()
 
 		meta_file = self._meta_file
 
@@ -83,8 +85,7 @@ class Catalog(object):
 				if not entry.dtype == _md_structure[k]['dtype']:
 					raise ValueError('Incorrect or unfamiliar dtype in dset ' + entry.name)
 
-		self._md_lock.release()
-		self._d_lock.release()
+		for l in self.locks: l.release() 
 
 	def make_meta_structure(self):
 		"""
@@ -121,20 +122,29 @@ class Catalog(object):
 	def set_search(self,search):
 		self._search = search
 
+	def do_write(self,datum,catalogable,hfile):
+		dset = hfile[_reference_name[catalogable]]
+		l = len(dset)
+		dset.resize(l + 1,)
+		dset[l] = datum
+
 def make_hdf5_structure(hfile,structure):
 	"""Add the specified structure to an already open h5py file"""
 	for k in structure.keys():
 		elem = structure[k]
 		param_dict  = elem[1]
+		attr_dict = elem[2]
 		if elem[0] == 'dset':
-			hfile.create_dataset(name=k,shape=param_dict['shape'],dtype=param_dict['dtype'])
+			h_elem = hfile.create_dataset(name=k,shape=(0,),maxshape=param_dict['maxshape'],dtype=param_dict['dtype'])
 		elif elem[0] == 'group':
-			hfile.create_group(name=k)
+			h_elem = hfile.create_group(name=k)
 		else:
 			raise ValueError('Invalid element type ' + elem[0] + ' in structure specification')
+		for j in attr_dict.keys():
+			h_elem[j] = attr_dict[j]
 
-#recursively flatten the path hierarchy of an hdf5 file
-def flat_paths(group,paths = []):
+# recursively flatten the hierarchy of an hdf5 file
+def flat_paths(group, paths = []):
 	for elem in group.values():
 		paths.append(elem.name)
 		if isinstance(elem,h5py._hl.group.Group):

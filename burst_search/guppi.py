@@ -18,6 +18,8 @@ from . import search
 from . import simulate
 from simulate import *
 
+import hashlib
+
 
 # XXX Eventually a parameter, seconds.
 #TIME_BLOCK = 30.
@@ -50,8 +52,27 @@ s_sd = 0.1
 dm_m = 600
 dm_sd = 100
 
+# Is this the best place for this code?
+class SearchSpec(Catalogable):
+    dtype = np.dtype([('primary_key', np.long), ('file_hash', np.str_, 64),('snr_min', np.float32), ('time_and_olap', np.float32, (2,)),('dm', np.float32, (2,)), 
+        ('time_ind', np.float32), ('right_ascension', np.float32), ('declination', np.float32)])
 
+    def __init__(self, file_hash, dm_min,dm_max,snr_min,t_block,t_olap):
+        self._primary_key = hashlib.sha256(hdulist[0].header + hdulist[1].header).hexdigest()
 
+        self._t_olap = t_olap
+        self._t_block = t_block
+        self._dm_min = dm_min
+        self._dm_max = dm_max
+        self._snr_min = snr_min
+
+    def primary_key(self):
+        return _primary_key
+
+    def dtype(self):
+        return np.array([[primary_key]],dtype=dtype)
+
+class FileSpec(Catalogable):
 
 
 class FileSearch(object):
@@ -60,6 +81,11 @@ class FileSearch(object):
 
         self._filename = filename
         hdulist = pyfits.open(filename, 'readonly')
+
+        #
+        # hashing is done in the spec class
+
+        self._search_spec = SearchSpec(hdulist, dm_min=MIN_SEARCH_DM, dm_max=MAX_DM, t_olap=OVERLAP, t_block=TIME_BLOCK)
 
         parameters = parameters_from_header(hdulist)
         #print parameters
@@ -339,5 +365,3 @@ def get_nrecords(filename):
     nrecords = len(hdulist[1].data)
     hdulist.close()
     return nrecords
-
-
