@@ -60,7 +60,7 @@ class SearchSpec(Catalogable):
 
     def __init__(self, file_spec, dm_min, dm_max, snr_min, t_block, t_olap, start_rec=0, current_rec=0):
         self._primary_key = str(uuid.uuid4())
-        self._file_hash = file_spec.
+        self._file_hash = file_spec.primary_key()
 
         self._t_olap = t_olap
         self._t_block = t_block
@@ -79,10 +79,16 @@ class SearchSpec(Catalogable):
 
 class FileSpec(Catalogable):
 
-    def __init__(self, )
+    dtype = np.dtype([('file_hash', np.str_, 64)])
+
+    def __init__(self, hdulist):
+       self._file_hash = hashlib.sha256(str(hdulist[0].header) + str(hdulist[1].header)).hexdigest()
 
     def primary_key(self):
         return _file_hash
+
+    def row_value(self):
+        return [_file_hash]
 
 
 class FileSearch(object):
@@ -92,10 +98,9 @@ class FileSearch(object):
         self._filename = filename
         hdulist = pyfits.open(filename, 'readonly')
 
-        #
         # hashing is done in the spec class
-
-        self._search_spec = SearchSpec(hdulist, dm_min=MIN_SEARCH_DM, dm_max=MAX_DM, t_olap=OVERLAP, t_block=TIME_BLOCK)
+        self._file_spec = FileSpec(hdulist)
+        self._search_spec = SearchSpec(self._file_spec, dm_min=MIN_SEARCH_DM, dm_max=MAX_DM, t_olap=OVERLAP, t_block=TIME_BLOCK)
 
         parameters = parameters_from_header(hdulist)
         #print parameters
