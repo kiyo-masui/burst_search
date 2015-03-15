@@ -51,7 +51,8 @@ class Trigger(Catalogable):
     def row_value(self):
         return np.matrix([(_search_spec.primary_key(), self._snr, self._dm, self._time_ind, self._ra, self._dec)], self.dtype())[0]
 
-    def 
+    def primary_key():
+        return self._search_spec.primary_key()
 
     def __str__(self):
         return str((self._snr, self.centre,(ra,dec)))

@@ -58,9 +58,9 @@ class SearchSpec(Catalogable):
     dtype = np.dtype([('primary_key', np.str_, 36), ('file_hash', np.str_, 64),('snr_min', np.float32), ('time_and_olap', np.float32, (2,)),('dm', np.float32, (2,)), 
         ('nrecords', np.float32), ('right_ascension', np.float32), ('declination', np.float32), , ('records_searched',np.int32,(2,))])
 
-    def __init__(self, file_hash, dm_min,dm_max,snr_min,t_block,t_olap, start_rec=0, current_rec=0):
+    def __init__(self, file_spec, dm_min, dm_max, snr_min, t_block, t_olap, start_rec=0, current_rec=0):
         self._primary_key = str(uuid.uuid4())
-        self._file_hash = file_hash
+        self._file_hash = file_spec.
 
         self._t_olap = t_olap
         self._t_block = t_block
@@ -72,13 +72,17 @@ class SearchSpec(Catalogable):
         return _primary_key
 
     def dtype(self):
-        return np.array([[primary_key]],dtype=dtype)
+        return dtype
 
     def row_value(self):
-        return 
+        return []
 
 class FileSpec(Catalogable):
 
+    def __init__(self, )
+
+    def primary_key(self):
+        return _file_hash
 
 
 class FileSearch(object):

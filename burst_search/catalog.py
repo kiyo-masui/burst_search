@@ -17,7 +17,7 @@ class Catalog(object):
 
 	"""
 
-	reference_name = {Trigger:'/triggers', SimEvent:'/sim_events', SearchSpec:'/searches'}
+	_reference_name = {Trigger:'/triggers', SimEvent:'/sim_events', SearchSpec:'/searches'}
 
 	# the key set of this dict must be a subset of the key set of the metafile
 	# in future, could/should load from a configuration file or even a hosted file specifying standards/versions
@@ -96,17 +96,23 @@ class Catalog(object):
 	#	self._meta_file
 
 	def write(self,catalogable,hfile,owrite=False):
-		if owrite == False:
-			
-		self_write_pool.apply_async(target=do_write, args=(catalogable, hfile))
+		self_write_pool.apply_async(target=do_write, args=(catalogable, hfile, owrite))
 
-	def do_write(self,catalogable,hfile):
+	def do_write(self,catalogable,hfile,owrite):
 		self._locks[hfile].acquire()
 		dset = hfile[_reference_name[catalogable]]
-		l = len(dset)
-		dset.resize(l + 1,)
-		dset[l] = catalogable.row_value()
-		self._locks[hfile].release()
+		if owrite:
+			primary_key = catalogable.primary_key()
+			for i in xrange(0,dset):
+				if elem[i][0] == primary_key:
+					elem[i] = catalogable.row_value()
+					self._locks[hfile].release()
+					return
+		else:
+			l = len(dset)
+			dset.resize(l + 1,)
+			dset[l] = catalogable.row_value()
+			self._locks[hfile].release()
 
 def microstructure_check(hfile,structure):
 	"""Raises an exception if the hdf5 file has structure inconsistent with that specified by the structure file."""
