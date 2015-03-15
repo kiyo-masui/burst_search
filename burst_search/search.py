@@ -12,9 +12,13 @@ from catalog import Catalogable
 
 class Trigger(Catalogable):
 
-    dtype = np.dtype([('primary_key',np.long), ('snr', np.float32), ('dm', np.float32), ('time_ind', np.float32), ('right_ascension', np.float32), ('declination', np.float32)])
+    dtype = np.dtype([('primary_key',np.str_,36), ('snr', np.float32), ('dm', np.float32), ('time_ind', np.float32), ('right_ascension', np.float32), ('declination', np.float32)])
 
-    def __init__(self, data, centre, snr=0.,ra=None,dec=None):
+    def __init__(self, data, centre, search_spec = None, snr=0.,ra=None,dec=None):
+
+        #Alex's catalogable stuff
+        #must associate each trigger object with a search spec to match primary keys
+        self._search_spec = search_spec
 
         self._data = data
         self._dm_ind = centre[0]
@@ -39,11 +43,15 @@ class Trigger(Catalogable):
     def declination(self):
         return (self._dec)
 
+
+    #from catalogable
     def dtype(self):
         return dt
 
     def row_value(self):
-        return np.matrix([(long(-1), self._snr, self._dm, self._time_ind, self._ra, self._dec)], self.dtype())[0]
+        return np.matrix([(_search_spec.primary_key(), self._snr, self._dm, self._time_ind, self._ra, self._dec)], self.dtype())[0]
+
+    def 
 
     def __str__(self):
         return str((self._snr, self.centre,(ra,dec)))

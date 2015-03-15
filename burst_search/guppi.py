@@ -19,6 +19,7 @@ from . import simulate
 from simulate import *
 
 import hashlib
+import uuid
 
 
 # XXX Eventually a parameter, seconds.
@@ -54,11 +55,12 @@ dm_sd = 100
 
 # Is this the best place for this code?
 class SearchSpec(Catalogable):
-    dtype = np.dtype([('primary_key', np.long), ('file_hash', np.str_, 64),('snr_min', np.float32), ('time_and_olap', np.float32, (2,)),('dm', np.float32, (2,)), 
-        ('time_ind', np.float32), ('right_ascension', np.float32), ('declination', np.float32)])
+    dtype = np.dtype([('primary_key', np.str_, 36), ('file_hash', np.str_, 64),('snr_min', np.float32), ('time_and_olap', np.float32, (2,)),('dm', np.float32, (2,)), 
+        ('nrecords', np.float32), ('right_ascension', np.float32), ('declination', np.float32), , ('records_searched',np.int32,(2,))])
 
-    def __init__(self, file_hash, dm_min,dm_max,snr_min,t_block,t_olap):
-        self._primary_key = hashlib.sha256(hdulist[0].header + hdulist[1].header).hexdigest()
+    def __init__(self, file_hash, dm_min,dm_max,snr_min,t_block,t_olap, start_rec=0, current_rec=0):
+        self._primary_key = str(uuid.uuid4())
+        self._file_hash = file_hash
 
         self._t_olap = t_olap
         self._t_block = t_block
@@ -72,7 +74,11 @@ class SearchSpec(Catalogable):
     def dtype(self):
         return np.array([[primary_key]],dtype=dtype)
 
+    def row_value(self):
+        return 
+
 class FileSpec(Catalogable):
+
 
 
 class FileSearch(object):
