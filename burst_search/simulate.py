@@ -11,6 +11,16 @@ exclusion_sd =  100
 gain = 2.000 # K/Jy
 
 class SimEvent(Catalogable):
+
+	dtype = np.dtype([('primary_key', np.str_, 36), ('f_center', np.float32), ('bw', np.float32), ('dm', np.float32), (t_inf,)])
+
+	def __init__(self,search_spec):
+		self._search_spec = search_spec
+
+
+
+	def primary_key(self):
+		return self._search_spec
 	
 
 class RandSource(object):
@@ -23,7 +33,7 @@ class RandSource(object):
 
 	
 
-	def __init__(self,**kwargs):
+	def __init__(self, catalog=None, **kwargs):
 		"""
 		Initialize a RandSource object
 
@@ -73,6 +83,8 @@ class RandSource(object):
 		self.file_params = kwargs['file_params']
 		self.t_overlap = kwargs['t_overlap']
 		self.nrecords_block = kwargs['nrecords_block']
+
+		self._catalog = catalog
 
 		# for convenience
 		self.ntime_record = self.file_params['ntime_record']
@@ -139,7 +151,10 @@ class RandSource(object):
 				sim_dat[j,nt_disp:ntime_block] = sim_dat[j,0:ntime_block - nt_disp]
 				sim_dat[j,0:nt_disp] = 0.0
 
-			# rudamentary for eval
+
+			if not self._catalog == None:
+				self._catalog.
+			# rudamentary reporting for evaluation
 			print "Sim Event {0} at  t = {1} s block time = {4} with dm {2} s_max {3}".format(i,i*delta_t,dm,params['s_max'],(i%ntime_block)*delta_t)
 
 		return sim_dat
