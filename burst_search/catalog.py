@@ -96,7 +96,17 @@ class Catalog(object):
 	#	self._meta_file
 
 	def write(self,catalogable,hfile,owrite=False):
-		self_write_pool.apply_async(target=do_write, args=(catalogable, hfile, owrite))
+		self._write_pool.apply_async(target=self, args=(catalogable, hfile, owrite))
+
+	def write_metadata(self,catalogable,owrite=False):
+		self._write_pool.apply_async(target=self, args=(catalogable,self._meta_file, owrite))
+
+	def write_data(self,catalogable,owrite=False):
+		self._write_pool.apply_async(target=self, args=(catalogable,self._data_file, owrite))
+
+	def __call__(self,catalogable,hfile,owrite):
+		#An inelegant solution
+		self.do_write(catalogable,hfile,owrite)
 
 	def do_write(self,catalogable,hfile,owrite):
 		self._locks[hfile].acquire()

@@ -56,7 +56,7 @@ dm_sd = 100
 # Is this the best place for this code?
 class SearchSpec(Catalogable):
     dtype = np.dtype([('primary_key', np.str_, 36), ('file_hash', np.str_, 64),('snr_min', np.float32), ('time_and_olap', np.float32, (2,)),('dm', np.float32, (2,)), 
-        ('nrecords', np.float32), ('right_ascension', np.float32), ('declination', np.float32), , ('records_searched',np.int32,(2,))])
+        ('nrecords', np.float32), ('right_ascension', np.float32), ('declination', np.float32), ('records_searched',np.int32,(2,))])
 
     def __init__(self, file_spec, dm_min, dm_max, snr_min, t_block, t_olap, start_rec=0, current_rec=0):
         self._primary_key = str(uuid.uuid4())
