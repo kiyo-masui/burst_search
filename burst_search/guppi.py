@@ -16,6 +16,7 @@ from . import preprocess
 from . import dedisperse
 from . import search
 from . import simulate
+from . import catalog
 from simulate import *
 
 import hashlib
@@ -53,7 +54,7 @@ s_sd = 0.1
 dm_m = 600
 dm_sd = 100
 
-# Is this the best place for this code?
+# Not the best place for this code
 class SearchSpec(Catalogable):
     dtype = np.dtype([('primary_key', np.str_, 36), ('file_hash', np.str_, 64),('snr_min', np.float32), ('time_and_olap', np.float32, (2,)),('dm', np.float32, (2,)), 
         ('nrecords', np.float32), ('right_ascension', np.float32), ('declination', np.float32), ('records_searched',np.int32,(2,))])
@@ -90,11 +91,10 @@ class FileSpec(Catalogable):
     def row_value(self):
         return [_file_hash]
 
-
 class FileSearch(object):
 
-    def __init__(self, filename):
-
+    def __init__(self, filename, catalog=None):
+        self._catalog = catalog
         self._filename = filename
         hdulist = pyfits.open(filename, 'readonly')
 
@@ -172,6 +172,12 @@ class FileSearch(object):
         if action == 'print':
             def action_fun(triggers, data):
                 print triggers
+            return action_fun
+            self._action = action_fun
+        elif action == 'catalog_lite':
+            def action_fun(triggers, data):
+                for t in triggers:
+                    self._catalog.write_metadata(t)
             return action_fun
             self._action = action_fun
         elif action == 'show_plot_dm':

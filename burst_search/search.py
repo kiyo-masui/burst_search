@@ -9,6 +9,17 @@ import _search
 from catalog import Catalogable
 
 
+class TriggerData(Catalogable):
+    dtype = np.dtype([('primary_key',np.str_,36), ('snr', np.float32), ('dm', np.float32), ('time_ind', np.float32), ('right_ascension', np.float32), ('declination', np.float32)])
+
+    def dtype(self):
+        return dtype
+
+    def row_value(self):
+        return np.matrix([(_search_spec.primary_key(), self._snr, self._dm, self._time_ind, self._ra, self._dec)], self.dtype())[0]
+
+    def primary_key(self):
+        return self._search_spec.primary_key()
 
 class Trigger(Catalogable):
 
@@ -46,12 +57,12 @@ class Trigger(Catalogable):
 
     #from catalogable
     def dtype(self):
-        return dt
+        return dtype
 
     def row_value(self):
         return np.matrix([(_search_spec.primary_key(), self._snr, self._dm, self._time_ind, self._ra, self._dec)], self.dtype())[0]
 
-    def primary_key():
+    def primary_key(self):
         return self._search_spec.primary_key()
 
     def __str__(self):

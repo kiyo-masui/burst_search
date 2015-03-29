@@ -30,7 +30,7 @@ class Catalog(object):
 		md_name = 'gbt_frb_metadata.hdf5'
 		d_name = 'gbt_frb_data.hdf5'
 		if base_path != None:
-			if not base_path[-1] == '/':
+			if not base_path[-1] == '/' and len(base_path) > 1:
 				base_path += '/'
 			md_name = base_path + md_name
 			d_name = base_path + md_name
@@ -98,11 +98,12 @@ class Catalog(object):
 	def write(self,catalogable,hfile,owrite=False):
 		self._write_pool.apply_async(target=self, args=(catalogable, hfile, owrite))
 
+	# TODO add overwrite flag to catalogable object
 	def write_metadata(self,catalogable,owrite=False):
-		self._write_pool.apply_async(target=self, args=(catalogable,self._meta_file, owrite))
+		self._write_pool.apply_async(target=self, args=(catalogable, self._meta_file, owrite))
 
 	def write_data(self,catalogable,owrite=False):
-		self._write_pool.apply_async(target=self, args=(catalogable,self._data_file, owrite))
+		self._write_pool.apply_async(target=self, args=(catalogable, self._data_file, owrite))
 
 	def __call__(self,catalogable,hfile,owrite):
 		#An inelegant solution
