@@ -133,6 +133,19 @@ class FileSearch(object):
                 print triggers
             return action_fun
             self._action = action_fun
+        elif action == "save_raw_data":
+            def action_fun(triggers, data):
+                for t in triggers:
+                    parameters = self._parameters
+                    t_offset = (parameters['ntime_record'] * data.start_record)
+                    t_offset += t.centre[1]
+                    t_offset *= parameters['delta_t']
+                    out_filename = path.splitext(path.basename(self._filename))[0]
+                    out_filename += "+%06.2fs.npy" % t_offset
+                    dm_dat = t.trimmed_dm_data()
+                    np.save(out_filename,dm_dat)
+
+            return action_fun
         elif action == 'show_plot_dm':
             def action_fun(triggers, data):
                 for t in triggers:

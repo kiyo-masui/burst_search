@@ -50,6 +50,16 @@ class Trigger(object):
         plt.ylabel("DM (Pc/cm^3)")
         plt.colorbar()
 
+    def trimmed_dm_data(self):
+        di, ti = self.centre
+        tside = 500
+        dside = 300
+
+        start_ti = max(0, ti - tside)
+        end_ti = min(self.data.dm_data.shape[1], ti + tside)
+        start_di = max(0, di - dside)
+        end_di = min(self.data.dm_data.shape[0], di + dside)
+        return self.data.dm_data[start_di:end_di,start_ti:end_ti]
 
 
 def basic(data, snr_threshold=5., min_dm=50.):
