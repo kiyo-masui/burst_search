@@ -37,12 +37,12 @@ THRESH_SNR = 8.0
 DEV_PLOTS = True
 
 #Event simulation params, speculative/contrived
-SIMULATE = False
+SIMULATE = True
 sim_rate = 100*1.0/6000.0
 f_m = 800
-f_sd = 50
+f_sd = 0
 bw_m = 200
-bw_sd = 50
+bw_sd = 0
 t_m = 0.003
 t_sd = 0.002
 s_m = 0.6
@@ -140,10 +140,22 @@ class FileSearch(object):
                     t_offset = (parameters['ntime_record'] * data.start_record)
                     t_offset += t.centre[1]
                     t_offset *= parameters['delta_t']
-                    out_filename = path.splitext(path.basename(self._filename))[0]
-                    out_filename += "+%06.2fs.npy" % t_offset
-                    dm_dat = t.trimmed_dm_data()
-                    np.save(out_filename,dm_dat)
+                    dm_out_filename = path.splitext(path.basename(self._filename))[0]
+                    dm_out_filename += "+%06.2fs_dm.npy" % t_offset
+                    spec_out_filename = path.splitext(path.basename(self._filename))[0]
+                    spec_out_filename += "+%06.2fs_spec.npy" % t_offset
+                    spec_dat,dm_dat ,dm_lims,delta_dm,t_lims,delta_t= t.trimmed_dm_data()
+                    np.save(dm_out_filename,dm_dat)
+                    np.save(spec_out_filename,spec_dat)
+                    print(spec_dat)
+
+                    meta_out = path.splitext(path.basename(self._filename))[0]
+                    meta_out += "+%06.2fs.csv" % t_offset
+                    meta_str = 'dm_min,dm_max,delta_dm,t_min,t_max,delta_t\n{0},{1},{2},{3},{4},{5}'.format(
+                        dm_lims[0]*delta_dm,dm_lims[1]*delta_dm,delta_dm,t_lims[0]*delta_t,t_lims[1]*delta_t,delta_t)
+                    f = open(meta_out,'w')
+                    f.write(meta_str)
+                    f.close()
 
             return action_fun
         elif action == 'show_plot_dm':

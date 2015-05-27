@@ -55,11 +55,13 @@ class Trigger(object):
         tside = 500
         dside = 300
 
+        delta_t = self.data.delta_t
+        delta_dm = self.data.delta_dm
         start_ti = max(0, ti - tside)
         end_ti = min(self.data.dm_data.shape[1], ti + tside)
         start_di = max(0, di - dside)
         end_di = min(self.data.dm_data.shape[0], di + dside)
-        return self.data.dm_data[start_di:end_di,start_ti:end_ti]
+        return self.data.spec_data[:,start_ti:end_ti + 1000],self.data.dm_data[start_di:end_di,start_ti:end_ti],(start_di,end_di),delta_dm,(start_ti,end_ti),delta_t
 
 
 def basic(data, snr_threshold=5., min_dm=50.):
