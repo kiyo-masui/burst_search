@@ -7,7 +7,7 @@ cimport cython
 np.import_array()
 
 
-# These mush match prototypes in src/dedisperse.h
+# These must match prototypes in src/dedisperse.h
 DTYPE = np.float32
 ctypedef np.float32_t DTYPE_t
 
@@ -77,7 +77,7 @@ def dm_transform(
             depth,
             )
 
-    our = np.ascontiguousarray(out[:,:ntime_out])
+    out = np.ascontiguousarray(out[:,:ntime_out])
 
     return out
 

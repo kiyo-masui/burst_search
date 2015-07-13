@@ -21,5 +21,41 @@ class TestPeriodic(unittest.TestCase):
         self.assertTrue(np.allclose(profile, right_profile))
 
 
+class TestHighpass(unittest.TestCase):
+    
+    def test_ramp(self):
+
+        ntime = 1000
+        data = np.arange(5 * ntime)
+        data.shape = (5, ntime)
+
+        data_filt = preprocess.highpass_filter(data, 100)
+        self.assertTrue(np.allclose(data_filt, 0))
+
+    def test_high(self):
+        ntime = 10000
+        data = np.arange(5 * ntime)
+        data.shape = (5, ntime)
+        data = np.cos(data)
+
+        data_filt = preprocess.highpass_filter(data, 1000)
+        nlost = ntime - data_filt.shape[-1]
+
+        self.assertTrue(np.allclose(data_filt, data[:,nlost//2:-nlost//2],
+                atol=1e-5))
+
+    def test_low(self):
+        ntime = 1000000
+        data = np.arange(5 * ntime)
+        data.shape = (5, ntime)
+        data = np.cos(data / 200000.)
+
+        data_filt = preprocess.highpass_filter(data, 100)
+        nlost = ntime - data_filt.shape[-1]
+
+        self.assertTrue(np.allclose(data_filt, 0,
+                atol=1e-5))
+
+
 if __name__ == '__main__':
     unittest.main()

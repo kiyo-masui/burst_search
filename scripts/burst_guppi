@@ -23,7 +23,7 @@ try:
     from mpi4py import MPI
     mpi = True
     mpi_size = MPI.COMM_WORLD.Get_size()
-    mpi_rank = MPI.COMM_WORLD.Get_size()
+    mpi_rank = MPI.COMM_WORLD.Get_rank()
     logger.info("MPI available. Process size is %d. My rank is %d."
                 % (mpi_size, mpi_rank))
 except ImportError:
@@ -59,7 +59,7 @@ if __name__ == "__main__":
         cal_spec = None
 
     if mpi:
-        files = args.files.sorted()
+        files = sorted(args.files)
     else:
         files = args.files
 
@@ -67,7 +67,7 @@ if __name__ == "__main__":
         Searcher = guppi.FileSearch(filename)
         if not cal_spec is None:
             Searcher.set_cal_spectrum(cal_spec)
-        Searcher.set_trigger_action('save_plot_dm, print')
+        Searcher.set_trigger_action('save_plot_dm, print, show_plot_time')
         #Searcher.set_trigger_action('print')
 
         # To write dedispered data to disk.

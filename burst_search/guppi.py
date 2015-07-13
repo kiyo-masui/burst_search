@@ -29,12 +29,15 @@ TIME_BLOCK = 10.0
 
 MAX_DM = 1000
 # For DM=4000, 13s delay across the band, so overlap searches by ~15s.
+
+# Overlap needs to account for the total delay across the band at max DM as
+# well as any data invalidated by FIR filtering of the data.
 #OVERLAP = 15.
 OVERLAP = 0.
 
 THRESH_SNR = 8.0
 
-DEV_PLOTS = True
+DEV_PLOTS = False
 
 #Event simulation params, speculative/contrived
 SIMULATE = False
@@ -140,6 +143,13 @@ class FileSearch(object):
                     t.plot_dm()
                 plt.show()
             return action_fun
+        elif action == 'show_plot_time':
+            def action_fun(triggers, data):
+                for t in triggers:
+                    plt.figure()
+                    t.plot_time()
+                plt.show()
+            return action_fun
         elif action == 'save_plot_dm':
             def action_fun(triggers, data):
                 for t in triggers:
@@ -183,10 +193,13 @@ class FileSearch(object):
 
         if (True):
             # Preprocess.
+            preprocess.sys_temperature_bandpass(data)
 
             if parameters['cal_period_samples']:
-                preprocess.noisecal_bandpass(data, self._cal_spec,
-                                             parameters['cal_period_samples'])
+                preprocess.remove_periodic(data,
+                                           parameters['cal_period_samples'])
+                #preprocess.noisecal_bandpass(data, self._cal_spec,
+                #                             parameters['cal_period_samples'])
 
             if SIMULATE and block_ind in self._sim_source.coarse_event_schedule():
                 #do simulation
@@ -199,10 +212,12 @@ class FileSearch(object):
                 plt.figure()
                 plt.plot(np.mean(data[:1000], 0))
 
+            # 200 ms (hard coded) highpass filter.
+            preprocess.highpass_filter(data, 0.200 / parameters['delta_t'])
             preprocess.remove_outliers(data, 5)
             preprocess.remove_noisy_freq(data, 3)
             #preprocess.remove_continuum(data)
-            preprocess.remove_continuum_v2(data)
+            #preprocess.remove_continuum_v2(data)
 
             # Second round RFI flagging post continuum removal?
             # Doesn't seem to help.
@@ -297,6 +312,7 @@ def parameters_from_header(hdulist):
     parameters['delta_t'] = dheader['TBIN']
     parameters['nfreq'] = dheader['NCHAN']
     parameters['freq0'] = mheader['OBSFREQ'] - mheader['OBSBW'] / 2.
+
     parameters['delta_f'] = dheader['CHAN_BW']
 
     record0 = hdulist[1].data[0]
