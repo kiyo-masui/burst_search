@@ -58,7 +58,7 @@ if __name__ == "__main__":
     else:
         cal_spec = None
 
-    if mpi_size > 1:
+    if mpi:
         files = sorted(args.files)
     else:
         files = args.files
@@ -67,7 +67,7 @@ if __name__ == "__main__":
         Searcher = guppi.FileSearch(filename)
         if not cal_spec is None:
             Searcher.set_cal_spectrum(cal_spec)
-        Searcher.set_trigger_action('save_plot_dm, print')
+        Searcher.set_trigger_action('save_plot_dm, print, show_plot_time')
         #Searcher.set_trigger_action('print')
 
         # To write dedispered data to disk.

@@ -50,6 +50,22 @@ class Trigger(object):
         plt.ylabel("DM (Pc/cm^3)")
         plt.colorbar()
 
+    def plot_time(self):
+        di, ti = self.centre
+        tside = 500
+        dside = 300
+        delta_t = self.data.delta_t
+        delta_dm = self.data.delta_dm
+        start_ti = max(0, ti - tside)
+        end_ti = min(self.data.dm_data.shape[1], ti + tside)
+        time = np.arange(start_ti, end_ti) * delta_t
+        plt.plot(time, self.data.dm_data[di,start_ti:end_ti], 'b'
+                   )
+        plt.plot(time, self.data.dm_data[di,start_ti:end_ti], 'r.'
+                   )
+        plt.xlabel("time (s)")
+        plt.ylabel("Flux")
+
 
 
 def basic(data, snr_threshold=5., min_dm=50.):

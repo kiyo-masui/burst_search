@@ -5,6 +5,7 @@ This module contains, bandpass calibration, RFI flagging, etc.
 """
 
 import numpy as np
+from scipy import signal, fftpack
 
 from _preprocess import remove_continuum_v2
 
@@ -50,6 +51,9 @@ def remove_periodic(data, period):
 def noisecal_bandpass(data, cal_spectrum, cal_period):
     """Remove noise-cal and use to bandpass calibrate.
 
+    Do not use this function. The estimate of the cal amplitude is very noisy.
+    Need an algorithm to find the square wave.
+
     Parameters
     ----------
     data : array with shape ``(nfreq, ntime)``
@@ -63,12 +67,27 @@ def noisecal_bandpass(data, cal_spectrum, cal_period):
 
     cal_profile = remove_periodic(data, cal_period)
     # An *okay* estimate of the height of a square wave is twice the standard
-    # deviation.
+    # deviation.  This is really bad if there is any noise at all... which
+    # there is.
     cal_amplitude = 2 * np.std(cal_profile, 1)
     # Find frequencies with no data.
     bad_chans = cal_amplitude < 1e-5 * np.median(cal_amplitude)
     cal_amplitude[bad_chans] = 1.
     data *= (cal_spectrum / cal_amplitude)[:,None]
+    data[bad_chans,:] = 0
+
+
+def sys_temperature_bandpass(data):
+    """Bandpass calibrate based on system temperature.
+
+    The lowest noise way to flatten the bandpass. Very good if T_sys is
+    relatively constant accross the band.
+    """
+
+    T_sys = np.mean(data, 1)
+    bad_chans = T_sys < 0.001 * np.median(T_sys)
+    T_sys[bad_chans] = 1
+    data /= T_sys
     data[bad_chans,:] = 0
 
 
@@ -87,14 +106,14 @@ def remove_outliers(data, sigma_threshold):
         this_freq_data = data[ii,:]
         mean = np.mean(this_freq_data)
         std = np.std(this_freq_data)
-        outliers = abs(this_freq_data) > sigma_threshold * std
+        outliers = abs(this_freq_data - mean) > sigma_threshold * std
         this_freq_data[outliers] = mean
 
 
 def remove_noisy_freq(data, sigma_threshold):
     """Flag frequency channels with high variance.
 
-    To be effective, data should be bandpass calibrated.
+    To be effective, data should be bandpass calibrated in some way.
 
     """
 
@@ -141,5 +160,39 @@ def remove_continuum(data):
     for ii in range(nfreq):
         data[ii] -= np.sum(data[ii] * continuum) * continuum
 
+
+def highpass_filter(data, width):
+    """Highpass filter on *width* scales using balckman window.
+
+    Finite impulse response filter *that discards invalid data* at the ends.
+
+    """
+
+    ntime = data.shape[-1]
+
+    # Blackman FWHM factor.
+    window_width = int(width / 0.4054785)
+
+    if window_width % 2:
+        window_width += 1
+
+    window = np.zeros(ntime, dtype=np.float32)
+    window_core = signal.blackman(window_width, sym=True)
+    window_core = -window_core / np.sum(window_core)
+    window_core[window_width // 2] += 1
+    window[:window_width] = window_core
+    window_fft = fftpack.fft(window)
+
+    ntime_out = data.shape[-1] - window_width + 1
+    out_shape = data.shape[:-1] + (ntime_out,)
+    out = np.empty(out_shape, data.dtype)
+
+    for ii in range(data.shape[0]):
+        d_fft = fftpack.fft(data[ii])
+        d_fft *= window_fft
+        d_lpf = fftpack.ifft(d_fft)
+        out[ii] = d_lpf[-ntime_out:].real
+
+    return out
 
 

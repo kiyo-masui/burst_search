@@ -78,7 +78,7 @@ def dm_transform(
             jon,
             )
 
-    our = np.ascontiguousarray(out[:,:ntime_out])
+    out = np.ascontiguousarray(out[:,:ntime_out])
 
     return out
 
