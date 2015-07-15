@@ -23,7 +23,7 @@ try:
     from mpi4py import MPI
     mpi = True
     mpi_size = MPI.COMM_WORLD.Get_size()
-    mpi_rank = MPI.COMM_WORLD.Get_size()
+    mpi_rank = MPI.COMM_WORLD.Get_rank()
     logger.info("MPI available. Process size is %d. My rank is %d."
                 % (mpi_size, mpi_rank))
 except ImportError:
@@ -58,8 +58,8 @@ if __name__ == "__main__":
     else:
         cal_spec = None
 
-    if mpi:
-        files = args.files.sorted()
+    if mpi_size > 1:
+        files = sorted(args.files)
     else:
         files = args.files
 
