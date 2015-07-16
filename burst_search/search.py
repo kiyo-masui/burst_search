@@ -52,8 +52,9 @@ class Trigger(object):
 
     def trimmed_dm_data(self):
         di, ti = self.centre
-        tside = int(1500*(0.001024/self.data.delta_t))
-        dside = 300
+        scale = (0.001024/self.data.delta_t)
+        tside = int(1500*scale)
+        dside = int(300*scale)
 
         delta_t = self.data.delta_t
         delta_dm = self.data.delta_dm

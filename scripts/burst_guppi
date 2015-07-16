@@ -56,6 +56,7 @@ if __name__ == "__main__":
     if args.cal_spec_file:
         cal_spec = np.load(args.cal_spec_file)
     else:
+        print 'no calspec'
         cal_spec = None
 
     if mpi:
@@ -63,12 +64,16 @@ if __name__ == "__main__":
     else:
         files = args.files
 
+    print 'mpi_rank: {0}, mpi_size: {1}'.format(mpi_rank, mpi_size)
+
     for filename in files[mpi_rank::mpi_size]:
+        print 'loop'
         Searcher = guppi.FileSearch(filename)
         print 'initialized searcher'
         if not cal_spec is None:
             Searcher.set_cal_spectrum(cal_spec)
-        Searcher.set_trigger_action('save_plot_dm, print, save_raw_data')
+        #Searcher.set_trigger_action('save_plot_dm, print, save_raw_data')
+        Searcher.set_trigger_action('print')
         print 'set triggers'
         #Searcher.set_trigger_action('print')
 

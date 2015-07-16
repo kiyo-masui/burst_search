@@ -23,14 +23,14 @@ from simulate import *
 #TIME_BLOCK = 30.
 
 #Additions:
-MIN_SEARCH_DM = 50
+MIN_SEARCH_DM = 5
 
-TIME_BLOCK = 10.0
+TIME_BLOCK = 30.0
 
-MAX_DM = 250
+MAX_DM = 1000
 # For DM=4000, 13s delay across the band, so overlap searches by ~15s.
 #OVERLAP = 15.
-OVERLAP = 0.
+OVERLAP = 5.0
 
 THRESH_SNR = 8.0
 
@@ -60,7 +60,7 @@ class FileSearch(object):
 
         self._filename = filename
         hdulist = pyfits.open(filename, 'readonly')
-
+        
         parameters = parameters_from_header(hdulist)
         #print parameters
         self._parameters = parameters
