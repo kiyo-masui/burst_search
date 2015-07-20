@@ -64,11 +64,14 @@ if __name__ == "__main__":
         files = args.files
 
     for filename in files[mpi_rank::mpi_size]:
-        Searcher = guppi.FileSearch(filename)
-        if not cal_spec is None:
+        try:        
+            Searcher = guppi.FileSearch(filename)
+        except ValueError:
+            continue        
+	if not cal_spec is None:
             Searcher.set_cal_spectrum(cal_spec)
-        Searcher.set_trigger_action('save_plot_dm')
-        #Searcher.set_trigger_action('print')
+        #Searcher.set_trigger_action('save_plot_dm')
+        Searcher.set_trigger_action('print')
 
         # To write dedispered data to disk.
         #out_filename = path.splitext(path.basename(filename))[0] + ".h5"

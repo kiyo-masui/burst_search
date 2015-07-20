@@ -31,9 +31,39 @@ class Trigger(object):
     def __repr__(self):
         return str((self._snr, self.centre))
 
+#    def plot_dm(self):
+#        di, ti = self.centre
+#        tside = 500
+#        dside = 300
+#        delta_t = self.data.delta_t
+#        delta_dm = self.data.delta_dm
+#        delta_f = self.data.delta_f
+#	start_ti = max(0, ti - tside)
+#        end_ti = min(self.data.dm_data.shape[1], ti + tside)
+#        start_di = max(0, di - dside)
+#        end_di = min(self.data.dm_data.shape[0], di + dside)
+#	plt.subplot(2,1,1)
+#        plt.imshow(self.data.dm_data[start_di:end_di,start_ti:end_ti],
+#                   extent=[start_ti * delta_t, end_ti * delta_t,
+#                           end_di * delta_dm, start_di * delta_dm],
+#                   aspect='auto',
+#                   )
+#        plt.xlabel("time (s)")
+#        plt.ylabel("DM (Pc/cm^3)")
+#        plt.colorbar()
+#	plt.subplot(2,1,2)
+#        plt.imshow(self.data.spec_data[:],
+#                   #extent=[start_ti * delta_t, end_ti * delta_t,
+#                   #        end_di * delta_f, start_di * delta_f],
+#                   aspect='auto',
+#                   )
+#	plt.xlabel("time samples")
+#        plt.ylabel("Freq")
+#        plt.colorbar()
+
     def plot_dm(self):
         di, ti = self.centre
-        tside = 500
+        tside = 600
         dside = 300
         delta_t = self.data.delta_t
         delta_dm = self.data.delta_dm
@@ -47,8 +77,23 @@ class Trigger(object):
                    aspect='auto',
                    )
         plt.xlabel("time (s)")
-        plt.ylabel("DM (Pc/cm^3)")
-        plt.colorbar()
+        plt.ylabel("DM (Pc/cm$^3$)")
+        plt.colorbar()	
+
+    def plot_spec(self):
+        di, ti = self.centre
+        tside = 500
+        dside = 300
+        delta_t = self.data.delta_t
+        delta_f = self.data.delta_f
+        start_ti = max(0, ti - tside)
+        end_ti = min(self.data.spec_data.shape[1], ti + tside)
+        start_di = max(0, di - dside)
+        end_di = min(self.data.spec_data.shape[0], di + dside)
+        plt.plot(np.mean(self.data.spec_data[:],0))
+        #plt.xlabel("time (s)")
+        #plt.ylabel("Freq (MHz)")
+        #plt.colorbar()
 
 
 

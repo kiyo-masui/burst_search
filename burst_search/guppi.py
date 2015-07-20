@@ -19,13 +19,14 @@ from . import search
 
 # XXX Eventually a parameter, seconds.
 #TIME_BLOCK = 30.
-TIME_BLOCK = 30.
+TIME_BLOCK = 30
 
 MAX_DM = 2000.
+Min_Search_DM = 1.
 #MAX_DM = 1000.
 # For DM=4000, 13s delay across the band, so overlap searches by ~15s.
 #OVERLAP = 15.
-OVERLAP = 8.
+OVERLAP = 8
 
 THRESH_SNR = 8.
 
@@ -36,6 +37,7 @@ class FileSearch(object):
 
     def __init__(self, filename):
         self._filename = filename
+        print filename
         hdulist = pyfits.open(filename, 'readonly')
 
         parameters = parameters_from_header(hdulist)
@@ -80,7 +82,7 @@ class FileSearch(object):
 
     def set_search_method(self, method='basic', **kwargs):
         if method == 'basic':
-            self._search = lambda dm_data : search.basic(dm_data, THRESH_SNR)
+            self._search = lambda dm_data : search.basic(dm_data, THRESH_SNR,Min_Search_DM)
         else:
             msg = "Unrecognized search method."
             raise ValueError(msg)
@@ -106,7 +108,7 @@ class FileSearch(object):
                     t_offset *= parameters['delta_t']
                     f = plt.figure()
                     t.plot_dm()
-                    out_filename = path.splitext(path.basename(self._filename))[0]
+		    out_filename = path.splitext(path.basename(self._filename))[0]
                     out_filename += "+%06.2fs.png" % t_offset
                     plt.savefig(out_filename, bbox_inches='tight')
                     plt.close(f)
@@ -162,7 +164,12 @@ class FileSearch(object):
 
         # Dispersion measure transform.
         dm_data = self._Transformer(data)
+        print dm_data.dm_data.shape
+        print dm_data.spec_data.shape
+        print dm_data.delta_dm
+        print dm_data.delta_t
         dm_data.start_record = start_record
+ 
 
         if DEV_PLOTS:
             plt.figure()
@@ -176,7 +183,7 @@ class FileSearch(object):
             plt.show()
 
         return dm_data
-
+        
     def search_all_records(self, time_block=TIME_BLOCK, overlap=OVERLAP):
 
         parameters = self._parameters
@@ -238,6 +245,11 @@ def parameters_from_header(hdulist):
     #print repr(hdulist[1].header)
     mheader = hdulist[0].header
     dheader = hdulist[1].header
+
+    #parameters['delta_t'] = dheader['TBIN']
+    #parameters['nfreq'] = dheader['NCHAN']
+    #parameters['freq0'] = mheader['OBSFREQ'] - mheader['OBSBW'] / 2.
+    #parameters['delta_f'] = dheader['CHAN_BW']
 
     if mheader['CAL_FREQ']:
         cal_period = 1. / mheader['CAL_FREQ']
