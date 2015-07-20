@@ -1,0 +1,78 @@
+#! /usr/bin/python
+"""Search guppi files for fast radio bursts.
+
+"""
+
+import time
+import argparse
+from os import path
+import logging
+
+import numpy as np
+import h5py
+
+from burst_search import cal_guppi
+
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+logger.addHandler(logging.StreamHandler())
+
+
+try:
+    from mpi4py import MPI
+    mpi = True
+    mpi_size = MPI.COMM_WORLD.Get_size()
+    mpi_rank = MPI.COMM_WORLD.Get_rank()
+    logger.info("MPI available. Process size is %d. My rank is %d."
+                % (mpi_size, mpi_rank))
+except ImportError:
+    mpi = False
+    mpi_size = 1
+    mpi_rank = 0
+    logger.info("MPI not available.")
+
+
+# Command line arguments.
+parser = argparse.ArgumentParser(description='Search GUPPI data for T_calibration.')
+parser.add_argument(
+        "files",
+        metavar="GUPPI_calibration_files",
+        type=str,
+        nargs='+',
+        help="GUPPI calibration files to search.",
+        )
+parser.add_argument(
+        '-c', '--cal-spec-file',
+        help=('.npy file containing the noise-cal spectrum for bandpass'
+              ' calibration.'),
+        )
+
+
+
+if __name__ == "__main__":
+    args = parser.parse_args()
+
+    if mpi_size > 1:
+        files = sorted(args.files)
+    else:
+        files = args.files
+    
+    filename1 = args.files[0]
+    filename2 = args.files[1]
+
+    for filename in files[mpi_rank::mpi_size]:
+        Plotter = cal_guppi.T_cal(filename1, filename2)
+	#if not T_cal is None:
+        #    Plotter.T_cal(T_cal)
+        #Plotter.set_trigger_action('save_plot_dm')
+        #Searcher.set_trigger_action('print')
+
+        # To write dedispered data to disk.
+        #out_filename = path.splitext(path.basename(filename))[0] + ".h5"
+        #out_file = h5py.File(out_filename)
+        #Searcher.set_dedispersed_h5(out_file)
+
+        #Plotter.search_all_records()
+        #out_file.close()
+
