@@ -87,7 +87,7 @@ def sys_temperature_bandpass(data):
     T_sys = np.mean(data, 1)
     bad_chans = T_sys < 0.001 * np.median(T_sys)
     T_sys[bad_chans] = 1
-    data /= T_sys
+    data /= T_sys[:,None]
     data[bad_chans,:] = 0
 
 

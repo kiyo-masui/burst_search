@@ -7,6 +7,7 @@ import time
 import argparse
 from os import path
 import logging
+import glob
 
 import numpy as np
 import h5py
@@ -57,11 +58,15 @@ if __name__ == "__main__":
         cal_spec = np.load(args.cal_spec_file)
     else:
         cal_spec = None
+	
+    files = args.files
+    if len(files) == 1:
+	files = glob.glob(files[0])
 
-    if mpi:
-        files = sorted(args.files)
+    if mpi_size > 1:
+        files = sorted(files)
     else:
-        files = args.files
+        files = files
 
     for filename in files[mpi_rank::mpi_size]:
         Searcher = guppi.FileSearch(filename)
