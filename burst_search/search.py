@@ -66,6 +66,25 @@ class Trigger(object):
         plt.xlabel("time (s)")
         plt.ylabel("Flux")
 
+    def plot_freq(self):
+        di, ti = self.centre
+        tside = 500
+        dside = 300
+        delta_t = self.data.delta_t
+        delta_dm = self.data.delta_dm
+        start_ti = max(0, ti - tside)
+        end_ti = min(self.data.spec_data.shape[1], ti + tside)
+        start_di = max(0, di - dside)
+        end_di = min(self.data.spec_data.shape[0], di + dside)
+        plt.imshow(self.data.spec_data[start_di:end_di,start_ti:end_ti],
+                   extent=[start_ti * delta_t, end_ti * delta_t,
+                           end_di * delta_dm, start_di * delta_dm],
+                   aspect='auto',
+                   )
+        plt.xlabel("time (s)")
+        plt.ylabel("Frequency")
+        plt.colorbar()
+
 
 
 def basic(data, snr_threshold=5., min_dm=50.):

@@ -23,11 +23,11 @@ from simulate import *
 #TIME_BLOCK = 30.
 
 #Additions:
-MIN_SEARCH_DM = 500
+MIN_SEARCH_DM = 1
 
-TIME_BLOCK = 10.0
+TIME_BLOCK = 30.0
 
-MAX_DM = 1000
+MAX_DM = 2000
 # For DM=4000, 13s delay across the band, so overlap searches by ~15s.
 
 # Overlap needs to account for the total delay across the band at max DM as
@@ -157,8 +157,13 @@ class FileSearch(object):
                     t_offset = (parameters['ntime_record'] * data.start_record)
                     t_offset += t.centre[1]
                     t_offset *= parameters['delta_t']
-                    f = plt.figure()
+                    f = plt.figure(1)
+		    plt.subplot(311)
                     t.plot_dm()
+		    plt.subplot(312)
+		    t.plot_time()
+		    plt.subplot(313)
+                    t.plot_freq()
                     out_filename = path.splitext(path.basename(self._filename))[0]
                     out_filename += "+%06.2fs.png" % t_offset
                     plt.savefig(out_filename, bbox_inches='tight')
