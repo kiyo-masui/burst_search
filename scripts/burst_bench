@@ -221,7 +221,7 @@ if __name__ == "__main__":
 		plt.xlabel('parameter value')
 		plt.ylabel('dedisperse execution time (s)')
 		plt.title('time window behavior')
-		plt.savefig('tw_series.png')
+		plt.savefig('results/tw_series.png')
 
 	if max_dm_samples > 1:
 		dm_series = []
@@ -236,7 +236,7 @@ if __name__ == "__main__":
 		plt.xlabel('parameter value')
 		plt.ylabel('dedisperse execution time (s)')
 		plt.title('max dm behavior')
-		plt.savefig('dw_series.png')
+		plt.savefig('results/dw_series.png')
 
 	if nchan_samples > 1:
 		ch_series = []
@@ -260,7 +260,7 @@ if __name__ == "__main__":
 		plt.xlabel('parameter value')
 		plt.ylabel('dedisperse execution time (s)')
 		plt.title('channel count behavior')
-		plt.savefig('ch_series.png')
+		plt.savefig('results/ch_series.png')
 
 	if dt_samples > 1:
 		dt_series = []
@@ -285,7 +285,7 @@ if __name__ == "__main__":
 		plt.xlabel('parameter value')
 		plt.ylabel('dedisperse execution time (s)')
 		plt.title('inverse time resolution behavior')
-		plt.savefig('tr_series.png')
+		plt.savefig('results/tr_series.png')
 
    	plt.show()
 
