@@ -341,9 +341,12 @@ void dedisperse_single(float **inin, float **outout, int nchan,int ndat)
   //npass=2;
   int bs=nchan;
   float **in=inin;
-  float **out=outout;
 
-  printf('dedisperse using n threads');
+  float **out=outout;
+  FILE *fout;
+  fout = fopen('/var/log/burst_bench.log', 'w');
+  fprintf(fout,'dedisperse using %s threads' % *getenv('OMP_NUM_THREADS'));
+  fclose(fout);
 //  omp_set_dynamic(0);
 //  omp_set_num_threads(8);
 

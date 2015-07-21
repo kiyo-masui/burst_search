@@ -29,14 +29,21 @@ logger.addHandler(logging.StreamHandler())
 # Command line arguments.
 parser = argparse.ArgumentParser(description='benchmark the dm transform')
 parser.add_argument(
-        '--num_channels0',
+        '--num_channels',
         metavar="channels0",
         default=128,
         type=int,
         help="Number of channels to dedisperse; start of range - value increases by factors of two",
         )
 parser.add_argument(
-        '--max_dm0',
+        '--num_channels_samples',
+        metavar="channels_samples",
+        default=12,
+        type=int,
+        help="Number of power 2 orders of magnitude to test",
+        )
+parser.add_argument(
+        '--max_dm',
         metavar="dm_max0",
         default=1000.0,
         type=float,
@@ -50,6 +57,12 @@ parser.add_argument(
         help="Maximum dm to transform in pc cm^-3 units; end of range",
         )
 parser.add_argument(
+        '--max_dm_samples',
+        metavar="dm_samples",
+        default=1,
+        type=int,
+	)
+parser.add_argument(
         "-r", '--time_res',
         metavar="time_res",
         default=0.001,
@@ -57,18 +70,38 @@ parser.add_argument(
         help="Time resolution of data",
         )
 parser.add_argument(
-        '--length_time0',
+        '--time_res1',
+        metavar="time_res1",
+        default=0.01,
+        type=float,
+        help="Time resolution of data (max)",
+        )
+parser.add_argument(
+        '--time_res_samples',
+        metavar="time_res_samples",
+        default=1,
+        type=int,
+        help="number of time_res samples",
+        )
+parser.add_argument(
+        '--length_time',
         metavar="tw0",
-        default=10.0,
+        default=60.0,
         type=float,
         help="Length of window in time (start of range)",
         )
 parser.add_argument(
         '--length_time1',
         metavar="tw1",
-        default=40.0,
+        default=70.0,
         type=float,
         help="Length of window in time  (end of range)",
+        )
+parser.add_argument(
+        '--length_time_samples',
+        metavar="tw_samples",
+        default=1,
+        type=int,
         )
 parser.add_argument(
         "-c", '--count',
@@ -86,7 +119,7 @@ parser.add_argument(
 parser.add_argument(
         "-f", '--freq_zero',
         metavar="minimum frequency",
-        default=700.0,
+        default=400.0,
         type=float,
         help="Minimum frequency to transform (MHz)",
         )
@@ -109,18 +142,25 @@ parser.add_argument(
 if __name__ == "__main__":
 	args = parser.parse_args()
 
-	nchan0 = args.num_channels0
+	nchan = args.num_channels
+	nchan_samples = args.num_channels_samples
 	count = args.count
 	f0 = args.freq_zero
 	bw = args.bandwidth
-	time_window0 = args.length_time0
+	time_window = args.length_time
 	time_window1 = args.length_time1
-	max_dm0 = args.max_dm0
+	tw_samples = args.length_time_samples
+	max_dm = args.max_dm
 	max_dm1 = args.max_dm1
+	max_dm_samples = args.max_dm_samples
 	dt = args.time_res
-	samples = args.samples
+	dt1 = args.time_res1
+	dt_samples = args.time_res_samples
+	#samples = args.samples
 
 
+	#Does not seem to matter on our
+	#UBC test machine
 	if args.omp_num_threads:
 		threads = args.omp_num_threads
 		print 'using %i omp threads' % threads
@@ -129,70 +169,123 @@ if __name__ == "__main__":
 	else:
 		os.environ['OMP_DYNAMIC'] = 'TRUE'
 
+	time_windows = [time_window]
+	if tw_samples > 1:
+		time_windows = [a for a in np.linspace(time_window, time_window1, tw_samples)]
 
+	max_dms = [max_dm]
+	if max_dm_samples > 1:
+		max_dms = [a for a in np.linspace(max_dm, max_dm1, max_dm_samples)]
 
-	time_windows = [a for a in np.linspace(time_window0, time_window1, samples)]
-	max_dms = [a for a in np.linspace(max_dm0, max_dm1, samples)]
-	channels = [None]*samples
+	channels = [nchan]
+	if nchan_samples > 1:
+		channels = [None]*nchan_samples
+		for i in xrange(0,nchan_samples):
+			channels[i] = nchan*(2**i)
+		nc_xlab = [str(n) for n in channels]
 
-	for i in xrange(0,samples):
-		channels[i] = nchan0*(2**i)
+	dts = [dt]
+	if dt_samples > 1:
+		dts = [a for a in np.linspace(dt, dt1, dt_samples)]
 
 	times = []
-
-	for params in product(time_windows, max_dms, channels):
+	for params in product(time_windows, max_dms, channels,dts):
 		time_window = params[0]
 		max_dm = params[1]
 		nchan = params[2]
+		this_dt = params[3]
 
-		ntime = int(time_window/dt)
+		ntime = int(time_window/this_dt)
 		trans = DMTransform(dt,nchan,f0,bw/nchan,max_dm)
 		for i in xrange(0,count):
 			dat = np.matrix(np.random.rand(nchan,ntime), dtype=np.float32)
 			print 'attempting test with params \n tw {0}, max dm {1}, nchan {2}'.format(
-				time_window, max_dm, nchan)
+				time_window, max_dm, nchan, dt)
+
+			print 'effective channels: {0}'.format(2**trans.depth)
 			t0 = time.time()
 			trans(dat)
-			times.append([time.time() - t0,time_window,max_dm,nchan])
+			times.append([time.time() - t0,time_window,max_dm,nchan,this_dt])
 			print 'complete; t = {0}'.format(times[-1][0])
 
-	tw_series = []
-	for tw in time_windows:
-		entry = []
-		for t in times:
-			if t[1] == tw:
-				entry.append(t[0])
-		tw_series.append(np.mean(entry))
+	if tw_samples > 1:
+		tw_series = []
+		for tw in time_windows:
+			entry = []
+			for t in times:
+				if t[1] == tw:
+					entry.append(t[0])
+			tw_series.append(np.mean(entry))
+		plt.figure()
+		plt.plot(tw_series)
+		plt.xlabel('parameter value')
+		plt.ylabel('dedisperse execution time (s)')
+		plt.title('time window behavior')
+		plt.savefig('tw_series.png')
 
-	dm_series = []
-	for dm in max_dms:
-		entry = []
-		for t in times:
-			if t[2] == dm:
-				entry.append(t[0])
-		dm_series.append(np.mean(entry))
-	ch_series = []
-	for nc in channels:
-		entry = []
-		for t in times:
-			if t[3] == nc:
-				entry.append(t[0])
-		ch_series.append(np.mean(entry))
+	if max_dm_samples > 1:
+		dm_series = []
+		for dm in max_dms:
+			entry = []
+			for t in times:
+				if t[2] == dm:
+					entry.append(t[0])
+			dm_series.append(np.mean(entry))
+		plt.figure()
+		plt.plot(dm_series)
+		plt.xlabel('parameter value')
+		plt.ylabel('dedisperse execution time (s)')
+		plt.title('max dm behavior')
+		plt.savefig('dw_series.png')
 
-	plt.figure()
-	plt.plot(tw_series)
-	plt.title('time window behavior')
-	plt.savefig('tw_series.png')
-          
-	plt.figure()
-	plt.plot(dm_series)
-	plt.title('max dm behavior')
-	plt.savefig('dw_series.png')
+	if nchan_samples > 1:
+		ch_series = []
+		stdev = []
+		for nc in channels:
+			entry = []
+			for t in times:
+				if t[3] == nc:
+					entry.append(t[0])
+			stdev.append(np.std(entry))
+			ch_series.append(np.mean(entry))
+		stdev = np.array(stdev)
+		plt.figure()
+		ax = plt.gca()
+		plt.errorbar(channels, ch_series,yerr=3.0*stdev)
+		ax.text(0.60, 0.15, 'max_dm: {0}\ntime_window: {1}'.format(max_dms[0],time_windows[0]),
+			verticalalignment='bottom', horizontalalignment='left',
+			transform=ax.transAxes, color='green', fontsize=15)
+		ax.set_xticks(channels)
+		ax.set_xticklabels(nc_xlab)
+		plt.xlabel('parameter value')
+		plt.ylabel('dedisperse execution time (s)')
+		plt.title('channel count behavior')
+		plt.savefig('ch_series.png')
 
-	plt.figure()
-	plt.plot(ch_series)
-	plt.title('channel count behavior')
-	plt.savefig('ch_series.png')
+	if dt_samples > 1:
+		dt_series = []
+		stdev = []
+		for dti in dts:
+			entry = []
+			for t in times:
+				if t[4] == dti:
+					entry.append(t[0])
+			stdev.append(np.std(entry))
+			dt_series.append(np.mean(entry))
+		stdev = np.array(stdev)
+		plt.figure()
+		ax = plt.gca()
+		dt_lab = ['{:.2e}'.format(d) for d in dts]
+		dts = [1/d for d in dts]
+		plt.errorbar(dts, dt_series,yerr=3.0*stdev)
+		ax.text(0.60, 0.15, 'n_chan: {0}\nmax_dm: {1}\ntime_window: {2}'.format(channels[0],max_dms[0],time_windows[0]),
+			verticalalignment='bottom', horizontalalignment='left',
+			transform=ax.transAxes, color='green', fontsize=15)
+		ax.set_xticklabels(dt_lab)
+		plt.xlabel('parameter value')
+		plt.ylabel('dedisperse execution time (s)')
+		plt.title('inverse time resolution behavior')
+		plt.savefig('tr_series.png')
 
    	plt.show()
 

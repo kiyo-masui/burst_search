@@ -195,7 +195,6 @@ class DMTransform(object):
         chan_map = np.empty(2**depth, dtype=CM_DTYPE)
         burst_setup_channel_mapping(<CM_DTYPE_t *> chan_map.data, cnfreq, cfreq0,
                 cdelta_f, depth)
-
         self._chan_map = chan_map
         self._delta_t = delta_t
         self._nfreq = nfreq
