@@ -84,7 +84,7 @@ def sys_temperature_bandpass(data):
     relatively constant accross the band.
     """
 
-    T_sys = np.mean(data, 1)
+    T_sys = np.median(data, 1)
     bad_chans = T_sys < 0.001 * np.median(T_sys)
     T_sys[bad_chans] = 1
     data /= T_sys[:,None]
@@ -162,7 +162,7 @@ def remove_continuum(data):
 
 
 def highpass_filter(data, width):
-    """Highpass filter on *width* scales using balckman window.
+    """Highpass filter on *width* scales using blackman window.
 
     Finite impulse response filter *that discards invalid data* at the ends.
 

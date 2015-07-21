@@ -33,7 +33,7 @@ MAX_DM = 2000
 # Overlap needs to account for the total delay across the band at max DM as
 # well as any data invalidated by FIR filtering of the data.
 #OVERLAP = 15.
-OVERLAP = 0.
+OVERLAP = 8.
 
 THRESH_SNR = 8.0
 
@@ -218,7 +218,7 @@ class FileSearch(object):
                 plt.plot(np.mean(data[:1000], 0))
 
             # 200 ms (hard coded) highpass filter.
-            preprocess.highpass_filter(data, 0.200 / parameters['delta_t'])
+            data = preprocess.highpass_filter(data, 0.200 / parameters['delta_t'])
             preprocess.remove_outliers(data, 5)
             preprocess.remove_noisy_freq(data, 3)
             #preprocess.remove_continuum(data)
