@@ -191,7 +191,7 @@ Data *map_chans(Data *dat, int depth)
 /*--------------------------------------------------------------------------------*/
 void remap_data( Data *dat)
 {						
-  double t0=omp_get_wtime();
+  //double t0=omp_get_wtime();
   assert(dat->chan_map);
   memset(dat->data[0],0,sizeof(dat->data[0][0])*dat->nchan*dat->ndata);  
   for (int i=0;i<dat->raw_nchan;i++) {
@@ -342,6 +342,10 @@ void dedisperse_single(float **inin, float **outout, int nchan,int ndat)
   int bs=nchan;
   float **in=inin;
   float **out=outout;
+
+  printf('dedisperse using n threads');
+//  omp_set_dynamic(0);
+//  omp_set_num_threads(8);
 
   for (int i=0;i<npass;i++) {    
 #pragma omp parallel for

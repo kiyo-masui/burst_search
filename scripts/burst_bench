@@ -1,0 +1,201 @@
+#! /usr/bin/python
+"""Benchmark the DM transform of burst_search
+
+"""
+
+import time
+import argparse
+import os
+from os import path
+import logging
+from itertools import product
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+from burst_search.dedisperse import DMTransform
+
+
+import math
+
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+logger.addHandler(logging.StreamHandler())
+
+#removed mpi code
+
+
+# Command line arguments.
+parser = argparse.ArgumentParser(description='benchmark the dm transform')
+parser.add_argument(
+        '--num_channels0',
+        metavar="channels0",
+        default=128,
+        type=int,
+        help="Number of channels to dedisperse; start of range - value increases by factors of two",
+        )
+parser.add_argument(
+        '--max_dm0',
+        metavar="dm_max0",
+        default=1000.0,
+        type=float,
+        help="Maximum dm to transform in pc cm^-3 units; start of range",
+        )
+parser.add_argument(
+        '--max_dm1',
+        metavar="dm_max1",
+        default=5000.0,
+        type=float,
+        help="Maximum dm to transform in pc cm^-3 units; end of range",
+        )
+parser.add_argument(
+        "-r", '--time_res',
+        metavar="time_res",
+        default=0.001,
+        type=float,
+        help="Time resolution of data",
+        )
+parser.add_argument(
+        '--length_time0',
+        metavar="tw0",
+        default=10.0,
+        type=float,
+        help="Length of window in time (start of range)",
+        )
+parser.add_argument(
+        '--length_time1',
+        metavar="tw1",
+        default=40.0,
+        type=float,
+        help="Length of window in time  (end of range)",
+        )
+parser.add_argument(
+        "-c", '--count',
+        metavar="count",
+        default=1,
+        type=int,
+        help="Times to run benchmark (for statistics)",
+        )
+parser.add_argument(
+        "-t", '--omp_num_threads',
+        metavar="omp_threads",
+        type=int,
+        help="Number of threads that OMP is forced to use",
+        )
+parser.add_argument(
+        "-f", '--freq_zero',
+        metavar="minimum frequency",
+        default=700.0,
+        type=float,
+        help="Minimum frequency to transform (MHz)",
+        )
+parser.add_argument(
+        "-b", '--bandwidth',
+        metavar="bandwidth",
+        default=400.0,
+        type=float,
+        help="Frequency bandwidth (MHz)",
+        )
+parser.add_argument(
+        "-s", '--samples',
+        metavar="samples",
+        default=5,
+        type=int,
+        help="Number of samples per parameter",
+        )
+
+
+if __name__ == "__main__":
+	args = parser.parse_args()
+
+	nchan0 = args.num_channels0
+	count = args.count
+	f0 = args.freq_zero
+	bw = args.bandwidth
+	time_window0 = args.length_time0
+	time_window1 = args.length_time1
+	max_dm0 = args.max_dm0
+	max_dm1 = args.max_dm1
+	dt = args.time_res
+	samples = args.samples
+
+
+	if args.omp_num_threads:
+		threads = args.omp_num_threads
+		print 'using %i omp threads' % threads
+		os.environ['OMP_DYNAMIC'] = 'FALSE'
+		os.environ['OMP_NUM_THREADS'] = str(threads)
+	else:
+		os.environ['OMP_DYNAMIC'] = 'TRUE'
+
+
+
+	time_windows = [a for a in np.linspace(time_window0, time_window1, samples)]
+	max_dms = [a for a in np.linspace(max_dm0, max_dm1, samples)]
+	channels = [None]*samples
+
+	for i in xrange(0,samples):
+		channels[i] = nchan0*(2**i)
+
+	times = []
+
+	for params in product(time_windows, max_dms, channels):
+		time_window = params[0]
+		max_dm = params[1]
+		nchan = params[2]
+
+		ntime = int(time_window/dt)
+		trans = DMTransform(dt,nchan,f0,bw/nchan,max_dm)
+		for i in xrange(0,count):
+			dat = np.matrix(np.random.rand(nchan,ntime), dtype=np.float32)
+			print 'attempting test with params \n tw {0}, max dm {1}, nchan {2}'.format(
+				time_window, max_dm, nchan)
+			t0 = time.time()
+			trans(dat)
+			times.append([time.time() - t0,time_window,max_dm,nchan])
+			print 'complete; t = {0}'.format(times[-1][0])
+
+	tw_series = []
+	for tw in time_windows:
+		entry = []
+		for t in times:
+			if t[1] == tw:
+				entry.append(t[0])
+		tw_series.append(np.mean(entry))
+
+	dm_series = []
+	for dm in max_dms:
+		entry = []
+		for t in times:
+			if t[2] == dm:
+				entry.append(t[0])
+		dm_series.append(np.mean(entry))
+	ch_series = []
+	for nc in channels:
+		entry = []
+		for t in times:
+			if t[3] == nc:
+				entry.append(t[0])
+		ch_series.append(np.mean(entry))
+
+	plt.figure()
+	plt.plot(tw_series)
+	plt.title('time window behavior')
+	plt.savefig('tw_series.png')
+          
+	plt.figure()
+	plt.plot(dm_series)
+	plt.title('max dm behavior')
+	plt.savefig('dw_series.png')
+
+	plt.figure()
+	plt.plot(ch_series)
+	plt.title('channel count behavior')
+	plt.savefig('ch_series.png')
+
+   	plt.show()
+
+   	print 'results: \n'
+   	print '{0} executions in {1} seconds \n average: {2} +- {3} {4}, stdev: {5}\n'.format(samples*count,sum(times),
+   		np.mean(times),np.max(np.array(times) - np.mean(times)),np.min(np.array(times) - np.mean(times)),np.std(times))
