@@ -199,8 +199,8 @@ if __name__ == "__main__":
 		trans = DMTransform(dt,nchan,f0,bw/nchan,max_dm)
 		for i in xrange(0,count):
 			dat = np.matrix(np.random.rand(nchan,ntime), dtype=np.float32)
-			print 'attempting test with params \n tw {0}, max dm {1}, nchan {2}'.format(
-				time_window, max_dm, nchan, dt)
+			print 'attempting test with params \n tw {0}, max dm {1}, nchan {2}, dt {3}'.format(
+				time_window, max_dm, nchan, this_dt)
 
 			print 'effective channels: {0}'.format(2**trans.depth)
 			t0 = time.time()
@@ -275,20 +275,27 @@ if __name__ == "__main__":
 		stdev = np.array(stdev)
 		plt.figure()
 		ax = plt.gca()
-		dt_lab = ['{:.2e}'.format(d) for d in dts]
+		dt_lab = ['{:.1e}'.format(d) for d in dts]
+		dt_lab = dt_lab[::-1]
 		dts = [1/d for d in dts]
-		plt.errorbar(dts, dt_series,yerr=3.0*stdev)
-		ax.text(0.60, 0.15, 'n_chan: {0}\nmax_dm: {1}\ntime_window: {2}'.format(channels[0],max_dms[0],time_windows[0]),
+		plt.errorbar(dts, dt_series, yerr=3.0*stdev)
+		fit = np.polyfit(dts,dt_series,1)
+		fit_plt = [fit[1] + fit[0]*d for d  in dts]
+		plt.plot(dts, fit_plt,color='red',linestyle='--')
+		ax.text(0.50, 0.15, 'n_chan: {0}\nmax_dm: {1}\ntime_window: {2}'.format(channels[0],max_dms[0],time_windows[0]),
 			verticalalignment='bottom', horizontalalignment='left',
 			transform=ax.transAxes, color='green', fontsize=15)
+		ax.text(0.50, 0.35, 'linear fit params a/tau + b\na: {0:.2e}, b: {1:.2e}'.format(fit[0], fit[1]),
+			verticalalignment='bottom', horizontalalignment='left',
+			transform=ax.transAxes, color='purple', fontsize=15)
 		ax.set_xticklabels(dt_lab)
-		plt.xlabel('parameter value')
+		plt.xlabel('parameter value (s)')
 		plt.ylabel('dedisperse execution time (s)')
 		plt.title('inverse time resolution behavior')
 		plt.savefig('results/tr_series.png')
 
    	plt.show()
 
-   	print 'results: \n'
-   	print '{0} executions in {1} seconds \n average: {2} +- {3} {4}, stdev: {5}\n'.format(samples*count,sum(times),
-   		np.mean(times),np.max(np.array(times) - np.mean(times)),np.min(np.array(times) - np.mean(times)),np.std(times))
+   	#print 'results: \n'
+   	#print '{0} executions in {1} seconds \n average: {2} +- {3} {4}, stdev: {5}\n'.format(samples*count,sum(times),
+   	#	np.mean(times),np.max(np.array(times) - np.mean(times)),np.min(np.array(times) - np.mean(times)),np.std(times))

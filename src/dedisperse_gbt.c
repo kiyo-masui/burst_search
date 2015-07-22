@@ -6,7 +6,8 @@
 #include <assert.h>
 #include <omp.h>
 
-#define DM0 4000.0
+#define DM0 4150.0
+//OLD DM0 4000.0
 #define NOISE_PERIOD 64
 #define SIG_THRESH 30.0
 
@@ -89,6 +90,14 @@ float get_diagonal_dm_simple(float nu1, float nu2, float dt, int depth)
   //printf("current dm is %12.4f\n",dm_max);
   return fabs(dm_max);
   
+}
+
+float alex_diag_dm(float nu1,float nu2,float dt)
+{
+  float d1 = 1.0/nu1/nu1;
+  float d2 = 1.0/nu2/nu2;
+  float dm_max = dt/DM0/(d2 - d1);
+  return fabs(dt/DM0/(d2 - d1));
 }
 /*--------------------------------------------------------------------------------*/
 
@@ -336,6 +345,7 @@ void dedisperse_block_kernel_2pass(const float **in, float **out, int n, int m)
 
 void dedisperse_single(float **inin, float **outout, int nchan,int ndat)
 {
+  //omp_set_num_threads(8);
   int npass=get_npass(nchan);
   //printf("need %d passes.\n",npass);
   //npass=2;
@@ -343,16 +353,17 @@ void dedisperse_single(float **inin, float **outout, int nchan,int ndat)
   float **in=inin;
 
   float **out=outout;
-  FILE *fout;
-  fout = fopen('/var/log/burst_bench.log', 'w');
-  fprintf(fout,'dedisperse using %s threads' % *getenv('OMP_NUM_THREADS'));
-  fclose(fout);
+  //FILE *fout;
+  //fout = fopen('/var/log/burst_bench.log', 'w');
+  
+  //fclose(fout);
 //  omp_set_dynamic(0);
 //  omp_set_num_threads(8);
 
   for (int i=0;i<npass;i++) {    
 #pragma omp parallel for
     for (int j=0;j<nchan;j+=bs) {
+      //printf("dedisperse using %i threads\n",omp_get_num_threads());
       dedisperse_kernel(in+j,out+j,bs,ndat);
     }
     bs/=2;

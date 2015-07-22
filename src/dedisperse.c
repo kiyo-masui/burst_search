@@ -33,6 +33,8 @@ int burst_depth_for_max_dm(float max_dm, float delta_t, size_t nfreq, float freq
   int imax=20;
   int i=0;
   while ((get_diagonal_dm_simple(freq0,freq0+nfreq*delta_f,delta_t,depth)<max_dm)&&(i<imax)) {
+  //while ((alex_diag_dm(freq0, freq0+delta_f, delta_t)<max_dm)&&(i<imax)) {
+    //fprintf(stderr,"max DM: %d \n",alex_diag_dm(freq0,freq0+delta_f,delta_t));
     depth++;
     i++;
   }
