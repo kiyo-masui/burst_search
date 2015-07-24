@@ -137,7 +137,33 @@ parser.add_argument(
         type=int,
         help="Number of samples per parameter",
         )
+parser.add_argument(
+        '-v --verify',
+        metavar="verify",
+        default=False,
+        type=bool,
+        help="Verify and visually compare sievers/roman dedisperse",
+        )
 
+def make_transient(nchan, fmin, bandwidth, time_window, ntime,dm=100.0):
+	dt = time_window/float(ntime)
+	df = bandwidth/float(nchan)
+	width = 0.01
+	dw = int(width/dt)
+
+	dat = np.zeros((nchan,ntime),dtype=np.float32)
+	center_t = int(dat.shape[1]/2)
+	for i in xrange(0,len(dat)):
+		disp_delay = int(dm*4.1488*1000.0*(1.0/((fmin + (nchan - 1 - i)*df)**2))/dt)
+		dat[i,center_t:center_t + dw] = 1.0
+		if disp_delay > 0:
+			dat[i,disp_delay:] = dat[i,:-disp_delay]
+
+	plt.figure()
+	plt.imshow(dat,interpolation='nearest')
+	#plt.show()
+
+	return dat
 
 if __name__ == "__main__":
 	args = parser.parse_args()
@@ -196,15 +222,19 @@ if __name__ == "__main__":
 		this_dt = params[3]
 
 		ntime = int(time_window/this_dt)
-		trans = DMTransform(dt,nchan,f0,bw/nchan,max_dm)
+		trans = DMTransform(dt,nchan,f0 + bw,-bw/nchan,max_dm)
 		for i in xrange(0,count):
-			dat = np.matrix(np.random.rand(nchan,ntime), dtype=np.float32)
+			#dat = np.matrix(np.random.rand(nchan,ntime), dtype=np.float32)
+			dat = make_transient(nchan,f0,bw,time_window,ntime,dm=100.0)
 			print 'attempting test with params \n tw {0}, max dm {1}, nchan {2}, dt {3}'.format(
 				time_window, max_dm, nchan, this_dt)
 
 			print 'effective channels: {0}'.format(2**trans.depth)
 			t0 = time.time()
-			trans(dat)
+			plt.figure()
+			ax = plt.gca()
+			ax.imshow(trans(dat).dm_data,interpolation='nearest')
+			plt.show()
 			times.append([time.time() - t0,time_window,max_dm,nchan,this_dt])
 			print 'complete; t = {0}'.format(times[-1][0])
 
