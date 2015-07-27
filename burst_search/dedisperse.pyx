@@ -37,11 +37,7 @@ def dm_transform(
         float freq0,
         float delta_f,
         ):
-<<<<<<< HEAD
-    cdef int jon = 0;
-=======
-    cdef int jon = 1
->>>>>>> ea8b1b8b596cee534ca0ee46369f4600fcabe9f7
+    cdef int jon = 0
     cdef int nfreq = data1.shape[0]
 
     if data2 is None:
