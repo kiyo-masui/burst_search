@@ -5,6 +5,10 @@ __pycache__/
 # C extensions
 *.so
 
+#extraneous
+*DS_Store*
+burst_search/*.c
+
 # Distribution / packaging
 .Python
 env/
