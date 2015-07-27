@@ -138,10 +138,10 @@ parser.add_argument(
         help="Number of samples per parameter",
         )
 parser.add_argument(
-        '-v --verify',
+        '-v', '--verify',
         metavar="verify",
-        default=False,
-        type=bool,
+        default=0,
+        type=int,
         help="Verify and visually compare sievers/roman dedisperse",
         )
 
@@ -158,11 +158,6 @@ def make_transient(nchan, fmin, bandwidth, time_window, ntime,dm=100.0):
 		dat[i,center_t:center_t + dw] = 1.0
 		if disp_delay > 0:
 			dat[i,disp_delay:] = dat[i,:-disp_delay]
-
-	plt.figure()
-	plt.imshow(dat,interpolation='nearest')
-	#plt.show()
-
 	return dat
 
 if __name__ == "__main__":
@@ -187,13 +182,13 @@ if __name__ == "__main__":
 
 	#Does not seem to matter on our
 	#UBC test machine
-	if args.omp_num_threads:
-		threads = args.omp_num_threads
-		print 'using %i omp threads' % threads
-		os.environ['OMP_DYNAMIC'] = 'FALSE'
-		os.environ['OMP_NUM_THREADS'] = str(threads)
-	else:
-		os.environ['OMP_DYNAMIC'] = 'TRUE'
+	#if args.omp_num_threads:
+	#	threads = args.omp_num_threads
+	#	print 'using %i omp threads' % threads
+	#	os.environ['OMP_DYNAMIC'] = 'FALSE'
+	#	os.environ['OMP_NUM_THREADS'] = str(threads)
+	#else:
+	#	os.environ['OMP_DYNAMIC'] = 'TRUE'
 
 	time_windows = [time_window]
 	if tw_samples > 1:
@@ -224,17 +219,17 @@ if __name__ == "__main__":
 		ntime = int(time_window/this_dt)
 		trans = DMTransform(dt,nchan,f0 + bw,-bw/nchan,max_dm)
 		for i in xrange(0,count):
-			#dat = np.matrix(np.random.rand(nchan,ntime), dtype=np.float32)
-			dat = make_transient(nchan,f0,bw,time_window,ntime,dm=100.0)
+			dat = np.matrix(np.random.rand(nchan,ntime), dtype=np.float32)
+			#dat = make_transient(nchan,f0,bw,time_window,ntime,dm=100.0)
 			print 'attempting test with params \n tw {0}, max dm {1}, nchan {2}, dt {3}'.format(
 				time_window, max_dm, nchan, this_dt)
 
 			print 'effective channels: {0}'.format(2**trans.depth)
 			t0 = time.time()
-			plt.figure()
-			ax = plt.gca()
-			ax.imshow(trans(dat).dm_data,interpolation='nearest')
-			plt.show()
+			if args.verify:
+				trans(dat,jon=1)
+			else:
+				trans(dat,jon=0)
 			times.append([time.time() - t0,time_window,max_dm,nchan,this_dt])
 			print 'complete; t = {0}'.format(times[-1][0])
 

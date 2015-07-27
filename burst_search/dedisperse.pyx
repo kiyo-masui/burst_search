@@ -23,7 +23,7 @@ cdef extern int burst_depth_for_max_dm(float max_dm, float delta_t,
 
 cdef extern int  burst_dm_transform(DTYPE_t *indata1, DTYPE_t *indata2,
         CM_DTYPE_t *chan_map, DTYPE_t *outdata, size_t ntime1, int ntime2,
-        float delta_t, size_t nfreq, float freq0, float delta_f, int depth)
+        float delta_t, size_t nfreq, float freq0, float delta_f, int depth,int jon)
 
 cdef extern void burst_setup_channel_mapping(CM_DTYPE_t *chan_map, size_t nfreq,
         float freq0, float delta_f, int depth)
@@ -37,7 +37,7 @@ def dm_transform(
         float freq0,
         float delta_f,
         ):
-
+    cdef int jon = 1;
     cdef int nfreq = data1.shape[0]
 
     if data2 is None:
@@ -75,6 +75,7 @@ def dm_transform(
             freq0,
             delta_f,
             depth,
+            jon,
             )
 
     our = np.ascontiguousarray(out[:,:ntime_out])
@@ -206,7 +207,7 @@ class DMTransform(object):
 
 
     def __call__(self, np.ndarray[ndim=2, dtype=DTYPE_t] data1 not None,
-            np.ndarray[ndim=2, dtype=DTYPE_t] data2=None,jon=True):
+            np.ndarray[ndim=2, dtype=DTYPE_t] data2=None,jon=0):
 
         cdef int nfreq = self.nfreq
 
