@@ -163,14 +163,44 @@ class FileSearch(object):
 
         self._dedispersed_out_group = group
 
+
+    #simple method to replace nested structure
     def search_records(self, start_record, end_record):
-        data = self.dm_transform_records(start_record, end_record)
+        data = self.get_records(start_record, end_record)
+
+        if parameters['cal_period_samples']:
+                preprocess.noisecal_bandpass(data, self._cal_spec,
+                                             parameters['cal_period_samples'])
+
+            if SIMULATE and block_ind in self._sim_source.coarse_event_schedule():
+                #do simulation
+                data += self._sim_source.generate_events(block_ind)
+
+        preprocess.remove_outliers(data, 5)
+        preprocess.remove_noisy_freq(data, 3)
+        #preprocess.remove_continuum(data)
+        preprocess.remove_continuum_v2(data)
+
+
         if self._dedispersed_out_group:
             g = self._dedispersed_out_group.create_group("%d-%d"
                     % (start_record, end_record))
             data.to_hdf5(g)
         triggers = self._search(data)
         self._action(triggers, data)
+
+        dm_data = self._Transformer(data)
+        dm_data.start_record = start_record
+
+        triggers = self._search(dm_data)
+        self._action(triggers, data)
+
+
+    def get_records(self, start_record, end_record):
+        hdulist = pyfits.open(self._filename, 'readonly')
+        data = read_records(hdulist, start_record, end_record)
+        hdulist.close()
+        return data
 
     def dm_transform_records(self, start_record, end_record):
         parameters = self._parameters
@@ -234,6 +264,7 @@ class FileSearch(object):
         nrecords_block = int(math.ceil(time_block / record_length))
         nrecords_overlap = int(math.ceil(overlap / record_length))
         nrecords = self._nrecords
+
 
         for ii in xrange(0, nrecords, nrecords_block - nrecords_overlap):
             # XXX
