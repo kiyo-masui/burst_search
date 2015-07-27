@@ -6,9 +6,19 @@
 #include <assert.h>
 #include <omp.h>
 
-#define DM0 4000.0
+#ifndef max
+  #define max( a, b ) ( ((a) > (b)) ? (a) : (b) )
+#endif
+
+#ifndef min
+  #define min( a, b ) ( ((a) < (b)) ? (a) : (b) )
+#endif
+
+#define DM0 4150.0
+//OLD DM0 4000.0
 #define NOISE_PERIOD 64
 #define SIG_THRESH 30.0
+#define THREAD=8
 
 #include "dedisperse_gbt.h"
 
@@ -89,6 +99,15 @@ float get_diagonal_dm_simple(float nu1, float nu2, float dt, int depth)
   //printf("current dm is %12.4f\n",dm_max);
   return fabs(dm_max);
   
+}
+
+//Does not work
+float alex_diag_dm(float nu1,float nu2,float dt)
+{
+  float d1 = 1.0/nu1/nu1;
+  float d2 = 1.0/nu2/nu2;
+  float dm_max = dt/DM0/(d2 - d1);
+  return fabs(dt/DM0/(d2 - d1));
 }
 /*--------------------------------------------------------------------------------*/
 
@@ -191,7 +210,7 @@ Data *map_chans(Data *dat, int depth)
 /*--------------------------------------------------------------------------------*/
 void remap_data( Data *dat)
 {						
-  double t0=omp_get_wtime();
+  //double t0=omp_get_wtime();
   assert(dat->chan_map);
   memset(dat->data[0],0,sizeof(dat->data[0][0])*dat->nchan*dat->ndata);  
   for (int i=0;i<dat->raw_nchan;i++) {
@@ -215,19 +234,6 @@ int get_npass(int n)
 
 /*--------------------------------------------------------------------------------*/
 
-void dedisperse_kernel(float **in, float **out, int n, int m)
-{
-  int npair=n/2;
-  for (int jj=0;jj<npair;jj++) {
-    for (int i=0;i<m;i++)
-      out[jj][i]=in[2*jj][i]+in[2*jj+1][i];
-    for (int i=0;i<m-jj-2;i++) 
-      out[jj+npair][i]=in[2*jj][i+jj]+in[2*jj+1][i+jj+1];
-    
-  }
-}
-
-/*--------------------------------------------------------------------------------*/
 static void dedisperse_block_subkernel_2pass(const float *in1, const float *in2, float *out)
 {
   out[0]=in1[0]+in1[4]+in1[8]+in1[12];
@@ -334,18 +340,163 @@ void dedisperse_block_kernel_2pass(const float **in, float **out, int n, int m)
 }
 /*--------------------------------------------------------------------------------*/
 
+void dedisperse_kernel(float **in, float **out, int n, int m)
+{
+  int npair=n/2;
+  for (int jj=0;jj<npair;jj++) {
+    for (int i=0;i<m;i++)
+      out[jj][i]=in[2*jj][i]+in[2*jj+1][i];
+    for (int i=0;i<m-jj-2;i++) 
+      out[jj+npair][i]=in[2*jj][i+jj]+in[2*jj+1][i+jj+1];
+  }
+}
+
+/*--------------------------------------------------------------------------------*/
+void dedisperse_inplace(float **inin, int nchan, int m)
+{
+  //omp_set_num_threads(8);
+  int npass=get_npass(nchan);
+
+  float **in=inin;
+
+  int radix = 1;
+  int pairs = nchan/2;
+  int threads = 8;
+
+  //initial channel map
+  int *fmap = malloc(sizeof(int)*nchan);
+  int *cmap = malloc(sizeof(int)*nchan);
+  for (int i=0; i<nchan;i++){
+    cmap[i] = i;
+    fmap[i] = i;
+  }
+
+  float *tmp = (float*)malloc(sizeof(float*)*m);
+
+  for (int i=0;i<npass;i++) {
+
+    generate_shift_group(cmap,radix,nchan);
+    generate_shift_group(fmap,radix,nchan);
+
+    #pragma omp parallel for
+    for (int j=0;j<pairs;j++) {
+      int zero = 2*j;
+      int zero_ind = 0;
+
+      //Inefficient
+      while(cmap[zero_ind] != zero - (zero % (nchan/radix))){
+        zero_ind++;
+      }
+      zero_ind += radix*(zero % (nchan/radix));
+
+      int comp_ind = zero_ind + radix;
+
+      int jeff = j % (nchan/(radix*2));
+
+      for(int k = 0; k < m; k++){
+        tmp[k] = in[zero_ind][k];
+      }
+      for(int k = 0; k < m; k++){
+       in[zero_ind][k] = in[zero_ind][k] + in[comp_ind][k];
+      }
+      for(int k = 0; k < m - jeff - 1; k++){
+       in[comp_ind][k] = tmp[k + jeff] + in[comp_ind][k + jeff + 1];
+      }
+    }
+    radix *=2;
+  }
+
+  unshuffle(in,cmap,fmap,nchan,m);
+  free(cmap);
+  free(fmap);
+  free(tmp);
+}
+
+void unshuffle(float **data, int* cmap, int* fmap,int nchan, int m){
+
+  float *tmp = (float*)malloc(sizeof(float*)*m);
+
+  int par = 0;
+  int send_ind = nchan/2;
+  int this_ind = 1;
+  int sorted = 0;
+
+  while(sorted == 0){
+    for(int j=0; j < m; j++){
+      tmp[j] = data[send_ind][j];
+    }
+
+    for(int j=0; j < m; j++){    
+      data[send_ind][j] = data[this_ind][j];
+    }
+
+    for(int j=0; j < m; j++){    
+      data[this_ind][j] = tmp[j];
+    }
+
+    fmap[this_ind] = fmap[send_ind];
+    fmap[send_ind] = send_ind;
+
+    send_ind = fmap[this_ind];
+    if(this_ind == send_ind){
+      int count = 0;
+      while(fmap[this_ind % nchan] == this_ind % nchan){
+        this_ind++;
+        count++;
+        if(count == nchan){
+          sorted = 1;
+          break;
+        }
+      }
+      this_ind = this_ind % nchan;
+      send_ind = fmap[this_ind];
+    }
+  }
+  free(tmp);
+}
+
+/*--------------------------------------------------------------------------------*/
+void generate_shift_group(int *inin, int radix, int n)
+{
+  int *in = inin;
+
+  int nrad = n/radix;
+  int nrad2 = nrad/2;
+
+  for (int i = 0; i < (radix); i++){
+    int val = in[i];
+    in[i] = (val % (nrad))/2 + (val % 2)*(nrad) + (val/nrad)*(nrad);
+  }
+
+  //Can easily improve by referencing only the base array
+  //of size 2^j
+  for (int i = radix; i < n; i++){
+    in[i] = in[i % radix] + (i/radix);
+  }
+
+}
+
 void dedisperse_single(float **inin, float **outout, int nchan,int ndat)
 {
+  //omp_set_num_threads(8);
   int npass=get_npass(nchan);
   //printf("need %d passes.\n",npass);
   //npass=2;
   int bs=nchan;
   float **in=inin;
+
   float **out=outout;
+  //FILE *fout;
+  //fout = fopen('/var/log/burst_bench.log', 'w');
+  
+  //fclose(fout);
+//  omp_set_dynamic(0);
+//  omp_set_num_threads(8);
 
   for (int i=0;i<npass;i++) {    
 #pragma omp parallel for
     for (int j=0;j<nchan;j+=bs) {
+      //printf("dedisperse using %i threads\n",omp_get_num_threads());
       dedisperse_kernel(in+j,out+j,bs,ndat);
     }
     bs/=2;
@@ -403,20 +554,29 @@ void dedisperse_gbt(Data *dat, float *outdata)
   
   //remap_data(dat);  
   //float **tmp=matrix(dat->nchan, dat->ndata);
-  float **tmp=(float **)malloc(sizeof(float *)*dat->nchan);
-  for (int i=0;i<dat->nchan;i++)
-    tmp[i]=outdata+i*dat->ndata;
-  
-  memset(tmp[0],0,sizeof(tmp[0][0])*dat->ndata*dat->nchan);
+
+
+  //float **tmp=(float **)malloc(sizeof(float *)*dat->nchan);
+  //for (int i=0;i<dat->nchan;i++)
+    //tmp[i]=outdata+i*dat->ndata;
+
+  //memset(tmp[0],0,sizeof(tmp[0][0])*dat->ndata*dat->nchan);
+
   double t1=omp_get_wtime();
+
   //dedisperse_dual(dat->data,tmp,dat->nchan,dat->ndata);  
-  dedisperse_single(dat->data,tmp,dat->nchan,dat->ndata);  
-  
-  //printf("took %12.4f seconds to dedisperse.\n",omp_get_wtime()-t1);
-  memcpy(outdata,dat->data[0],dat->nchan*dat->ndata*sizeof(outdata[0]));
 
 
-  free(tmp);
+  //float **ip_dat =(float **)malloc(sizeof(float *)*dat->nchan);
+
+  //for (int i=0;i<dat->nchan;i++)
+    //ip_dat[i]=dat->data[0]+i*dat->ndata;
+
+  //memcpy(ip_dat[0],dat->data[0],dat->nchan*dat->ndata*sizeof(dat->data[0][0]));
+
+  dedisperse_inplace(dat->data,dat->nchan,dat->ndata);
+
+  memcpy(outdata,dat->data[0],dat->nchan*dat->ndata*sizeof(float));
 
   if (0) {
     printf("element 500,300 is %12.5e\n",dat->data[500][300]);
@@ -428,6 +588,45 @@ void dedisperse_gbt(Data *dat, float *outdata)
   }
 }
 /*--------------------------------------------------------------------------------*/
+
+void dedisperse_gbt_jon(Data *dat, float *outdata)
+{
+  
+  //remap_data(dat);  
+  //float **tmp=matrix(dat->nchan, dat->ndata);
+
+
+  float **tmp=(float **)malloc(sizeof(float *)*dat->nchan);
+  for (int i=0;i<dat->nchan;i++)
+    tmp[i]=outdata+i*dat->ndata;
+
+  memset(tmp[0],0,sizeof(tmp[0][0])*dat->ndata*dat->nchan);
+
+  double t1=omp_get_wtime();
+
+  //dedisperse_dual(dat->data,tmp,dat->nchan,dat->ndata);
+
+  //memcpy(ip_dat[0],dat->data[0],dat->nchan*dat->ndata*sizeof(dat->data[0][0]));
+
+  //dedisperse_inplace(ip_dat,dat->nchan,dat->ndata);  
+  dedisperse_single(dat->data,tmp,dat->nchan,dat->ndata);
+  
+  //printf("took %12.4f seconds to dedisperse.\n",omp_get_wtime()-t1);
+  
+  memcpy(outdata,dat->data[0],dat->nchan*dat->ndata*sizeof(outdata[0]));
+  free(tmp);
+
+  if (0) {
+    printf("element 500,300 is %12.5e\n",dat->data[500][300]);
+    FILE *outfile=fopen("burst_dump.dat","w");
+    fwrite(&(dat->nchan),sizeof(dat->nchan),1,outfile);
+    fwrite(&(dat->ndata),sizeof(dat->ndata),1,outfile);
+    fwrite(outdata,sizeof(outdata[0]),dat->nchan*dat->ndata,outfile);
+    fclose(outfile);
+  }
+}
+
+
 void clean_cols(Data *dat)
 {
   for (int i=0;i<dat->raw_nchan;i++) {
@@ -1249,7 +1448,7 @@ size_t find_peak_wrapper(float *data, int nchan, int ndata, float *peak_snr, int
 /*--------------------------------------------------------------------------------*/
 size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
 			     size_t ntime1, size_t ntime2, float delta_t,
-			     size_t nfreq, size_t *chan_map, int depth) 
+			     size_t nfreq, size_t *chan_map, int depth,int jon) 
 {
 
   double t1=omp_get_wtime();
@@ -1270,7 +1469,12 @@ size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
   //setup_data(dat);
   remap_data(dat);
 
-  dedisperse_gbt(dat,outdata);
+  if(jon == 1){
+    dedisperse_gbt_jon(dat,outdata);
+  }
+  else{
+    dedisperse_gbt(dat,outdata);
+  }
   double t2=omp_get_wtime();
   //Peak best=find_peak(dat);
 
