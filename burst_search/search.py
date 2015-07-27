@@ -130,50 +130,35 @@ class Trigger(object):
                 for j in xrange(0,self.data.spec_data.shape[1] - delay_ind):
                         ret[i,j] = self.data.spec_data[i,j + delay_ind]
 	        
-	rebin_factor_freq = 1
-	print rebin_factor_freq
-	rebin_factor_time = 1
-	xlen = ret.shape[0] / rebin_factor_freq
-	ylen = ret.shape[1] / rebin_factor_time
-	new_freq_data = np.zeros((xlen,ylen))
-	for i in range(xlen):
-    		for j in range(ylen):
-        		new_freq_data[i,j] = ret[i*rebin_factor_freq:(i+1)*rebin_factor_freq,j*rebin_factor_time:(j+1)*rebin_factor_time].mean()
-        freq_lower_std_index = 1
-        freq_upper_std_index = 5
-	print freq_upper_std_index
-        freq_mean = np.mean(new_freq_data)
-        freq_std = np.std(new_freq_data)
-        freq_vmin = freq_mean - freq_lower_std_index * freq_std
-        freq_vmax = freq_mean + freq_upper_std_index * freq_std
+#	rebin_factor_freq = 1
+#	print rebin_factor_freq
+#	rebin_factor_time = 1
+#	xlen = ret.shape[0] / rebin_factor_freq
+#	ylen = ret.shape[1] / rebin_factor_time
+#	new_freq_data = np.zeros((xlen,ylen))
+#	for i in range(xlen):
+#    		for j in range(ylen):
+#        		new_freq_data[i,j] = ret[i*rebin_factor_freq:(i+1)*rebin_factor_freq,j*rebin_factor_time:(j+1)*rebin_factor_time].mean()
+#        freq_lower_std_index = 1
+#        freq_upper_std_index = 5
+#	print freq_upper_std_index
+#        freq_mean = np.mean(new_freq_data)
+#        freq_std = np.std(new_freq_data)
+#        freq_vmin = freq_mean - freq_lower_std_index * freq_std
+#        freq_vmax = freq_mean + freq_upper_std_index * freq_std
 
-#	fig, ax = plt.subplots(figsize=(12,12))
-#	cax = ax.imshow(new_freq_data, 
-#			extent=[start_ti * delta_t, end_ti * delta_t, f1, f0],
-#                  	vmin = freq_vmin, vmax = freq_vmax,
-#                   	aspect='auto',
-#			cmap = cm.Blues
-#			)
-#	cbar = fig.colorbar(cax)
-#	cbar.set_ticks([freq_vmin, freq_mean, freq_vmax])
-#	cbar.set_ticklabels(['-1-sigma','mean','3-sigma'])
-#	#plt.axis([25.0, 26.5, 700, 790])
-#	plt.ylabel('Freq(MHz)')
-#	plt.xlabel('Time(s)')
-#	plt.show()
-
-	print start_ti
-	print end_ti
-        range_factor = 1
-	range_start_ti = int((start_ti + end_ti)/2 - (end_ti - start_ti)*(range_factor)/2)
-	print range_start_ti
-	range_end_ti = int((start_ti + end_ti)/2 + (end_ti - start_ti)*(range_factor)/2)
-	print range_end_ti
-	print delta_t
-	plt.imshow(new_freq_data[:,:],
+#	print start_ti
+#	print end_ti
+#        range_factor = 1
+#	range_start_ti = int((start_ti + end_ti)/2 - (end_ti - start_ti)*(range_factor)/2)
+#	print range_start_ti
+#	range_end_ti = int((start_ti + end_ti)/2 + (end_ti - start_ti)*(range_factor)/2)
+#	print range_end_ti
+#	print delta_t
+	plt.imshow(ret[:,:],
 #                   extent=[range_start_ti * delta_t, range_end_ti * delta_t, f1, f0
 #                           ],
-	           vmin = freq_vmin, vmax = freq_vmax,
+#	           vmin = freq_vmin, vmax = freq_vmax,
                    aspect='auto',
 		   cmap = cm.Blues
                    )
