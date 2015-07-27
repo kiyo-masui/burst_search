@@ -125,7 +125,7 @@ class Trigger(object):
         print f0
 	for i in xrange(0,self.data.spec_data.shape[0]):
                 f = f0 + i*df
-                dm = di
+                dm = di*delta_dm
                 delay_ind = int(round((disp_delay(f,dm) - disp_delay(f0,dm))/delta_t))
                 for j in xrange(0,self.data.spec_data.shape[1] - delay_ind):
                         ret[i,j] = self.data.spec_data[i,j + delay_ind]
@@ -149,15 +149,15 @@ class Trigger(object):
 
 #	print start_ti
 #	print end_ti
-#        range_factor = 1
-#	range_start_ti = int((start_ti + end_ti)/2 - (end_ti - start_ti)*(range_factor)/2)
-#	print range_start_ti
-#	range_end_ti = int((start_ti + end_ti)/2 + (end_ti - start_ti)*(range_factor)/2)
-#	print range_end_ti
-#	print delta_t
-	plt.imshow(ret[:,:],
-#                   extent=[range_start_ti * delta_t, range_end_ti * delta_t, f1, f0
-#                           ],
+        range_factor = 0.5
+	range_start_ti = int((start_ti + end_ti)/2 - (end_ti - start_ti)*(range_factor)/2)
+	print range_start_ti
+	range_end_ti = int((start_ti + end_ti)/2 + (end_ti - start_ti)*(range_factor)/2)
+	print range_end_ti
+	print delta_t
+	plt.imshow(ret[:,range_start_ti:range_end_ti],
+                   extent=[range_start_ti * delta_t, range_end_ti * delta_t, f1, f0
+                           ],
 #	           vmin = freq_vmin, vmax = freq_vmax,
                    aspect='auto',
 		   cmap = cm.Blues
