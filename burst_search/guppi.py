@@ -7,6 +7,7 @@ from os import path
 import time
 
 import numpy as np
+from numpy import array, dot
 import pyfits
 import matplotlib as mpl
 mpl.use('Agg')
@@ -31,6 +32,9 @@ MAX_DM = 1000
 # For DM=4000, 13s delay across the band, so overlap searches by ~15s.
 #OVERLAP = 15.
 OVERLAP = 0.
+SPEC_INDEX_MIN = -2
+SPEC_INDEX_MAX = 2
+SPEC_INDEX_SAMPLES = 5
 
 THRESH_SNR = 8.0
 
@@ -73,6 +77,9 @@ class FileSearch(object):
                 MAX_DM,
                 )
 
+        self._df = parameters['delta_f']
+        self._nfreq = parameters['nfreq']
+        self._f0 = parameters['f0']
         self._record_length = (parameters['ntime_record'] * parameters['delta_t'])
         self._nrecords_block = int(math.ceil(TIME_BLOCK / self._record_length))
         self._nrecords_overlap = int(math.ceil(OVERLAP / self._record_length))
@@ -181,19 +188,28 @@ class FileSearch(object):
         #preprocess.remove_continuum(data)
         preprocess.remove_continuum_v2(data)
 
+        #from here we weight channels by spectral index
+        center_f = self._f0 + self._df*self._nfreq/2.0
+        fmin = self._f0 + self._df*self._nfreq
+        fmax = self._f0
 
-        if self._dedispersed_out_group:
-            g = self._dedispersed_out_group.create_group("%d-%d"
-                    % (start_record, end_record))
-            data.to_hdf5(g)
-        triggers = self._search(data)
-        self._action(triggers, data)
+        for alpha in np.linspace(SPEC_INDEX_MIN,SPEC_IND_MAX,SPEC_INDEX_SAMPLES):
+            weights = [math.pow(f/center_f, alpha) for f in np.linspace(fmin,fmax,self._nfreq)]
 
-        dm_data = self._Transformer(data)
-        dm_data.start_record = start_record
+            this_dat = dot(array(weights),data)
 
-        triggers = self._search(dm_data)
-        self._action(triggers, data)
+            #if self._dedispersed_out_group:
+             #   g = self._dedispersed_out_group.create_group("%d-%d"
+              #          % (start_record, end_record))
+               # data.to_hdf5(g)
+            triggers = self._search(this_data)
+            self._action(triggers, this_data)
+
+            dm_data = self._Transformer(this_data)
+            dm_data.start_record = start_record
+
+            triggers = self._search(dm_data)
+            self._action(triggers, dm_data)
 
 
     def get_records(self, start_record, end_record):
