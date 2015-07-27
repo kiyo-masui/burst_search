@@ -23,7 +23,7 @@ from simulate import *
 #TIME_BLOCK = 30.
 
 #Additions:
-MIN_SEARCH_DM = 1
+MIN_SEARCH_DM = 5
 
 TIME_BLOCK = 30.0
 
@@ -43,15 +43,15 @@ DEV_PLOTS = False
 SIMULATE = False
 sim_rate = 100*1.0/6000.0
 f_m = 800
-f_sd = 50
+f_sd = 0
 bw_m = 200
-bw_sd = 50
+bw_sd = 0
 t_m = 0.003
 t_sd = 0.002
-s_m = 0.6
+s_m = 100*0.6
 s_sd = 0.1
 dm_m = 600
-dm_sd = 100
+dm_sd = 0
 
 
 
@@ -161,10 +161,21 @@ class FileSearch(object):
 		    plt.subplot(311)
                     t.plot_dm()
 		    plt.subplot(312)
-		    t.plot_time()
+		    t.plot_freq()
 		    plt.subplot(313)
-                    t.plot_freq()
-                    out_filename = path.splitext(path.basename(self._filename))[0]
+                    t.plot_time()
+		    t_dm_value = t.centre[0] * t.data.delta_dm
+		    if t_dm_value < 5:
+		        out_filename = "DM0-5_"
+		    elif 5 <= t_dm_value < 20:
+		        out_filename = "DM5-20_"
+                    elif 20 <= t_dm_value < 100:
+                        out_filename = "DM20-100_"
+                    elif 100 <= t_dm_value <300:
+                        out_filename = "DM100-300_"                    
+		    else:
+                        out_filename = "DM300-2000_" 
+                    out_filename += path.splitext(path.basename(self._filename))[0]
                     out_filename += "+%06.2fs.png" % t_offset
                     plt.savefig(out_filename, bbox_inches='tight')
                     plt.close(f)

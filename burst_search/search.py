@@ -3,19 +3,23 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 
 import _search
 
-
+def disp_delay(f,dm):
+    """Compute the dispersion delay (s) as a function of frequency (MHz) and DM"""
+    return 4.148808*dm*(10.0**3)/(f**2)
 
 class Trigger(object):
 
-    def __init__(self, data, centre, snr=0.):
+    def __init__(self, data, centre, snr=0., duration=1.):
 
         self._data = data
         self._dm_ind = centre[0]
         self._time_ind = centre[1]
         self._snr = snr
+	self._duration = duration
 
     @property
     def data(self):
@@ -41,12 +45,36 @@ class Trigger(object):
         end_ti = min(self.data.dm_data.shape[1], ti + tside)
         start_di = max(0, di - dside)
         end_di = min(self.data.dm_data.shape[0], di + dside)
-        plt.imshow(self.data.dm_data[start_di:end_di,start_ti:end_ti],
+
+	dm_value = "DM ="
+	dm_value += str(round(di*delta_dm, 3))
+	dm_value += " (pc/cm^3), "
+	snr = self._snr
+	snr_value = "SNR ="
+	snr_value += str(round(snr, 2))
+	duration = self._duration
+	duration_value = ",width ="
+	duration_value += str(round(duration*delta_t, 3))
+	duration_value += " (s)."
+	text = dm_value + snr_value + duration_value
+
+	dm_lower_std_index = 1
+	dm_upper_std_index = 5
+	dm_mean = np.mean(self.data.dm_data)
+	dm_std = np.std(self.data.dm_data)
+        dm_vmin = dm_mean - dm_lower_std_index * dm_std
+	dm_vmax = dm_mean + dm_upper_std_index * dm_std
+
+	plt.imshow(self.data.dm_data[start_di:end_di,start_ti:end_ti],
                    extent=[start_ti * delta_t, end_ti * delta_t,
                            end_di * delta_dm, start_di * delta_dm],
+		   vmin = dm_vmin, vmax = dm_vmax,
                    aspect='auto',
-                   )
-        plt.xlabel("time (s)")
+		   cmap = cm.jet
+		  )
+	ax = plt.gca()
+	ax.text(0.05, 1.2, text,transform=ax.transAxes)
+	plt.xlabel("time (s)")
         plt.ylabel("DM (Pc/cm^3)")
         plt.colorbar()
 
@@ -66,6 +94,20 @@ class Trigger(object):
         plt.xlabel("time (s)")
         plt.ylabel("Flux")
 
+#    def dedisperse(self):
+#	di, ti = self.centre
+#	delta_t = self.data.delta_t
+#        ret = np.zeros(self.data.spec_data.shape)
+#        df = -200.0/float(delta_dm)
+#        f0 = 900
+#        for i in xrange(0,self.data.spec_data.shape[0]):
+#                f = f0 + i*df
+#                dm = di
+#                delay_ind = int(round((disp_delay(f,dm) - disp_delay(f0,dm))/dt))
+#                for j in xrange(0,dat.shape[1] - delay_ind):
+#                        ret[i,j] = dat[i,j + delay_ind]
+#        return ret,int((disp_delay(700,dm) - disp_delay(900,dm))/dt)
+
     def plot_freq(self):
         di, ti = self.centre
         tside = 500
@@ -76,16 +118,68 @@ class Trigger(object):
         end_ti = min(self.data.spec_data.shape[1], ti + tside)
         start_di = max(0, di - dside)
         end_di = min(self.data.spec_data.shape[0], di + dside)
-        plt.imshow(self.data.spec_data[start_di:end_di,start_ti:end_ti],
-                   extent=[start_ti * delta_t, end_ti * delta_t,
-                           end_di * delta_dm, start_di * delta_dm],
+        ret = np.zeros(self.data.spec_data.shape)
+        df = -200.0/float(self.data.spec_data.shape[0])
+        f0 = 900
+	f1 = f0 + self.data.spec_data.shape[0]*df
+        print f0
+	for i in xrange(0,self.data.spec_data.shape[0]):
+                f = f0 + i*df
+                dm = di
+                delay_ind = int(round((disp_delay(f,dm) - disp_delay(f0,dm))/delta_t))
+                for j in xrange(0,self.data.spec_data.shape[1] - delay_ind):
+                        ret[i,j] = self.data.spec_data[i,j + delay_ind]
+	        
+	rebin_factor_freq = 1
+	print rebin_factor_freq
+	rebin_factor_time = 1
+	xlen = ret.shape[0] / rebin_factor_freq
+	ylen = ret.shape[1] / rebin_factor_time
+	new_freq_data = np.zeros((xlen,ylen))
+	for i in range(xlen):
+    		for j in range(ylen):
+        		new_freq_data[i,j] = ret[i*rebin_factor_freq:(i+1)*rebin_factor_freq,j*rebin_factor_time:(j+1)*rebin_factor_time].mean()
+        freq_lower_std_index = 1
+        freq_upper_std_index = 5
+	print freq_upper_std_index
+        freq_mean = np.mean(new_freq_data)
+        freq_std = np.std(new_freq_data)
+        freq_vmin = freq_mean - freq_lower_std_index * freq_std
+        freq_vmax = freq_mean + freq_upper_std_index * freq_std
+
+#	fig, ax = plt.subplots(figsize=(12,12))
+#	cax = ax.imshow(new_freq_data, 
+#			extent=[start_ti * delta_t, end_ti * delta_t, f1, f0],
+#                  	vmin = freq_vmin, vmax = freq_vmax,
+#                   	aspect='auto',
+#			cmap = cm.Blues
+#			)
+#	cbar = fig.colorbar(cax)
+#	cbar.set_ticks([freq_vmin, freq_mean, freq_vmax])
+#	cbar.set_ticklabels(['-1-sigma','mean','3-sigma'])
+#	#plt.axis([25.0, 26.5, 700, 790])
+#	plt.ylabel('Freq(MHz)')
+#	plt.xlabel('Time(s)')
+#	plt.show()
+
+	print start_ti
+	print end_ti
+        range_factor = 1
+	range_start_ti = int((start_ti + end_ti)/2 - (end_ti - start_ti)*(range_factor)/2)
+	print range_start_ti
+	range_end_ti = int((start_ti + end_ti)/2 + (end_ti - start_ti)*(range_factor)/2)
+	print range_end_ti
+	print delta_t
+	plt.imshow(new_freq_data[:,:],
+#                   extent=[range_start_ti * delta_t, range_end_ti * delta_t, f1, f0
+#                           ],
+	           vmin = freq_vmin, vmax = freq_vmax,
                    aspect='auto',
+		   cmap = cm.Blues
                    )
         plt.xlabel("time (s)")
-        plt.ylabel("Frequency")
+        plt.ylabel("Frequency (MHz)")
         plt.colorbar()
-
-
 
 def basic(data, snr_threshold=5., min_dm=50.):
     """Simple event search of DM data.
@@ -108,6 +202,6 @@ def basic(data, snr_threshold=5., min_dm=50.):
         snr, sample, duration = _search.sievers_find_peak(data, min_dm_ind)
 
         if snr > snr_threshold:
-            triggers.append(Trigger(data, sample, snr))
+            triggers.append(Trigger(data, sample, snr, duration))
 
     return triggers
