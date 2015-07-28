@@ -10,12 +10,13 @@ import _search
 
 class Trigger(object):
 
-    def __init__(self, data, centre, snr=0.):
+    def __init__(self, data, centre, snr=0.,spec_ind=None):
 
         self._data = data
         self._dm_ind = centre[0]
         self._time_ind = centre[1]
         self._snr = snr
+        self._spec_ind = spec_ind
 
     @property
     def data(self):
@@ -24,6 +25,10 @@ class Trigger(object):
     @property
     def centre(self):
         return (self._dm_ind, self._time_ind)
+
+    @property 
+    def spec_ind(self):
+        return self.spec_ind
 
     def __str__(self):
         return str((self._snr, self.centre))

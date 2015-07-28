@@ -146,8 +146,7 @@ class DMData(object):
         group.attrs['delta_dm'] = self.delta_dm
         group.create_dataset('spec_data', data=self.spec_data)
         group.create_dataset('dm_data', data=self.dm_data)
-
-
+        
 
 class DMTransform(object):
     """Performs dispersion measure transforms."""
