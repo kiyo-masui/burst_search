@@ -1,0 +1,22 @@
+# Eaxmple of a basic configureation/parameter file for FRB searcher.
+#
+# Currently this is just conceptual.
+
+# Only used for the log file. Currently plots go to the current directory.
+output_directory : tmp_out/
+log_filename : frb_search.log
+
+cal_spec_filename : "~/data/gbt_cal_spec/cal_spectrum_I_GBT13B_352_33_3C295.npy"
+
+# Globbable filename pattern.  Only files whose names match will be searched.
+filename_match_pattern : "guppi*wigglez*.fits"
+
+# Can be overwritten on the command line.
+search_directory : ~/data/raw_guppi/AGBT14B_339/20140721
+
+
+# None of these parameters are used yet. Currently hard coded.
+# How much data to search at once, in seconds.
+time_block : 30
+remove_noise_cal : True
+

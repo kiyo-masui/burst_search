@@ -36,7 +36,7 @@ def dm_transform(
         float delta_t,
         float freq0,
         float delta_f,
-        ):]
+        ):
 
     cdef int jon = 0
     cdef int nfreq = data1.shape[0]
@@ -207,7 +207,11 @@ class DMTransform(object):
 
 
     def __call__(self, np.ndarray[ndim=2, dtype=DTYPE_t] data1 not None,
+<<<<<<< HEAD
             np.ndarray[ndim=2, dtype=DTYPE_t] data2=None,jon=0):
+=======
+            np.ndarray[ndim=2, dtype=DTYPE_t] data2=None,jon=1):
+>>>>>>> bug
 
         cdef int nfreq = self.nfreq
 
@@ -246,7 +250,11 @@ class DMTransform(object):
                 freq0,
                 delta_f,
                 depth,
+<<<<<<< HEAD
                 0,
+=======
+                jon,
+>>>>>>> bug
                 )
 
         dm_data = np.ascontiguousarray(out[:,:ntime_out])
