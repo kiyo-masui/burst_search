@@ -207,11 +207,7 @@ class DMTransform(object):
 
 
     def __call__(self, np.ndarray[ndim=2, dtype=DTYPE_t] data1 not None,
-<<<<<<< HEAD
             np.ndarray[ndim=2, dtype=DTYPE_t] data2=None,jon=0):
-=======
-            np.ndarray[ndim=2, dtype=DTYPE_t] data2=None,jon=1):
->>>>>>> bug
 
         cdef int nfreq = self.nfreq
 
