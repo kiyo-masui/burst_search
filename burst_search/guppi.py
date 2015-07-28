@@ -60,7 +60,6 @@ dm_sd = 100
 
 class FileSearch(object):
 
-<<<<<<< Updated upstream
 	def __init__(self, filename):
 
 		self._filename = filename
