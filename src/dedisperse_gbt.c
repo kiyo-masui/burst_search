@@ -378,7 +378,6 @@ void dedisperse_inplace(float **inin, int nchan, int m)
     generate_shift_group(cmap,radix,nchan);
     generate_shift_group(fmap,radix,nchan);
 
-    #pragma omp parallel for
     for (int j=0;j<pairs;j++) {
       int zero = 2*j;
       int zero_ind = 0;

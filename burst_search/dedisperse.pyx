@@ -246,7 +246,7 @@ class DMTransform(object):
                 freq0,
                 delta_f,
                 depth,
-                1,
+                0,
                 )
 
         dm_data = np.ascontiguousarray(out[:,:ntime_out])
