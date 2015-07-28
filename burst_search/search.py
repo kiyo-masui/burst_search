@@ -37,7 +37,7 @@ class Trigger(object):
 
     def plot_dm(self):
         di, ti = self.centre
-        tside = 500
+        tside = 250
         dside = 300
         delta_t = self.data.delta_t
         delta_dm = self.data.delta_dm
@@ -80,7 +80,7 @@ class Trigger(object):
 
     def plot_time(self):
         di, ti = self.centre
-        tside = 500
+        tside = 250
         dside = 300
         delta_t = self.data.delta_t
         delta_dm = self.data.delta_dm
@@ -110,7 +110,7 @@ class Trigger(object):
 
     def plot_freq(self):
         di, ti = self.centre
-        tside = 500
+        tside = 250
         dside = 300
         delta_t = self.data.delta_t
         delta_dm = self.data.delta_dm

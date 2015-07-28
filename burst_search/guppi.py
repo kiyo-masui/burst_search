@@ -229,7 +229,8 @@ class FileSearch(object):
                 plt.plot(np.mean(data[:1000], 0))
 
             # 200 ms (hard coded) highpass filter.
-            data = preprocess.highpass_filter(data, 0.200 / parameters['delta_t'])
+            preprocess.remove_outliers(data, 5)
+	    data = preprocess.highpass_filter(data, 0.200 / parameters['delta_t'])
             preprocess.remove_outliers(data, 5)
             preprocess.remove_noisy_freq(data, 3)
             #preprocess.remove_continuum(data)
