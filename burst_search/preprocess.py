@@ -125,8 +125,9 @@ def remove_noisy_freq(data, sigma_threshold):
     skew = np.empty(nfreq, dtype=np.float64)
     for ii in range(nfreq):
         var[ii] = np.var(data[ii,:])
-        skew[ii] = np.mean((data[ii,:] - np.mean(data[ii,:])**3)
+        skew[ii] = np.mean((data[ii,:] - np.mean(data[ii,:])**3))
     # Find the bad channels.
+    
     bad_chans = var > sigma_threshold * np.std(var) + np.mean(var)
     bad_chans_skew = skew > sigma_threshold * np.std(skew) + np.mean(skew)
     # Iterate twice, lest bad channels contaminate the mean.
@@ -134,7 +135,7 @@ def remove_noisy_freq(data, sigma_threshold):
     skew[bad_chans_skew] = np.mean(skew)
     bad_chans_2 = var > sigma_threshold * np.std(var) + np.mean(var)
     bad_chans_2_skew = skew > sigma_threshold * np.std(skew) + np.mean(skew)
-    bad_chans = np.logical_or(bad_chans, bad_chans_2, bad_chans_skew, bad_chans_2_skew)
+    bad_chans = np.logical_or(np.logical_or(bad_chans, bad_chans_2), np.logical_or(bad_chans_skew, bad_chans_2_skew))
 
     data[bad_chans,:] = 0
 
