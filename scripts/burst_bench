@@ -294,6 +294,8 @@ if __name__ == "__main__":
 		plt.title('inverse time resolution behavior')
 		plt.savefig('results/tr_series.png')
 
+	tmat = np.matrix(times)
+	print "Total time: {0} for {1} trials\nAverage: {2}, Stdev: {3}".format(np.sum(tmat[:,0]),len(times),np.mean(tmat[:,0]),np.std(tmat[:,0]))
    	plt.show()
 
    	#print 'results: \n'
