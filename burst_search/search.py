@@ -18,6 +18,10 @@ class Trigger(object):
         self._snr = snr
         self._spec_ind = spec_ind
 
+    @property 
+    def snr(self):
+        return self._snr
+
     @property
     def data(self):
         return self._data

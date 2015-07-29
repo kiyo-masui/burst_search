@@ -32,8 +32,10 @@ MAX_DM = 1000
 # For DM=4000, 13s delay across the band, so overlap searches by ~15s.
 #OVERLAP = 15.
 OVERLAP = 10.0
+
+DO_SPEC_SEARCH = True
 SPEC_INDEX_MIN = -10
-SPEC_INDEX_MAX = 10
+SPEC_INDEX_MAX = 0
 SPEC_INDEX_SAMPLES = 11
 
 THRESH_SNR = 8.0
@@ -41,16 +43,17 @@ THRESH_SNR = 8.0
 DEV_PLOTS = False
 
 #Event simulation params, speculative/contrived
-SIMULATE = False
-sim_rate = 100*1.0/6000.0
+SIMULATE = True
+alpha = -5.0
+sim_rate = 50*1.0/6000.0
 f_m = 800
 f_sd = 50
 bw_m = 200
 bw_sd = 50
 t_m = 0.003
 t_sd = 0.002
-s_m = 0.6
-s_sd = 0.1
+s_m = 0.2
+s_sd = 0.01
 dm_m = 600
 dm_sd = 100
 
@@ -89,7 +92,7 @@ class FileSearch(object):
 
 		#initialize sim object, if there are to be simulated events
 		if SIMULATE:
-			self._sim_source = simulate.RandSource(f_m=f_m,f_sd=f_sd,bw_m=bw_m,bw_sd=bw_sd,t_m=t_m,
+			self._sim_source = simulate.RandSource(alpha=alpha,f_m=f_m,f_sd=f_sd,bw_m=bw_m,bw_sd=bw_sd,t_m=t_m,
 				t_sd=t_sd,s_m=s_m,s_sd=s_sd,dm_m=dm_m,dm_sd=dm_sd,
 				event_rate=sim_rate,file_params=self._parameters,t_overlap=OVERLAP,nrecords_block=self._nrecords_block)
 
@@ -197,23 +200,45 @@ class FileSearch(object):
 		fmin = self._f0 + self._df*self._nfreq
 		fmax = self._f0
 
-		for alpha in np.linspace(SPEC_INDEX_MIN,SPEC_INDEX_MAX,SPEC_INDEX_SAMPLES):
-			#for i in xrange(0,3):
-			weights = array([math.pow(f, -alpha) for f in np.linspace(fmax,fmin,self._nfreq)])
+		if DO_SPEC_SEARCH:
+			print "control"
+		dm_data = self._Transformer(data)
+		dm_data.start_record = start_record
 
-			
-			f = lambda x: weights*x
-			this_dat = np.matrix(np.apply_along_axis(f, axis=0, arr=data),dtype=np.float32)
+		triggers = self._search(dm_data)
+		self._action(triggers, dm_data)
+		if DO_SPEC_SEARCH:
+			print "----------------------"
 
-			#if self._dedispersed_out_group:
-			 #   g = self._dedispersed_out_group.create_group("%d-%d"
-			  #          % (start_record, end_record))
-			   # data.to_hdf5(g)
-			dm_data = self._Transformer(data)
-			dm_data.start_record = start_record
+		if DO_SPEC_SEARCH:
+			spec_triggers = []
 
-			triggers = self._search(dm_data,spec_ind=alpha)
-			self._action(triggers, dm_data)	
+			complete = 1
+			for alpha in np.linspace(SPEC_INDEX_MIN,SPEC_INDEX_MAX,SPEC_INDEX_SAMPLES):
+				#for i in xrange(0,3):
+				weights = array([math.pow(f/center_f, alpha) for f in np.linspace(fmax,fmin,self._nfreq)])
+
+				
+				f = lambda x: weights*x
+				this_dat = np.matrix(np.apply_along_axis(f, axis=0, arr=data),dtype=np.float32)
+
+				#if self._dedispersed_out_group:
+				 #   g = self._dedispersed_out_group.create_group("%d-%d"
+				  #          % (start_record, end_record))
+				   # data.to_hdf5(g)
+				dm_data = self._Transformer(this_dat)
+				dm_data.start_record = start_record
+
+				spec_triggers.append(self._search(dm_data,spec_ind=alpha))
+				print 'complete indices: {0} of {1} ({2})'.format(complete,SPEC_INDEX_SAMPLES,alpha)
+				if len(spec_triggers[-1])  > 0:
+					print 'max snr: {0}'.format(spec_triggers[-1][0].snr)
+				complete += 1
+			spec_triggers = [t[0] for t in spec_triggers if len(t) > 0]
+			spec_triggers = sorted(spec_triggers, key= lambda x: -x.snr)
+			if len(spec_triggers) > 0:
+				spec_triggers = [spec_triggers[0],]
+				self._action(spec_triggers, dm_data)		
 		
 
 
