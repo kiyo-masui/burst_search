@@ -10,12 +10,17 @@ import _search
 
 class Trigger(object):
 
-    def __init__(self, data, centre, snr=0.):
+    def __init__(self, data, centre, snr=0.,spec_ind=None):
 
         self._data = data
         self._dm_ind = centre[0]
         self._time_ind = centre[1]
         self._snr = snr
+        self._spec_ind = spec_ind
+
+    @property 
+    def snr(self):
+        return self._snr
 
     @property
     def data(self):
@@ -25,11 +30,15 @@ class Trigger(object):
     def centre(self):
         return (self._dm_ind, self._time_ind)
 
+    @property 
+    def spec_ind(self):
+        return self._spec_ind
+
     def __str__(self):
-        return str((self._snr, self.centre))
+        return str((self._snr, self._spec_ind, self.centre))
 
     def __repr__(self):
-        return str((self._snr, self.centre))
+        return str((self._snr, self._spec_ind, self.centre))
 
     def plot_dm(self):
         di, ti = self.centre
@@ -52,7 +61,7 @@ class Trigger(object):
 
 
 
-def basic(data, snr_threshold=5., min_dm=50.):
+def basic(data, snr_threshold=5., min_dm=50.,spec_ind=None):
     """Simple event search of DM data.
 
     Returns
@@ -73,6 +82,6 @@ def basic(data, snr_threshold=5., min_dm=50.):
         snr, sample, duration = _search.sievers_find_peak(data, min_dm_ind)
 
         if snr > snr_threshold:
-            triggers.append(Trigger(data, sample, snr))
+            triggers.append(Trigger(data, sample, snr,spec_ind=spec_ind))
 
     return triggers
