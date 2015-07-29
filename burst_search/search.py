@@ -140,7 +140,6 @@ class Trigger(object):
     		for j in range(ylen):
         		new_freq_data[i,j] = ret[i*rebin_factor_freq:(i+1)*rebin_factor_freq,j*rebin_factor_time:(j+1)*rebin_factor_time].mean()
 
-
         range_factor = 0.5
         range_start_ti = int((start_ti + end_ti)/2 - (end_ti - start_ti)*(range_factor)/2)
         range_end_ti = int((start_ti + end_ti)/2 + (end_ti - start_ti)*(range_factor)/2)

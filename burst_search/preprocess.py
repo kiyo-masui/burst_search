@@ -90,7 +90,6 @@ def sys_temperature_bandpass(data):
     data /= T_sys[:,None]
     data[bad_chans,:] = 0
 
-
 def remove_outliers(data, sigma_threshold, block=None):
     """Flag outliers within frequency channels.
 

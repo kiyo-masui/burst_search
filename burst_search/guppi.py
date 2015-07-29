@@ -228,13 +228,14 @@ class FileSearch(object):
                 plt.figure()
                 plt.plot(np.mean(data[:1000], 0))
 
-            # 200 ms (hard coded) highpass filter.
+            # 200 ms (hard coded) highpass filter
             preprocess.remove_outliers(data, 5, 512)
 	    data = preprocess.highpass_filter(data, 0.200 / parameters['delta_t'])
+
             preprocess.remove_outliers(data, 5)
             preprocess.remove_noisy_freq(data, 3)
             #preprocess.remove_continuum(data)
-            preprocess.remove_continuum_v2(data)
+            #preprocess.remove_continuum_v2(data)
 
             # Second round RFI flagging post continuum removal?
             # Doesn't seem to help.
