@@ -57,15 +57,16 @@ class Trigger(object):
 	duration_value += str(round(duration*delta_t, 3))
 	duration_value += " (s)."
 	text = dm_value + snr_value + duration_value
-
+	
+	dm_data_cut = self.data.dm_data[start_di:end_di,start_ti:end_ti]
 	dm_lower_std_index = 1
 	dm_upper_std_index = 5
-	dm_mean = np.mean(self.data.dm_data)
-	dm_std = np.std(self.data.dm_data)
+	dm_mean = np.mean(dm_data_cut)
+	dm_std = np.std(dm_data_cut)
         dm_vmin = dm_mean - dm_lower_std_index * dm_std
 	dm_vmax = dm_mean + dm_upper_std_index * dm_std
 
-	plt.imshow(self.data.dm_data[start_di:end_di,start_ti:end_ti],
+	plt.imshow(dm_data_cut,
                    extent=[start_ti * delta_t, end_ti * delta_t,
                            end_di * delta_dm, start_di * delta_dm],
 		   vmin = dm_vmin, vmax = dm_vmax,
@@ -122,16 +123,15 @@ class Trigger(object):
         df = -200.0/float(self.data.spec_data.shape[0])
         f0 = 900
 	f1 = f0 + self.data.spec_data.shape[0]*df
-        print f0
 	for i in xrange(0,self.data.spec_data.shape[0]):
                 f = f0 + i*df
                 dm = di*delta_dm
                 delay_ind = int(round((disp_delay(f,dm) - disp_delay(f0,dm))/delta_t))
+#        	self.data.spec[:,0:-delay_ind] = self.data.spec[:,delay_ind:]
                 for j in xrange(0,self.data.spec_data.shape[1] - delay_ind):
                         ret[i,j] = self.data.spec_data[i,j + delay_ind]
 	        
-	rebin_factor_freq = 32
-	print rebin_factor_freq
+	rebin_factor_freq = 64
 	rebin_factor_time = 1
 	xlen = ret.shape[0] / rebin_factor_freq
 	ylen = ret.shape[1] / rebin_factor_time
@@ -139,26 +139,23 @@ class Trigger(object):
 	for i in range(xlen):
     		for j in range(ylen):
         		new_freq_data[i,j] = ret[i*rebin_factor_freq:(i+1)*rebin_factor_freq,j*rebin_factor_time:(j+1)*rebin_factor_time].mean()
+
+
+        range_factor = 0.5
+        range_start_ti = int((start_ti + end_ti)/2 - (end_ti - start_ti)*(range_factor)/2)
+        range_end_ti = int((start_ti + end_ti)/2 + (end_ti - start_ti)*(range_factor)/2)
+
         freq_lower_std_index = 1
         freq_upper_std_index = 5
-	print freq_upper_std_index
-        freq_mean = np.mean(new_freq_data)
-        freq_std = np.std(new_freq_data)
+        freq_mean = np.mean(new_freq_data[:,range_start_ti:range_end_ti])
+        freq_std = np.std(new_freq_data[:,range_start_ti:range_end_ti])
         freq_vmin = freq_mean - freq_lower_std_index * freq_std
         freq_vmax = freq_mean + freq_upper_std_index * freq_std
 
-	print start_ti
-	print end_ti
-        range_factor = 0.5
-	range_start_ti = int((start_ti + end_ti)/2 - (end_ti - start_ti)*(range_factor)/2)
-	print range_start_ti
-	range_end_ti = int((start_ti + end_ti)/2 + (end_ti - start_ti)*(range_factor)/2)
-	print range_end_ti
-	print delta_t
 	plt.imshow(new_freq_data[:,range_start_ti:range_end_ti],
                    extent=[range_start_ti * delta_t, range_end_ti * delta_t, f1, f0
                            ],
-#	           vmin = freq_vmin, vmax = freq_vmax,
+	           vmin = freq_vmin, vmax = freq_vmax,
                    aspect='auto',
 		   cmap = cm.Blues
                    )

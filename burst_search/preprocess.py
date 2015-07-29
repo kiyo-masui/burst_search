@@ -91,15 +91,28 @@ def sys_temperature_bandpass(data):
     data[bad_chans,:] = 0
 
 
-def remove_outliers(data, sigma_threshold):
+def remove_outliers(data, sigma_threshold, block=None):
     """Flag outliers within frequency channels.
 
     Replace outliers with that frequency's mean.
 
     """
 
-    nfreq = data.shape[0]
-    ntime = data.shape[1]
+    nfreq0 = data.shape[0]
+    ntime0 = data.shape[1]
+
+    if block is None:
+	block = ntime0
+
+    if ntime0 % block:
+	raise ValueError("Time axis must be divisible by block."
+			 " (ntime, block) = (%d, %d)." % (ntime0, block))
+
+    ntime = block
+    nfreq = nfreq0 * (ntime0 // block)
+
+    data.shape = (nfreq, ntime)
+    
 
     # To optimize cache usage, process one frequency at a time.
     for ii in range(nfreq):
@@ -108,6 +121,8 @@ def remove_outliers(data, sigma_threshold):
         std = np.std(this_freq_data)
         outliers = abs(this_freq_data - mean) > sigma_threshold * std
         this_freq_data[outliers] = mean
+
+    data.shape = (nfreq0, ntime0)
 
 
 def remove_noisy_freq(data, sigma_threshold):
