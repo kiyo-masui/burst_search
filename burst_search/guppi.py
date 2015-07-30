@@ -189,7 +189,7 @@ class FileSearch(object):
 
 		if SIMULATE and block_ind in self._sim_source.coarse_event_schedule():
 			#do simulation
-			data += self._sim_source.generate_events(block_ind)
+			data += self._sim_source.generate_events(block_ind)[:,0:data.shape[1]]
 
 		preprocess.remove_outliers(data, 5)
 		preprocess.remove_noisy_freq(data, 3)
