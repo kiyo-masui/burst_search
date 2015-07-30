@@ -138,7 +138,7 @@ parser.add_argument(
         help="Number of samples per parameter",
         )
 parser.add_argument(
-        '-v', '--verify',
+        '-j', '--jon',
         metavar="verify",
         default=0,
         type=int,
@@ -226,7 +226,7 @@ if __name__ == "__main__":
 
 			print 'effective channels: {0}'.format(2**trans.depth)
 			t0 = time.time()
-			if args.verify:
+			if args.jon:
 				trans(dat,jon=1)
 			else:
 				trans(dat,jon=0)
@@ -319,6 +319,8 @@ if __name__ == "__main__":
 		plt.title('inverse time resolution behavior')
 		plt.savefig('results/tr_series.png')
 
+	tmat = np.matrix(times)
+	print "Total time: {0} for {1} trials\nAverage: {2}, Stdev: {3}".format(np.sum(tmat[:,0]),len(times),np.mean(tmat[:,0]),np.std(tmat[:,0]))
    	plt.show()
 
    	#print 'results: \n'

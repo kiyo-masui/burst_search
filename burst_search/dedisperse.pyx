@@ -37,6 +37,7 @@ def dm_transform(
         float freq0,
         float delta_f,
         ):
+
     cdef int jon = 0
     cdef int nfreq = data1.shape[0]
 
@@ -145,8 +146,7 @@ class DMData(object):
         group.attrs['delta_dm'] = self.delta_dm
         group.create_dataset('spec_data', data=self.spec_data)
         group.create_dataset('dm_data', data=self.dm_data)
-
-
+        
 
 class DMTransform(object):
     """Performs dispersion measure transforms."""
@@ -246,7 +246,7 @@ class DMTransform(object):
                 freq0,
                 delta_f,
                 depth,
-                0,
+                jon,
                 )
 
         dm_data = np.ascontiguousarray(out[:,:ntime_out])

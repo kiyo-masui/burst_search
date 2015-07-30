@@ -46,6 +46,11 @@ parser.add_argument(
         help=('.npy file containing the noise-cal spectrum for bandpass'
               ' calibration.'),
         )
+parser.add_argument(
+        '-p', '--show_plot',
+        type=bool,
+        default=False
+        )
 
 
 
@@ -70,7 +75,12 @@ if __name__ == "__main__":
         Searcher = guppi.FileSearch(filename)
         if not cal_spec is None:
             Searcher.set_cal_spectrum(cal_spec)
-        Searcher.set_trigger_action('save_plot_dm, print, show_plot_time')
+
+        act_str = 'save_plot_dm,show_plot_time,print'
+        if args.show_plot:
+            act_str = act_str + ', show_plot_dm'
+        print 'doing actions \n' + act_str
+        Searcher.set_trigger_action(act_str)
         #Searcher.set_trigger_action('print')
 
         # To write dedispered data to disk.

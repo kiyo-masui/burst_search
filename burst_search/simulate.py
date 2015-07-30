@@ -19,7 +19,7 @@ class RandSource(object):
 
 	
 
-	def __init__(self,**kwargs):
+	def __init__(self,alpha=0.0,**kwargs):
 		"""
 		Initialize a RandSource object
 
@@ -69,6 +69,7 @@ class RandSource(object):
 		self.file_params = kwargs['file_params']
 		self.t_overlap = kwargs['t_overlap']
 		self.nrecords_block = kwargs['nrecords_block']
+		self.alpha = alpha
 
 		# for convenience
 		self.ntime_record = self.file_params['ntime_record']
@@ -117,17 +118,25 @@ class RandSource(object):
 
 			# make undispersed data
 			delta_f = self.file_params['delta_f']
+			nfreq = self.file_params['nfreq']
 			f0 = self.file_params['freq0']
-			f_min = params['f_center'] - 0.5*params['bw']
-			f_max = params['f_center'] + 0.5*params['bw']
+			#f_min = params['f_center'] - 0.5*params['bw']
+			#f_max = params['f_center'] + 0.5*params['bw']
+			f_min = f0 - nfreq*delta_f
+			f_max = f0
 			delta_t = self.file_params['delta_t']
 			nt_width = int(math.ceil(params['t_width']/delta_t))
 			# note that nf_min > nf_max since this is the index corresponding to min freq
+
+			center_f = f0 + 0.5*nfreq*delta_f
+
 			nf_min = int(round((f_min - f0/delta_f)))
 			nf_max = int(round((f_max - f0)/delta_f))
 			dm = params['dm']
 			# fill rectangular region (with endpoint considerations if sim signal is cutoff)
-			sim_dat[max(0,nf_max):min(nf_min,sim_dat.shape[0]),t_start:t_start + nt_width] = params['s_max']
+
+			for j in xrange(0,nfreq):
+				sim_dat[j,t_start:t_start + nt_width] = math.pow(((f0 + j*delta_f)/center_f), self.alpha)*params['s_max']
 
 			# disperse data in time
 			for j in xrange(0,sim_dat.shape[0]):
@@ -136,7 +145,7 @@ class RandSource(object):
 				sim_dat[j,0:nt_disp] = 0.0
 
 			# rudamentary for eval
-			print "Sim Event {0} at  t = {1} s block time = {4} with dm {2} s_max {3}".format(i,i*delta_t,dm,params['s_max'],(i%ntime_block)*delta_t)
+			print "Sim Event {0} at  t = {1} s block time = {4} with dm {2} s_max {3} alpha {5}".format(i,i*delta_t,dm,params['s_max'],(i%ntime_block)*delta_t,self.alpha)
 
 		return sim_dat
 	def make_event_schedule(self):
