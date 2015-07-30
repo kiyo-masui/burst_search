@@ -72,7 +72,12 @@ if __name__ == "__main__":
         files = files
 
     for filename in files[mpi_rank::mpi_size]:
-        Searcher = guppi.FileSearch(filename)
+        print "Rank %d, file %s." % (mpi_rank, filename)
+        try:
+	    Searcher = guppi.FileSearch(filename)
+        except IOError:
+	    print "Rank %d, file can't be opened %s." % (mpi_rank, filename)
+            continue
         if not cal_spec is None:
             Searcher.set_cal_spectrum(cal_spec)
 

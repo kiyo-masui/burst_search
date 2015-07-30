@@ -64,8 +64,11 @@ class Trigger(object):
 	duration = self._duration
 	duration_value = ",width ="
 	duration_value += str(round(duration*delta_t, 3))
-	duration_value += " (s)."
-	text = dm_value + snr_value + duration_value
+	duration_value += " (s)"
+	spec_ind = self._spec_ind
+	spec_ind_value = ",spec_ind ="
+	spec_ind_value += str(round(spec_ind,1))
+	text = dm_value + snr_value + duration_value + spec_ind_value
 	
 	dm_data_cut = self.data.dm_data[start_di:end_di,start_ti:end_ti].copy()
 	dm_lower_std_index = 1
@@ -103,6 +106,42 @@ class Trigger(object):
                    )
         plt.xlabel("time (s)")
         plt.ylabel("Flux")
+
+    def plot_spec(self):
+        di, ti = self.centre
+        tside = 250
+        dside = 300
+        delta_t = self.data.delta_t
+        delta_dm = self.data.delta_dm
+        df = -200.0/float(self.data.spec_data.shape[0])
+        f0 = 900
+        f1 = f0 + self.data.spec_data.shape[0]*df	
+	duration = self._duration
+
+        start_ti = max(0, ti - tside)
+        end_ti = min(self.data.dm_data.shape[1], ti + tside)
+        time = np.arange(start_ti, end_ti) * delta_t
+        freq = np.arange(f0,f1,df)
+
+        rebin_factor_freq = 1
+        rebin_factor_time = 1
+        xlen = self.data.spec_data.shape[0] / rebin_factor_freq
+        ylen = self.data.spec_data.shape[1] / rebin_factor_time
+        new_spec_data = np.zeros((xlen,ylen))
+        for i in range(xlen):
+                for j in range(ylen):
+                        new_spec_data[i,j] = self.data.spec_data[i*rebin_factor_freq:(i+1)*rebin_factor_freq,j*rebin_factor_time:(j+1)*rebin_factor_time].mean()
+
+	intensity_integrate[i] = new_spec_data[i,ti]
+	for k in range(duration):
+		intensity_integrate[i] += new_spec_data[i,ti+k]
+
+	plt.plot(freq, intensity_integrate[:], 'b'
+                   )
+        plt.plot(freq, intensity_integrate[:], 'r.'
+                   )
+        plt.xlabel("freq (MHz)")
+        plt.ylabel("Intensity_integrate")
 
 #    def dedisperse(self):
 #	di, ti = self.centre
