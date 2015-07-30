@@ -58,7 +58,7 @@ class Trigger(object):
 	duration_value += " (s)."
 	text = dm_value + snr_value + duration_value
 	
-	dm_data_cut = self.data.dm_data[start_di:end_di,start_ti:end_ti]
+	dm_data_cut = self.data.dm_data[start_di:end_di,start_ti:end_ti].copy()
 	dm_lower_std_index = 1
 	dm_upper_std_index = 5
 	dm_mean = np.mean(dm_data_cut)
