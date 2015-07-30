@@ -5,6 +5,7 @@
 #include <math.h>
 #include <assert.h>
 #include <omp.h>
+#include <immintrin.h>
 
 #ifndef max
   #define max( a, b ) ( ((a) > (b)) ? (a) : (b) )
@@ -23,6 +24,7 @@
 
 #include "dedisperse_gbt.h"
 
+//typdef int v4si __attribute__ ((vector_size (16)));
 
 /*--------------------------------------------------------------------------------*/
 float *vector(int n)
@@ -354,14 +356,14 @@ void dedisperse_kernel(float **in, float **out, int n, int m)
 
 /*--------------------------------------------------------------------------------*/
 
-void dedisperse_inplace(float **inin, int nchan, int m)
+void dedisperse_inplace(float ** restrict inin, int nchan, int m)
 {
   omp_set_dynamic(0);
   omp_set_num_threads(OMP_THREADS);
 
   int npass=get_npass(nchan);
 
-  float **in=inin;
+  float **restrict in=inin;
 
   int radix = 1;
   int pairs = nchan/2;
@@ -379,7 +381,11 @@ void dedisperse_inplace(float **inin, int nchan, int m)
   //for(int i = 0; i < OMP_THREADS; i++){
 
   //}
-  float **tmp = matrix(OMP_THREADS,m);
+  float **restrict tmp = matrix(OMP_THREADS,m);
+
+
+  float** in1 = __builtin_assume_aligned(in,16);
+  float** tmp1 = __builtin_assume_aligned(tmp,16);
 
   for (int i=0;i<npass;i++) {
 
@@ -400,21 +406,31 @@ void dedisperse_inplace(float **inin, int nchan, int m)
 
       int jeff = j % (nchan/(radix*2));
 
-      for(int k = 0; k < m; k++){
-        tmp[id][k] = in[zero_ind][k];
+      float* src = __builtin_assume_aligned(in[zero_ind],32);
+      float *src1 = __builtin_assume_aligned(in[comp_ind],32);
+      float* dst = __builtin_assume_aligned(tmp[id],32);
+
+      for(int k = 0; k < m - 8; k+=8){
+        
+        for(int l = 0; l < 8; l++){
+          dst[k + l] = src[k + l];
+        }
+
       }
+
       for(int k = 0; k < m; k++){
-       in[zero_ind][k] = in[zero_ind][k] + in[comp_ind][k];
+      src[k] += src1[k];
       }
+
       for(int k = 0; k < m - jeff - 1; k++){
-       in[comp_ind][k] = tmp[id][k + jeff] + in[comp_ind][k + jeff + 1];
+       src1[k] = dst[k + jeff] + src1[k + jeff + 1];
       }
     }
 
     radix *=2;
   }
 
-  unshuffle(in,fmap,nchan,m);
+  unshuffle(in1,fmap,nchan,m);
   free(fmap);
   free(tmp);
 }
