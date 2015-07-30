@@ -41,7 +41,7 @@ THRESH_SNR = 8.0
 DEV_PLOTS = False
 
 #Event simulation params, speculative/contrived
-SIMULATE = True
+SIMULATE = False
 alpha = -5.0
 sim_rate = 50*1.0/6000.0
 f_m = 800
@@ -160,14 +160,14 @@ class FileSearch(object):
                     t_offset += t.centre[1]
                     t_offset *= parameters['delta_t']
                     f = plt.figure(1)
-                    plt.subplot(411)
+                    plt.subplot(211)
                     t.plot_dm()
-                    plt.subplot(412)
-                    t.plot_freq()
-                    plt.subplot(413)
+#                    plt.subplot(412)
+#                    t.plot_freq()
+                    plt.subplot(212)
                     t.plot_time()
-                    plt.subplot(414)
-                    t.plot_spec()
+#                    plt.subplot(212)
+#                    t.plot_spec()
                     t_dm_value = t.centre[0] * t.data.delta_dm
                     if t_dm_value < 5:
                         out_filename = "DM0-5_"
