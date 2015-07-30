@@ -14,11 +14,12 @@
   #define min( a, b ) ( ((a) < (b)) ? (a) : (b) )
 #endif
 
-#define DM0 4150.0
+#define DM0 4148.8
 //OLD DM0 4000.0
 #define NOISE_PERIOD 64
 #define SIG_THRESH 30.0
-#define THREAD=8
+#define THREAD 8
+#define OMP_THREADS 8
 
 #include "dedisperse_gbt.h"
 
@@ -352,9 +353,12 @@ void dedisperse_kernel(float **in, float **out, int n, int m)
 }
 
 /*--------------------------------------------------------------------------------*/
+
 void dedisperse_inplace(float **inin, int nchan, int m)
 {
-  //omp_set_num_threads(8);
+  omp_set_dynamic(0);
+  omp_set_num_threads(OMP_THREADS);
+
   int npass=get_npass(nchan);
 
   float **in=inin;
@@ -365,25 +369,29 @@ void dedisperse_inplace(float **inin, int nchan, int m)
 
   //initial channel map
   int *fmap = malloc(sizeof(int)*nchan);
-  int *cmap = malloc(sizeof(int)*nchan);
+
   for (int i=0; i<nchan;i++){
-    cmap[i] = i;
     fmap[i] = i;
   }
 
-  float *tmp = (float*)malloc(sizeof(float*)*m);
+  //float *vec = (float*)malloc(sizeof(float)*OMP_THREADS*m);
+  //float **tmp = (float**)malloc(sizeof(float*)*OMP_THREADS);
+  //for(int i = 0; i < OMP_THREADS; i++){
+
+  //}
+  float **tmp = matrix(OMP_THREADS,m);
 
   for (int i=0;i<npass;i++) {
 
-    generate_shift_group(cmap,radix,nchan);
     generate_shift_group(fmap,radix,nchan);
 
+    #pragma omp parallel for
     for (int j=0;j<pairs;j++) {
       int zero = 2*j;
       int zero_ind = 0;
-
-      //Inefficient
-      while(cmap[zero_ind] != zero - (zero % (nchan/radix))){
+      int id = omp_get_thread_num();
+      //Inefficient, but it scans over at most n/2
+      while(fmap[zero_ind] != zero - (zero % (nchan/radix))){
         zero_ind++;
       }
       zero_ind += radix*(zero % (nchan/radix));
@@ -393,29 +401,28 @@ void dedisperse_inplace(float **inin, int nchan, int m)
       int jeff = j % (nchan/(radix*2));
 
       for(int k = 0; k < m; k++){
-        tmp[k] = in[zero_ind][k];
+        tmp[id][k] = in[zero_ind][k];
       }
       for(int k = 0; k < m; k++){
        in[zero_ind][k] = in[zero_ind][k] + in[comp_ind][k];
       }
       for(int k = 0; k < m - jeff - 1; k++){
-       in[comp_ind][k] = tmp[k + jeff] + in[comp_ind][k + jeff + 1];
+       in[comp_ind][k] = tmp[id][k + jeff] + in[comp_ind][k + jeff + 1];
       }
     }
+
     radix *=2;
   }
 
-  unshuffle(in,cmap,fmap,nchan,m);
-  free(cmap);
+  unshuffle(in,fmap,nchan,m);
   free(fmap);
   free(tmp);
 }
 
-void unshuffle(float **data, int* cmap, int* fmap,int nchan, int m){
+void unshuffle(float **data, int* fmap,int nchan, int m){
 
   float *tmp = (float*)malloc(sizeof(float*)*m);
 
-  int par = 0;
   int send_ind = nchan/2;
   int this_ind = 1;
   int sorted = 0;

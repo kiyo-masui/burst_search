@@ -32,17 +32,11 @@ MAX_DM = 1000
 # For DM=4000, 13s delay across the band, so overlap searches by ~15s.
 #OVERLAP = 15.
 OVERLAP = 10.0
-<<<<<<< HEAD
 
 DO_SPEC_SEARCH = True
 SPEC_INDEX_MIN = -10
 SPEC_INDEX_MAX = 0
 SPEC_INDEX_SAMPLES = 11
-=======
-SPEC_INDEX_MIN = -10
-SPEC_INDEX_MAX = 10
-SPEC_INDEX_SAMPLES = 10
->>>>>>> b2782d3bb37c74de9cc4c0eb0f8453234ae5096a
 
 THRESH_SNR = 8.0
 
@@ -98,11 +92,7 @@ class FileSearch(object):
 
 		#initialize sim object, if there are to be simulated events
 		if SIMULATE:
-<<<<<<< HEAD
 			self._sim_source = simulate.RandSource(alpha=alpha,f_m=f_m,f_sd=f_sd,bw_m=bw_m,bw_sd=bw_sd,t_m=t_m,
-=======
-			self._sim_source = simulate.RandSource(f_m=f_m,f_sd=f_sd,bw_m=bw_m,bw_sd=bw_sd,t_m=t_m,
->>>>>>> b2782d3bb37c74de9cc4c0eb0f8453234ae5096a
 				t_sd=t_sd,s_m=s_m,s_sd=s_sd,dm_m=dm_m,dm_sd=dm_sd,
 				event_rate=sim_rate,file_params=self._parameters,t_overlap=OVERLAP,nrecords_block=self._nrecords_block)
 
@@ -135,11 +125,7 @@ class FileSearch(object):
 
 	def set_search_method(self, method='basic', **kwargs):
 		if method == 'basic':
-<<<<<<< HEAD
 			self._search = lambda dm_data,spec_ind=None : search.basic(dm_data, THRESH_SNR, MIN_SEARCH_DM,spec_ind)
-=======
-			self._search = lambda dm_data : search.basic(dm_data, THRESH_SNR, MIN_SEARCH_DM)
->>>>>>> b2782d3bb37c74de9cc4c0eb0f8453234ae5096a
 		else:
 			msg = "Unrecognized search method."
 			raise ValueError(msg)
@@ -174,11 +160,8 @@ class FileSearch(object):
 					f = plt.figure()
 					t.plot_dm()
 					out_filename = path.splitext(path.basename(self._filename))[0]
-<<<<<<< HEAD
 					if not t.spec_ind is None:
 			                   		out_filename += "+a=%02.f" % t.spec_ind
-=======
->>>>>>> b2782d3bb37c74de9cc4c0eb0f8453234ae5096a
 					out_filename += "+%06.2fs.png" % t_offset
 					plt.savefig(out_filename, bbox_inches='tight')
 					plt.close(f)
