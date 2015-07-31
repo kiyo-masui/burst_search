@@ -128,7 +128,7 @@ class FileSearch(object):
 
     def set_search_method(self, method='basic', **kwargs):
         if method == 'basic':
-            self._search = lambda dm_data : search.basic(dm_data, THRESH_SNR, MIN_SEARCH_DM)
+            self._search = lambda dm_data,spec_ind=None : search.basic(dm_data, THRESH_SNR, MIN_SEARCH_DM,spec_ind=spec_ind)
         else:
             msg = "Unrecognized search method."
             raise ValueError(msg)
