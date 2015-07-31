@@ -36,6 +36,11 @@ MAX_DM = 2000
 #OVERLAP = 15.
 OVERLAP = 8.
 
+DO_SPEC_SEARCH = True
+SPEC_INDEX_MIN = -10
+SPEC_INDEX_MAX = 0
+SPEC_INDEX_SAMPLES = 11
+
 THRESH_SNR = 8.0
 
 DEV_PLOTS = False
@@ -180,6 +185,8 @@ class FileSearch(object):
                     else:
                         out_filename = "DM300-2000_" 
                     out_filename += path.splitext(path.basename(self._filename))[0]
+                    if not t.spec_ind is None:
+                                    out_filename += "+a=%02.f" % t.spec_ind
                     out_filename += "+%06.2fs.png" % t_offset
                     plt.savefig(out_filename, bbox_inches='tight')
                     plt.close(f)
@@ -193,14 +200,73 @@ class FileSearch(object):
 
         self._dedispersed_out_group = group
 
+    #simple method to replace nested structure
     def search_records(self, start_record, end_record):
-        data = self.dm_transform_records(start_record, end_record)
-        if self._dedispersed_out_group:
-            g = self._dedispersed_out_group.create_group("%d-%d"
-                    % (start_record, end_record))
-            data.to_hdf5(g)
-        triggers = self._search(data)
-        self._action(triggers, data)
+        data = self.get_records(start_record, end_record)
+
+        if self._parameters['cal_period_samples']:
+            preprocess.noisecal_bandpass(data, self._cal_spec,
+             self._parameters['cal_period_samples'])
+
+        block_ind = start_record/self._nrecords_block
+
+        # Preprocess.
+        preprocess.sys_temperature_bandpass(data)
+
+        if SIMULATE and block_ind in self._sim_source.coarse_event_schedule():
+            #do simulation
+            data += self._sim_source.generate_events(block_ind)[:,0:data.shape[1]]
+
+        preprocess.remove_outliers(data, 5, 512)
+        data = preprocess.highpass_filter(data, 0.200 / parameters['delta_t'])
+
+        preprocess.remove_outliers(data, 5)
+        preprocess.remove_noisy_freq(data, 3)
+
+        #from here we weight channels by spectral index
+        center_f = self._f0 + (self._df*self._nfreq/2.0)
+        fmin = self._f0 + self._df*self._nfreq
+        fmax = self._f0
+
+        if DO_SPEC_SEARCH:
+            print "control"
+        dm_data = self._Transformer(data)
+        dm_data.start_record = start_record
+
+        triggers = self._search(dm_data)
+        self._action(triggers, dm_data)
+        if DO_SPEC_SEARCH:
+            print "----------------------"
+
+        if DO_SPEC_SEARCH:
+            spec_triggers = []
+
+            complete = 1
+            for alpha in np.linspace(SPEC_INDEX_MIN,SPEC_INDEX_MAX,SPEC_INDEX_SAMPLES):
+                #for i in xrange(0,3):
+                weights = array([math.pow(f/center_f, alpha) for f in np.linspace(fmax,fmin,self._nfreq)])
+
+                
+                f = lambda x: weights*x
+                this_dat = np.matrix(np.apply_along_axis(f, axis=0, arr=data),dtype=np.float32)
+
+                #if self._dedispersed_out_group:
+                 #   g = self._dedispersed_out_group.create_group("%d-%d"
+                  #          % (start_record, end_record))
+                   # data.to_hdf5(g)
+                dm_data = self._Transformer(this_dat)
+                dm_data.start_record = start_record
+
+                spec_triggers.append(self._search(dm_data,spec_ind=alpha))
+                print 'complete indices: {0} of {1} ({2})'.format(complete,SPEC_INDEX_SAMPLES,alpha)
+                if len(spec_triggers[-1])  > 0:
+                    print 'max snr: {0}'.format(spec_triggers[-1][0].snr)
+                complete += 1
+            spec_triggers = [t[0] for t in spec_triggers if len(t) > 0]
+            spec_triggers = sorted(spec_triggers, key= lambda x: -x.snr)
+            if len(spec_triggers) > 0:
+                spec_triggers = [spec_triggers[0],]
+                self._action(spec_triggers, dm_data)
 
     def dm_transform_records(self, start_record, end_record):
         parameters = self._parameters
@@ -374,5 +440,3 @@ def get_nrecords(filename):
     nrecords = len(hdulist[1].data)
     hdulist.close()
     return nrecords
-
-
