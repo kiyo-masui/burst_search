@@ -130,7 +130,6 @@ class Trigger(object):
                 for j in xrange(0,self.data.spec_data.shape[1] - delay_ind):
                         ret[i,j] = self.data.spec_data[i,j + delay_ind]
 
-        print f0
         intensity_integrate = np.array([0.0]*self.data.spec_data.shape[0])
         for i in xrange(len(intensity_integrate)):
                 print "operating on row {0}".format(i)                
@@ -139,22 +138,16 @@ class Trigger(object):
 
         rebin_factor_freq = 64
         xlen = (len(intensity_integrate)) / rebin_factor_freq
-        print xlen
         freq = np.arange(f0,f1,df*rebin_factor_freq)
-        intensity_integrate_rebin = np.array([0]*xlen)
+        intensity_integrate_rebin = np.zeros(xlen)
         for i in xrange(xlen):
                 intensity_integrate_rebin[i] = intensity_integrate[i*rebin_factor_freq:(i+1)*rebin_factor_freq].mean()
-                print round(intensity_integrate_rebin[i],8)
 
-        print f1
         plt.plot(freq, intensity_integrate_rebin, 'b',
-#                vmin = 1e-5, vmax = -1e-5,
-#                aspect = 'auto'
                    )
         plt.plot(freq, intensity_integrate_rebin, 'r.',
-#                vmin = 1e-5, vmax = -1e-5,
-#                aspect = 'auto'
                    )
+#        plt.ylim([-(0.1**4),0.1**4])
         plt.xlabel("freq (MHz)")
         plt.ylabel("Intensity_integrate")
 
