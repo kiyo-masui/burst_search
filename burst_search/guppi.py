@@ -203,7 +203,8 @@ class FileSearch(object):
     #simple method to replace nested structure
     def search_records(self, start_record, end_record):
         data = self.get_records(start_record, end_record)
-
+        parameters = self._parameters
+        
         if self._parameters['cal_period_samples']:
             preprocess.noisecal_bandpass(data, self._cal_spec,
              self._parameters['cal_period_samples'])
