@@ -1,4 +1,5 @@
 import numpy as np
+import time
 
 cimport numpy as np
 cimport cython
@@ -234,6 +235,7 @@ class DMTransform(object):
         cdef np.ndarray[ndim=2, dtype=DTYPE_t] out
         out = np.empty(shape=(ndm, ntime1), dtype=DTYPE)
 
+        t1 = time.time()
         cdef int ntime_out = burst_dm_transform(
                 <DTYPE_t *> data1.data,
                 <DTYPE_t *> data2.data,
@@ -249,7 +251,9 @@ class DMTransform(object):
                 jon,
                 )
 
+        print "dedisperse_time: {0}".format(time.time() - t1)
         dm_data = np.ascontiguousarray(out[:,:ntime_out])
+
         spec_data = np.ascontiguousarray(data1[:, :ntime_out])
 
         dm0 = 0

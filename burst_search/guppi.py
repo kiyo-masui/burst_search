@@ -24,14 +24,14 @@ from simulate import *
 #TIME_BLOCK = 30.
 
 #Additions:
-MIN_SEARCH_DM = 400
+MIN_SEARCH_DM = 400.0
 
-TIME_BLOCK = 30.0
+TIME_BLOCK = 20.0
 
-MAX_DM = 1000
+MAX_DM = 1000.0
 # For DM=4000, 13s delay across the band, so overlap searches by ~15s.
 #OVERLAP = 15.
-OVERLAP = 10.0
+OVERLAP = 5.0
 
 DO_SPEC_SEARCH = True
 SPEC_INDEX_MIN = -10
@@ -54,7 +54,7 @@ t_m = 0.003
 t_sd = 0.002
 s_m = 0.2
 s_sd = 0.01
-dm_m = 600
+dm_m = 200
 dm_sd = 100
 
 

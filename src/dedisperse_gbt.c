@@ -356,6 +356,56 @@ void dedisperse_kernel(float **in, float **out, int n, int m)
 
 /*--------------------------------------------------------------------------------*/
 
+int delay(int disp, int subblock, int nblocks){
+  return (int) round(((float) subblock)*((float) disp)/((float) nblocks));
+}
+
+int delta_delay(int disp, int subblock, int nblocks){
+  return delay(disp,subblock + 1,nblocks) - delay(disp,subblock,nblocks);
+}
+
+void dedisperse_interlace(float** in, float**out, int nchan, int m, int blocksize){
+  int nblock = nchan/blocksize;
+
+  assert(nblock*blocksize == nchan);
+
+
+
+  float **tmp= matrix(nchan,m);
+  memset(tmp[0],0,sizeof(tmp[0][0])*m*nchan);
+  omp_set_dynamic(0);
+  omp_set_num_threads(OMP_THREADS);
+
+  //for(int i=0; i < nblock; i++){
+  //  dedisperse_inplace(in + i*blocksize, blocksize, m);
+  //}
+  for(int i=0; i < nblock; i++){
+    dedisperse_single(in + i*blocksize,tmp + i*blocksize, blocksize, m);
+  }
+
+  memcpy(out[0],tmp[0],sizeof(float)*m*nchan);
+
+  int this_delay = 0;
+  int chan = 0;
+
+  for(int i=0; i < nchan; i++){
+    for(int j=0; j < nblock; j++){
+      chan = j*blocksize + min(delta_delay(i,j,nblock),blocksize - 1);
+      this_delay = delay(i,j,nblock);
+
+      //printf("disp_channel: %i, block: %i, delay: %i, delta_delay: %i, desired_ind: %i\n",i,j,this_delay,delta_delay(i,j,nblock),chan);
+
+      for(int k = 0; k < m - this_delay; k++){
+        out[i][k] += in[chan][k + this_delay];
+      }
+
+    }
+  }
+
+  free(tmp);
+
+}
+
 void dedisperse_inplace(float ** restrict inin, int nchan, int m)
 {
   omp_set_dynamic(0);
@@ -384,8 +434,8 @@ void dedisperse_inplace(float ** restrict inin, int nchan, int m)
   float **restrict tmp = matrix(OMP_THREADS,m);
 
 
-  float** in1 = __builtin_assume_aligned(in,16);
-  float** tmp1 = __builtin_assume_aligned(tmp,16);
+  float** restrict in1 = __builtin_assume_aligned(in,16);
+  float** restrict tmp1 = __builtin_assume_aligned(tmp,16);
 
   for (int i=0;i<npass;i++) {
 
@@ -406,16 +456,12 @@ void dedisperse_inplace(float ** restrict inin, int nchan, int m)
 
       int jeff = j % (nchan/(radix*2));
 
-      float* src = __builtin_assume_aligned(in[zero_ind],32);
-      float *src1 = __builtin_assume_aligned(in[comp_ind],32);
-      float* dst = __builtin_assume_aligned(tmp[id],32);
+      float* restrict src = __builtin_assume_aligned(in[zero_ind],16);
+      float *restrict src1 = __builtin_assume_aligned(in[comp_ind],16);
+      float* restrict dst = __builtin_assume_aligned(tmp[id],16);
 
-      for(int k = 0; k < m - 8; k+=8){
-        
-        for(int l = 0; l < 8; l++){
-          dst[k + l] = src[k + l];
-        }
-
+      for(int k = 0; k <m; k++){
+        dst[k] = src[k];
       }
 
       for(int k = 0; k < m; k++){
@@ -578,11 +624,11 @@ void dedisperse_gbt(Data *dat, float *outdata)
   //float **tmp=matrix(dat->nchan, dat->ndata);
 
 
-  //float **tmp=(float **)malloc(sizeof(float *)*dat->nchan);
-  //for (int i=0;i<dat->nchan;i++)
-    //tmp[i]=outdata+i*dat->ndata;
+  float **tmp=(float **)malloc(sizeof(float *)*dat->nchan);
+  for (int i=0;i<dat->nchan;i++)
+    tmp[i]=outdata+i*dat->ndata;
 
-  //memset(tmp[0],0,sizeof(tmp[0][0])*dat->ndata*dat->nchan);
+  memset(tmp[0],0,sizeof(tmp[0][0])*dat->ndata*dat->nchan);
 
   double t1=omp_get_wtime();
 
@@ -596,10 +642,11 @@ void dedisperse_gbt(Data *dat, float *outdata)
 
   //memcpy(ip_dat[0],dat->data[0],dat->nchan*dat->ndata*sizeof(dat->data[0][0]));
 
-  dedisperse_inplace(dat->data,dat->nchan,dat->ndata);
-
-  memcpy(outdata,dat->data[0],dat->nchan*dat->ndata*sizeof(float));
-
+  //dedisperse_inplace(dat->data,dat->nchan,dat->ndata);
+  dedisperse_interlace(dat->data,tmp,dat->nchan,dat->ndata,128);
+  
+  //memcpy(outdata,tmp,dat->nchan*dat->ndata*sizeof(float));
+  //free(tmp);
   if (0) {
     printf("element 500,300 is %12.5e\n",dat->data[500][300]);
     FILE *outfile=fopen("burst_dump.dat","w");

@@ -219,17 +219,21 @@ if __name__ == "__main__":
 		ntime = int(time_window/this_dt)
 		trans = DMTransform(dt,nchan,f0 + bw,-bw/nchan,max_dm)
 		for i in xrange(0,count):
-			dat = np.matrix(np.random.rand(nchan,ntime), dtype=np.float32)
-			#dat = make_transient(nchan,f0,bw,time_window,ntime,dm=100.0)
+			#dat = np.matrix(np.random.rand(nchan,ntime), dtype=np.float32)
+			dat = make_transient(nchan,f0,bw,time_window,ntime,dm=100.0)
 			print 'attempting test with params \n tw {0}, max dm {1}, nchan {2}, dt {3}'.format(
 				time_window, max_dm, nchan, this_dt)
 
 			print 'effective channels: {0}'.format(2**trans.depth)
+
+			#plt.figure()
+			#ax = plt.gca()
 			t0 = time.time()
 			if args.jon:
 				trans(dat,jon=1)
 			else:
 				trans(dat,jon=0)
+				#ax.imshow(trans(dat,jon=0).dm_data,interpolation='nearest')
 			times.append([time.time() - t0,time_window,max_dm,nchan,this_dt])
 			print 'complete; t = {0}'.format(times[-1][0])
 
