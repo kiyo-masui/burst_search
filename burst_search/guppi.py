@@ -83,6 +83,9 @@ class FileSearch(object):
                 MAX_DM,
                 )
 
+        self._df = parameters['delta_f']
+        self._nfreq = parameters['nfreq']
+        self._f0 = parameters['freq0']
         self._record_length = (parameters['ntime_record'] * parameters['delta_t'])
         self._nrecords_block = int(math.ceil(TIME_BLOCK / self._record_length))
         self._nrecords_overlap = int(math.ceil(OVERLAP / self._record_length))
@@ -204,7 +207,7 @@ class FileSearch(object):
     def search_records(self, start_record, end_record):
         data = self.get_records(start_record, end_record)
         parameters = self._parameters
-        
+
         if self._parameters['cal_period_samples']:
             preprocess.noisecal_bandpass(data, self._cal_spec,
              self._parameters['cal_period_samples'])
