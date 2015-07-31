@@ -329,6 +329,13 @@ class FileSearch(object):
 
         return dm_data
 
+    def get_records(self, start_record, end_record):
+        hdulist = pyfits.open(self._filename, 'readonly')
+        data = read_records(hdulist, start_record, end_record)
+        hdulist.close()
+        return data
+
+
     def search_all_records(self, time_block=TIME_BLOCK, overlap=OVERLAP):
 
         parameters = self._parameters
