@@ -43,7 +43,7 @@ THRESH_SNR = 8.0
 DEV_PLOTS = False
 
 #Event simulation params, speculative/contrived
-SIMULATE = True
+SIMULATE = False
 alpha = -5.0
 sim_rate = 50*1.0/6000.0
 f_m = 800
