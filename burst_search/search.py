@@ -110,6 +110,8 @@ class Trigger(object):
 
     def plot_spec(self):
         di, ti = self.centre
+        print di
+        print ti
         tside = 250
         dside = 300
         delta_t = self.data.delta_t
@@ -122,6 +124,8 @@ class Trigger(object):
         end_ti = min(self.data.dm_data.shape[1], ti + tside)
         ret = np.zeros(self.data.spec_data.shape)
 
+        print self.data.spec_data[1000:1005,1000:1005]
+        
         for i in xrange(0,self.data.spec_data.shape[0]):
                 f = f0 + i*df
                 dm = di*delta_dm
@@ -130,26 +134,84 @@ class Trigger(object):
                 for j in xrange(0,self.data.spec_data.shape[1] - delay_ind):
                         ret[i,j] = self.data.spec_data[i,j + delay_ind]
 
+        print ret[1000:1005,1000:1005]
+
         intensity_integrate = np.array([0.0]*self.data.spec_data.shape[0])
         for i in xrange(len(intensity_integrate)):
-                print "operating on row {0}".format(i)                
-                for k in xrange(-duration/2+1,duration/2+1):
+#                print "operating on row {0}".format(i)                
+                for k in xrange(-duration/2,duration/2):
                         intensity_integrate[i] += ret[i,ti+k] * delta_t
 
-        rebin_factor_freq = 64
-        xlen = (len(intensity_integrate)) / rebin_factor_freq
-        freq = np.arange(f0,f1,df*rebin_factor_freq)
-        intensity_integrate_rebin = np.zeros(xlen)
-        for i in xrange(xlen):
-                intensity_integrate_rebin[i] = intensity_integrate[i*rebin_factor_freq:(i+1)*rebin_factor_freq].mean()
+        colors = ['blue','red','darkgreen','orange']
 
-        plt.plot(freq, intensity_integrate_rebin, 'b',
-                   )
-        plt.plot(freq, intensity_integrate_rebin, 'r.',
-                   )
+        rebin_factor_freq_0 = 4**0
+        xlen_0 = (len(intensity_integrate)) / rebin_factor_freq_0
+        freq_0 = np.arange(f0,f1,df*rebin_factor_freq_0)
+        intensity_integrate_rebin_0 = np.zeros(xlen_0)
+        for i in xrange(xlen_0):
+              intensity_integrate_rebin_0[i] = intensity_integrate[i*rebin_factor_freq_0:(i+1)*rebin_factor_freq_0].mean()
+
+        rebin_factor_freq_1 = 4**1
+        xlen_1 = (len(intensity_integrate)) / rebin_factor_freq_1
+        freq_1 = np.arange(f0,f1,df*rebin_factor_freq_1)
+        intensity_integrate_rebin_1 = np.zeros(xlen_1)
+        for i in xrange(xlen_1):
+              intensity_integrate_rebin_1[i] = intensity_integrate[i*rebin_factor_freq_1:(i+1)*rebin_factor_freq_1].mean()
+
+        rebin_factor_freq_2 = 4**2
+        xlen_2 = (len(intensity_integrate)) / rebin_factor_freq_2
+        freq_2 = np.arange(f0,f1,df*rebin_factor_freq_2)
+        intensity_integrate_rebin_2 = np.zeros(xlen_2)
+        for i in xrange(xlen_2):
+              intensity_integrate_rebin_2[i] = intensity_integrate[i*rebin_factor_freq_2:(i+1)*rebin_factor_freq_2].mean()
+
+        rebin_factor_freq_3 = 4**3
+        xlen_3 = (len(intensity_integrate)) / rebin_factor_freq_3
+        freq_3 = np.arange(f0,f1,df*rebin_factor_freq_3)
+        intensity_integrate_rebin_3 = np.zeros(xlen_3)
+        for i in xrange(xlen_3):
+              intensity_integrate_rebin_3[i] = intensity_integrate[i*rebin_factor_freq_3:(i+1)*rebin_factor_freq_3].mean()
+
+
+
+        plt.subplot(411)
+        plt.plot(freq_0, intensity_integrate_rebin_0, 'blue')
+        plt.ylabel('rebin_1')
+
+        plt.subplot(412)
+        plt.plot(freq_1, intensity_integrate_rebin_1, 'red')
+        plt.ylabel('rebin_4')
+
+        plt.subplot(413)
+        plt.plot(freq_2, intensity_integrate_rebin_2, 'darkgreen')
+        plt.ylabel('rebin_16')
+
+        plt.subplot(414)
+        plt.plot(freq_3, intensity_integrate_rebin_3, 'orange')
+        plt.ylabel('rebin_64')
+#        plt.plot(freq, intensity_integrate_rebin_n, color = colors[n]
+#                )
+#        plt.plot(freq, intensity_integrate_rebin, 'r.'
+#                   )
 #        plt.ylim([-(0.1**4),0.1**4])
-        plt.xlabel("freq (MHz)")
-        plt.ylabel("Intensity_integrate")
+#        plt.xlabel("freq (MHz)")
+#        plt.ylabel("Intensity_integrate")
+
+#        rebin_factor_freq = 64
+#        xlen = (len(intensity_integrate)) / rebin_factor_freq
+#        freq = np.arange(f0,f1,df*rebin_factor_freq)
+#        intensity_integrate_rebin = np.zeros(xlen)
+#        for i in xrange(xlen):
+#                intensity_integrate_rebin[i] = intensity_integrate[i*rebin_factor_freq:(i+1)*rebin_factor_freq].mean()
+
+#        plt.plot(freq, intensity_integrate_rebin, 'b',
+#                   )
+#        plt.plot(freq, intensity_integrate_rebin, 'r.',
+#                   )
+#        plt.ylim([-(0.1**4),0.1**4])
+#        plt.xlabel("freq (MHz)")
+#        plt.ylabel("Intensity_integrate")
+
 
 #    def dedisperse(self):
 #	di, ti = self.centre

@@ -164,7 +164,7 @@ class FileSearch(object):
                     t.plot_dm()
 #                    plt.subplot(412)
 #                    t.plot_freq()
-#                    plt.subplot(212)
+#                    plt.subplot(413)
 #                    t.plot_time()
                     plt.subplot(212)
                     t.plot_spec()
