@@ -123,24 +123,30 @@ class Trigger(object):
         start_ti = max(0, ti - tside)
         end_ti = min(self.data.dm_data.shape[1], ti + tside)
         time = np.arange(start_ti, end_ti) * delta_t
-        freq = np.arange(f0,f1,df)
 
-        rebin_factor_freq = 1
+        rebin_factor_freq = 64
         rebin_factor_time = 1
         xlen = self.data.spec_data.shape[0] / rebin_factor_freq
         ylen = self.data.spec_data.shape[1] / rebin_factor_time
+        print xlen
+        print ylen
+        freq = np.arange(f0,f1,df*rebin_factor_freq)
         new_spec_data = np.zeros((xlen,ylen))
-        for i in range(xlen):
-                for j in range(ylen):
+        for i in xrange(xlen):
+                print "operating on row {0}".format(i)
+                for j in xrange(ylen):
                         new_spec_data[i,j] = self.data.spec_data[i*rebin_factor_freq:(i+1)*rebin_factor_freq,j*rebin_factor_time:(j+1)*rebin_factor_time].mean()
 
-        intensity_integrate[i] = new_spec_data[i,ti]
-        for k in range(duration):
-            intensity_integrate[i] += new_spec_data[i,ti+k]
+        print f1
+        intensity_integrate = np.array([0]*xlen)
+        
+        for k in xrange(-duration,duration):
+            intensity_integrate[i] += new_spec_data[i,ti+k]* delta_t
 
-        plt.plot(freq, intensity_integrate[:], 'b'
+        print df
+        plt.plot(freq, intensity_integrate, 'b'
                    )
-        plt.plot(freq, intensity_integrate[:], 'r.'
+        plt.plot(freq, intensity_integrate, 'r.'
                    )
         plt.xlabel("freq (MHz)")
         plt.ylabel("Intensity_integrate")

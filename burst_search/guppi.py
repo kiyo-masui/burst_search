@@ -164,10 +164,10 @@ class FileSearch(object):
                     t.plot_dm()
 #                    plt.subplot(412)
 #                    t.plot_freq()
-                    plt.subplot(212)
-                    t.plot_time()
 #                    plt.subplot(212)
-#                    t.plot_spec()
+#                    t.plot_time()
+                    plt.subplot(212)
+                    t.plot_spec()
                     t_dm_value = t.centre[0] * t.data.delta_dm
                     if t_dm_value < 5:
                         out_filename = "DM0-5_"
