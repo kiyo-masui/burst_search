@@ -12,7 +12,7 @@ if VERSION_DEV:
     VERSION = VERSION + ".dev%d" % VERSION_DEV
 
 
-COMPILE_FLAGS = ['-Ofast', '-march=native', '-std=c99', '-fopenmp']
+COMPILE_FLAGS = ['-Ofast','-O3', '-march=native', '-std=c99', '-fopenmp']
 LINK_FLAGS = ['-fopenmp']
 MACROS = [
     ('BURST_VERSION_MAJOR', VERSION_MAJOR),
