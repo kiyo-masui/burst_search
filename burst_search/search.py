@@ -124,7 +124,6 @@ class Trigger(object):
         end_ti = min(self.data.dm_data.shape[1], ti + tside)
         ret = np.zeros(self.data.spec_data.shape)
 
-        print self.data.spec_data[1000:1005,1000:1005]
         
         for i in xrange(0,self.data.spec_data.shape[0]):
                 f = f0 + i*df
@@ -134,7 +133,6 @@ class Trigger(object):
                 for j in xrange(0,self.data.spec_data.shape[1] - delay_ind):
                         ret[i,j] = self.data.spec_data[i,j + delay_ind]
 
-        print ret[1000:1005,1000:1005]
 
         intensity_integrate = np.array([0.0]*self.data.spec_data.shape[0])
         for i in xrange(len(intensity_integrate)):
@@ -173,22 +171,24 @@ class Trigger(object):
               intensity_integrate_rebin_3[i] = intensity_integrate[i*rebin_factor_freq_3:(i+1)*rebin_factor_freq_3].mean()
 
 
+        plt.plot(freq_0, intensity_integrate_rebin_0, 'blue', freq_1, intensity_integrate_rebin_1, 'red', freq_2, intensity_integrate_rebin_2, 'darkgreen', freq_3, intensity_integrate_rebin_3, 'orange')
+        plt.show()
 
-        plt.subplot(411)
-        plt.plot(freq_0, intensity_integrate_rebin_0, 'blue')
-        plt.ylabel('rebin_1')
+#        plt.subplot(411)
+#        plt.plot(freq_0, intensity_integrate_rebin_0, 'blue')
+#        plt.ylabel('rebin_1')
 
-        plt.subplot(412)
-        plt.plot(freq_1, intensity_integrate_rebin_1, 'red')
-        plt.ylabel('rebin_4')
+#        plt.subplot(412)
+#        plt.plot(freq_1, intensity_integrate_rebin_1, 'red')
+#        plt.ylabel('rebin_4')
 
-        plt.subplot(413)
-        plt.plot(freq_2, intensity_integrate_rebin_2, 'darkgreen')
-        plt.ylabel('rebin_16')
+#        plt.subplot(413)
+#        plt.plot(freq_2, intensity_integrate_rebin_2, 'darkgreen')
+#        plt.ylabel('rebin_16')
 
-        plt.subplot(414)
-        plt.plot(freq_3, intensity_integrate_rebin_3, 'orange')
-        plt.ylabel('rebin_64')
+#        plt.subplot(414)
+#        plt.plot(freq_3, intensity_integrate_rebin_3, 'orange')
+#        plt.ylabel('rebin_64')
 #        plt.plot(freq, intensity_integrate_rebin_n, color = colors[n]
 #                )
 #        plt.plot(freq, intensity_integrate_rebin, 'r.'

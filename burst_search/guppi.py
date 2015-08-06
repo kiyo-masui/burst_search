@@ -208,6 +208,7 @@ class FileSearch(object):
         data = self.get_records(start_record, end_record)
         parameters = self._parameters
 
+        preprocess.sys_temperature_bandpass(data)
         if self._parameters['cal_period_samples']:
             preprocess.noisecal_bandpass(data, self._cal_spec,
              self._parameters['cal_period_samples'])
@@ -215,7 +216,7 @@ class FileSearch(object):
         block_ind = start_record/self._nrecords_block
 
         # Preprocess.
-        preprocess.sys_temperature_bandpass(data)
+        #preprocess.sys_temperature_bandpass(data)
 
         if SIMULATE and block_ind in self._sim_source.coarse_event_schedule():
             #do simulation
