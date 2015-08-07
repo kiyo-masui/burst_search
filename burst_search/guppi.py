@@ -41,7 +41,7 @@ SPEC_INDEX_MIN = -10
 SPEC_INDEX_MAX = 0
 SPEC_INDEX_SAMPLES = 11
 
-THRESH_SNR = 10.0
+THRESH_SNR = 8.0
 
 DEV_PLOTS = False
 
@@ -59,9 +59,6 @@ s_m = 100*0.6
 s_sd = 0.1
 dm_m = 600
 dm_sd = 0
-
-
-
 
 
 class FileSearch(object):
@@ -244,7 +241,7 @@ class FileSearch(object):
             print "----------------------"
 
         if DO_SPEC_SEARCH:
-            spec_triggers = []
+            spec_trigger = None
 
             complete = 1
             for alpha in np.linspace(SPEC_INDEX_MIN,SPEC_INDEX_MAX,SPEC_INDEX_SAMPLES):
@@ -261,17 +258,21 @@ class FileSearch(object):
                    # data.to_hdf5(g)
                 dm_data = self._Transformer(this_dat)
                 dm_data.start_record = start_record
-
-                spec_triggers.append(self._search(dm_data,spec_ind=alpha))
+                these_triggers = self._search(dm_data,spec_ind=alpha)
                 print 'complete indices: {0} of {1} ({2})'.format(complete,SPEC_INDEX_SAMPLES,alpha)
-                if len(spec_triggers[-1])  > 0:
-                    print 'max snr: {0}'.format(spec_triggers[-1][0].snr)
+                if len(these_triggers)  > 0:
+                    print 'max snr: {0}'.format(these_triggers[0].snr)
+                    if spec_trigger == None or these_triggers[0].snr > spec_trigger.snr:
+                        spec_trigger = these_triggers[0]
                 complete += 1
-            spec_triggers = [t[0] for t in spec_triggers if len(t) > 0]
-            spec_triggers = sorted(spec_triggers, key= lambda x: -x.snr)
-            if len(spec_triggers) > 0:
-                spec_triggers = [spec_triggers[0],]
-                self._action(spec_triggers, dm_data)
+
+            #spec_triggers = [t[0] for t in spec_triggers if len(t) > 0]
+            #spec_triggers = sorted(spec_triggers, key= lambda x: -x.snr)
+            #if len(spec_triggers) > 0:
+                #spec_triggers = [spec_triggers[0],]
+                #self._action(spec_triggers, dm_data)
+            if spec_trigger != None:
+                self._action((spec_trigger,), dm_data)
 
     def dm_transform_records(self, start_record, end_record):
         parameters = self._parameters
