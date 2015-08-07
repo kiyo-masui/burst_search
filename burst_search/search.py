@@ -171,7 +171,9 @@ class Trigger(object):
               intensity_integrate_rebin_3[i] = intensity_integrate[i*rebin_factor_freq_3:(i+1)*rebin_factor_freq_3].mean()
 
 
-        plt.plot(freq_0, intensity_integrate_rebin_0, 'blue', freq_1, intensity_integrate_rebin_1, 'red', freq_2, intensity_integrate_rebin_2, 'darkgreen', freq_3, intensity_integrate_rebin_3, 'orange')
+        plt.plot(freq_0, intensity_integrate_rebin_0, 'blue', freq_1, intensity_integrate_rebin_1, 'red', freq_2, intensity_integrate_rebin_2, 'green', freq_3, intensity_integrate_rebin_3, 'orange')
+        plt.ylabel("intensity_integrate")
+        plt.xlabel("Frequency (MHz)")
         plt.show()
 
 #        plt.subplot(411)

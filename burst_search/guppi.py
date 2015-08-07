@@ -36,12 +36,12 @@ MAX_DM = 2000
 #OVERLAP = 15.
 OVERLAP = 8.
 
-DO_SPEC_SEARCH = False
+DO_SPEC_SEARCH = True
 SPEC_INDEX_MIN = -10
 SPEC_INDEX_MAX = 0
 SPEC_INDEX_SAMPLES = 11
 
-THRESH_SNR = 8.0
+THRESH_SNR = 10.0
 
 DEV_PLOTS = False
 
@@ -168,13 +168,13 @@ class FileSearch(object):
                     t_offset += t.centre[1]
                     t_offset *= parameters['delta_t']
                     f = plt.figure(1)
-                    plt.subplot(211)
+                    plt.subplot(411)
                     t.plot_dm()
-#                    plt.subplot(412)
-#                    t.plot_freq()
-#                    plt.subplot(413)
-#                    t.plot_time()
-                    plt.subplot(212)
+                    plt.subplot(412)
+                    t.plot_freq()
+                    plt.subplot(413)
+                    t.plot_time()
+                    plt.subplot(414)
                     t.plot_spec()
                     t_dm_value = t.centre[0] * t.data.delta_dm
                     if t_dm_value < 5:
