@@ -81,7 +81,7 @@ if __name__ == "__main__":
         if not cal_spec is None:
             Searcher.set_cal_spectrum(cal_spec)
 
-        act_str = 'save_plot_dm,show_plot_time,print'
+        act_str = 'save_plot_dm,print'
         if args.show_plot:
             act_str = act_str + ', show_plot_dm'
         print 'doing actions \n' + act_str

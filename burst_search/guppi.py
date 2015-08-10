@@ -8,7 +8,10 @@ import time
 
 import numpy as np
 from numpy import array, dot
-import pyfits
+try:
+    import astropy.io.fits as pyfits
+except ImportError:
+    import pyfits
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
@@ -38,7 +41,7 @@ OVERLAP = 8.
 
 DO_SPEC_SEARCH = True
 SPEC_INDEX_MIN = -10
-SPEC_INDEX_MAX = 0
+SPEC_INDEX_MAX = 10
 SPEC_INDEX_SAMPLES = 11
 
 THRESH_SNR = 8.0
@@ -230,13 +233,14 @@ class FileSearch(object):
         fmin = self._f0 + self._df*self._nfreq
         fmax = self._f0
 
-        if DO_SPEC_SEARCH:
-            print "control"
-        dm_data = self._Transformer(data)
-        dm_data.start_record = start_record
+        #if DO_SPEC_SEARCH:
+        #    print "control"
+        #dm_data = self._Transformer(data)
+        #dm_data.start_record = start_record
 
-        triggers = self._search(dm_data)
-        self._action(triggers, dm_data)
+        #triggers = self._search(dm_data)
+        #self._action(triggers, dm_data)
+        #del triggers
         if DO_SPEC_SEARCH:
             print "----------------------"
 
@@ -257,8 +261,10 @@ class FileSearch(object):
                   #          % (start_record, end_record))
                    # data.to_hdf5(g)
                 dm_data = self._Transformer(this_dat)
+                del this_dat
                 dm_data.start_record = start_record
                 these_triggers = self._search(dm_data,spec_ind=alpha)
+                del dm_data
                 print 'complete indices: {0} of {1} ({2})'.format(complete,SPEC_INDEX_SAMPLES,alpha)
                 if len(these_triggers)  > 0:
                     print 'max snr: {0}'.format(these_triggers[0].snr)

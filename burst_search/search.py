@@ -97,7 +97,7 @@ class Trigger(object):
         dside = 300
         delta_t = self.data.delta_t
         delta_dm = self.data.delta_dm
-        print delta_dm
+        #print delta_dm
         start_ti = max(0, ti - tside)
         end_ti = min(self.data.dm_data.shape[1], ti + tside)
         time = np.arange(start_ti, end_ti) * delta_t
@@ -110,8 +110,8 @@ class Trigger(object):
 
     def plot_spec(self):
         di, ti = self.centre
-        print di
-        print ti
+        #print di
+        #print ti
         tside = 250
         dside = 300
         delta_t = self.data.delta_t
