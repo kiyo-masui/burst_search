@@ -135,36 +135,36 @@ class FileSearch(object):
 
     def set_trigger_action(self, action='print', **kwargs):
         actions = [self._get_trigger_action(s.strip()) for s in action.split(',')]
-        def action_fun(triggers,data):
+        def action_fun(triggers):
             for a in actions:
-                a(triggers,data) 
+                a(triggers) 
         self._action = action_fun
 
     def _get_trigger_action(self,action):
         if action == 'print':
-            def action_fun(triggers, data):
+            def action_fun(triggers):
                 print triggers
             return action_fun
             self._action = action_fun
         elif action == 'show_plot_dm':
-            def action_fun(triggers, data):
+            def action_fun(triggers):
                 for t in triggers:
                     plt.figure()
                     t.plot_dm()
                 plt.show()
             return action_fun
         elif action == 'show_plot_time':
-            def action_fun(triggers, data):
+            def action_fun(triggers):
                 for t in triggers:
                     plt.figure()
                     t.plot_time()
                 plt.show()
             return action_fun
         elif action == 'save_plot_dm':
-            def action_fun(triggers, data):
+            def action_fun(triggers):
                 for t in triggers:
                     parameters = self._parameters
-                    t_offset = (parameters['ntime_record'] * data.start_record)
+                    t_offset = (parameters['ntime_record'] * t.data.start_record)
                     t_offset += t.centre[1]
                     t_offset *= parameters['delta_t']
                     f = plt.figure(1)
@@ -270,6 +270,7 @@ class FileSearch(object):
                     print 'max snr: {0}'.format(these_triggers[0].snr)
                     if spec_trigger == None or these_triggers[0].snr > spec_trigger.snr:
                         spec_trigger = these_triggers[0]
+                del these_triggers
                 complete += 1
 
             #spec_triggers = [t[0] for t in spec_triggers if len(t) > 0]
@@ -278,7 +279,7 @@ class FileSearch(object):
                 #spec_triggers = [spec_triggers[0],]
                 #self._action(spec_triggers, dm_data)
             if spec_trigger != None:
-                self._action((spec_trigger,), dm_data)
+                self._action((spec_trigger,))
 
     def dm_transform_records(self, start_record, end_record):
         parameters = self._parameters
