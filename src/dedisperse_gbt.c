@@ -423,10 +423,16 @@ void dedisperse_inplace(float **inin, int nchan, int m)
 
 void fast_unshuffle(float **data, int* fmap, int nchan, int m){
   float* zero = data[0];
+  float ** tmp = malloc(sizeof(float*)*nchan);
   for(int i = 0; i < nchan; i++){
-    //for unaligned data
-    data[fmap[i]] = zero + i*m;
+    tmp[i] = &(data[i][0]);
   }
+
+  for(int i = 0; i < nchan; i++){
+    //for any alignment
+    data[fmap[i]] = tmp[i];
+  }
+  free(tmp);
 }
 
 void unshuffle(float **data, int* fmap,int nchan, int m){
@@ -593,7 +599,9 @@ void dedisperse_gbt(Data *dat, float *outdata)
   //dedisperse_blocked_cached_inplace(dat->data,dat->nchan,dat->ndata,64,1024);
   dedisperse_inplace(dat->data,dat->nchan,dat->ndata);
   
-  memcpy(outdata,dat->data[0],dat->nchan*dat->ndata*sizeof(float));
+  for(int i = 0; i < dat->nchan; i++){
+    memcpy(outdata + i*dat->ndata, dat->data[i],dat->ndata*sizeof(float));
+  }
 
   if (0) {
     printf("element 500,300 is %12.5e\n",dat->data[500][300]);
@@ -629,8 +637,9 @@ void dedisperse_gbt_jon(Data *dat, float *outdata)
   dedisperse_single(dat->data,tmp,dat->nchan,dat->ndata);
   
   //printf("took %12.4f seconds to dedisperse.\n",omp_get_wtime()-t1);
-  
-  memcpy(outdata,dat->data[0],dat->nchan*dat->ndata*sizeof(outdata[0]));
+  for(int i = 0; i < dat->nchan; i++){
+    memcpy(outdata + i*dat->ndata,dat->data[i],dat->ndata*sizeof(outdata[0]));
+  }
   free(tmp);
 
   if (0) {
