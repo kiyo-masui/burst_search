@@ -8,7 +8,10 @@ import time
 
 import numpy as np
 from numpy import array, dot
-import pyfits
+try:
+    import astropy.io.fits as pyfits
+except ImportError:
+    import pyfits
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
@@ -24,18 +27,21 @@ from simulate import *
 #TIME_BLOCK = 30.
 
 #Additions:
-MIN_SEARCH_DM = 400
+MIN_SEARCH_DM = 5
 
 TIME_BLOCK = 30.0
 
-MAX_DM = 1000
+MAX_DM = 2000
 # For DM=4000, 13s delay across the band, so overlap searches by ~15s.
+
+# Overlap needs to account for the total delay across the band at max DM as
+# well as any data invalidated by FIR filtering of the data.
 #OVERLAP = 15.
-OVERLAP = 10.0
+OVERLAP = 8.
 
 DO_SPEC_SEARCH = True
 SPEC_INDEX_MIN = -10
-SPEC_INDEX_MAX = 0
+SPEC_INDEX_MAX = 10
 SPEC_INDEX_SAMPLES = 11
 
 THRESH_SNR = 8.0
@@ -47,18 +53,15 @@ SIMULATE = False
 alpha = -5.0
 sim_rate = 50*1.0/6000.0
 f_m = 800
-f_sd = 50
+f_sd = 0
 bw_m = 200
-bw_sd = 50
+bw_sd = 0
 t_m = 0.003
 t_sd = 0.002
-s_m = 0.2
-s_sd = 0.01
+s_m = 100*0.6
+s_sd = 0.1
 dm_m = 600
-dm_sd = 100
-
-
-
+dm_sd = 0
 
 
 class FileSearch(object):
@@ -92,7 +95,7 @@ class FileSearch(object):
 
         #initialize sim object, if there are to be simulated events
         if SIMULATE:
-            self._sim_source = simulate.RandSource(alpha=alpha,f_m=f_m,f_sd=f_sd,bw_m=bw_m,bw_sd=bw_sd,t_m=t_m,
+            self._sim_source = simulate.RandSource(alpha=alpha, f_m=f_m,f_sd=f_sd,bw_m=bw_m,bw_sd=bw_sd,t_m=t_m,
                 t_sd=t_sd,s_m=s_m,s_sd=s_sd,dm_m=dm_m,dm_sd=dm_sd,
                 event_rate=sim_rate,file_params=self._parameters,t_overlap=OVERLAP,nrecords_block=self._nrecords_block)
 
@@ -125,49 +128,74 @@ class FileSearch(object):
 
     def set_search_method(self, method='basic', **kwargs):
         if method == 'basic':
-            self._search = lambda dm_data,spec_ind=None : search.basic(dm_data, THRESH_SNR, MIN_SEARCH_DM,spec_ind)
+            self._search = lambda dm_data,spec_ind=None : search.basic(dm_data, THRESH_SNR, MIN_SEARCH_DM,spec_ind=spec_ind)
         else:
             msg = "Unrecognized search method."
             raise ValueError(msg)
 
     def set_trigger_action(self, action='print', **kwargs):
         actions = [self._get_trigger_action(s.strip()) for s in action.split(',')]
-        def action_fun(triggers,data):
+        def action_fun(triggers):
             for a in actions:
-                a(triggers,data) 
+                a(triggers) 
         self._action = action_fun
 
     def _get_trigger_action(self,action):
         if action == 'print':
-            def action_fun(triggers, data):
+            def action_fun(triggers):
                 print triggers
             return action_fun
             self._action = action_fun
         elif action == 'show_plot_dm':
-            def action_fun(triggers, data):
+            def action_fun(triggers):
                 for t in triggers:
                     plt.figure()
                     t.plot_dm()
                 plt.show()
             return action_fun
+        elif action == 'show_plot_time':
+            def action_fun(triggers):
+                for t in triggers:
+                    plt.figure()
+                    t.plot_time()
+                plt.show()
+            return action_fun
         elif action == 'save_plot_dm':
-            def action_fun(triggers, data):
+            def action_fun(triggers):
                 for t in triggers:
                     parameters = self._parameters
-                    t_offset = (parameters['ntime_record'] * data.start_record)
+                    t_offset = (parameters['ntime_record'] * t.data.start_record)
                     t_offset += t.centre[1]
                     t_offset *= parameters['delta_t']
-                    f = plt.figure()
+                    f = plt.figure(1)
+                    plt.subplot(411)
                     t.plot_dm()
-                    out_filename = path.splitext(path.basename(self._filename))[0]
+                    plt.subplot(412)
+                    t.plot_freq()
+                    plt.subplot(413)
+                    t.plot_time()
+                    plt.subplot(414)
+                    t.plot_spec()
+                    t_dm_value = t.centre[0] * t.data.delta_dm
+                    if t_dm_value < 5:
+                        out_filename = "DM0-5_"
+                    elif 5 <= t_dm_value < 20:
+                        out_filename = "DM5-20_"
+                    elif 20 <= t_dm_value < 100:
+                        out_filename = "DM20-100_"
+                    elif 100 <= t_dm_value <300:
+                        out_filename = "DM100-300_"                    
+                    else:
+                        out_filename = "DM300-2000_" 
+                    out_filename += path.splitext(path.basename(self._filename))[0]
                     if not t.spec_ind is None:
-                                       out_filename += "+a=%02.f" % t.spec_ind
+                                    out_filename += "+a=%02.f" % t.spec_ind
                     out_filename += "+%06.2fs.png" % t_offset
                     plt.savefig(out_filename, bbox_inches='tight')
                     plt.close(f)
             return action_fun
         else:
-            msg = "Unrecognized trigger action."
+            msg = "Unrecognized trigger action: " + action
             raise ValueError(msg)
 
     def set_dedispersed_h5(self, group=None):
@@ -175,44 +203,49 @@ class FileSearch(object):
 
         self._dedispersed_out_group = group
 
-
     #simple method to replace nested structure
     def search_records(self, start_record, end_record):
         data = self.get_records(start_record, end_record)
+        parameters = self._parameters
 
+        preprocess.sys_temperature_bandpass(data)
         if self._parameters['cal_period_samples']:
             preprocess.noisecal_bandpass(data, self._cal_spec,
              self._parameters['cal_period_samples'])
 
         block_ind = start_record/self._nrecords_block
 
+        # Preprocess.
+        #preprocess.sys_temperature_bandpass(data)
 
         if SIMULATE and block_ind in self._sim_source.coarse_event_schedule():
             #do simulation
             data += self._sim_source.generate_events(block_ind)[:,0:data.shape[1]]
 
+        preprocess.remove_outliers(data, 5, 512)
+        data = preprocess.highpass_filter(data, 0.200 / parameters['delta_t'])
+
         preprocess.remove_outliers(data, 5)
         preprocess.remove_noisy_freq(data, 3)
-        #preprocess.remove_continuum(data)
-        preprocess.remove_continuum_v2(data)
 
         #from here we weight channels by spectral index
         center_f = self._f0 + (self._df*self._nfreq/2.0)
         fmin = self._f0 + self._df*self._nfreq
         fmax = self._f0
 
-        if DO_SPEC_SEARCH:
-            print "control"
-        dm_data = self._Transformer(data)
-        dm_data.start_record = start_record
+        #if DO_SPEC_SEARCH:
+        #    print "control"
+        #dm_data = self._Transformer(data)
+        #dm_data.start_record = start_record
 
-        triggers = self._search(dm_data)
-        self._action(triggers, dm_data)
+        #triggers = self._search(dm_data)
+        #self._action(triggers, dm_data)
+        #del triggers
         if DO_SPEC_SEARCH:
             print "----------------------"
 
         if DO_SPEC_SEARCH:
-            spec_triggers = []
+            spec_trigger = None
 
             complete = 1
             for alpha in np.linspace(SPEC_INDEX_MIN,SPEC_INDEX_MAX,SPEC_INDEX_SAMPLES):
@@ -228,19 +261,86 @@ class FileSearch(object):
                   #          % (start_record, end_record))
                    # data.to_hdf5(g)
                 dm_data = self._Transformer(this_dat)
+                del this_dat
                 dm_data.start_record = start_record
-
-                spec_triggers.append(self._search(dm_data,spec_ind=alpha))
+                these_triggers = self._search(dm_data,spec_ind=alpha)
+                del dm_data
                 print 'complete indices: {0} of {1} ({2})'.format(complete,SPEC_INDEX_SAMPLES,alpha)
-                if len(spec_triggers[-1])  > 0:
-                    print 'max snr: {0}'.format(spec_triggers[-1][0].snr)
+                if len(these_triggers)  > 0:
+                    print 'max snr: {0}'.format(these_triggers[0].snr)
+                    if spec_trigger == None or these_triggers[0].snr > spec_trigger.snr:
+                        spec_trigger = these_triggers[0]
+                del these_triggers
                 complete += 1
-            spec_triggers = [t[0] for t in spec_triggers if len(t) > 0]
-            spec_triggers = sorted(spec_triggers, key= lambda x: -x.snr)
-            if len(spec_triggers) > 0:
-                spec_triggers = [spec_triggers[0],]
-                self._action(spec_triggers, dm_data)        
-        
+
+            #spec_triggers = [t[0] for t in spec_triggers if len(t) > 0]
+            #spec_triggers = sorted(spec_triggers, key= lambda x: -x.snr)
+            #if len(spec_triggers) > 0:
+                #spec_triggers = [spec_triggers[0],]
+                #self._action(spec_triggers, dm_data)
+            if spec_trigger != None:
+                self._action((spec_trigger,))
+
+    def dm_transform_records(self, start_record, end_record):
+        parameters = self._parameters
+
+        hdulist = pyfits.open(self._filename, 'readonly')
+        data = read_records(hdulist, start_record, end_record)
+        hdulist.close()
+
+        block_ind = start_record/self._nrecords_block
+
+        if (True):
+            # Preprocess.
+            preprocess.sys_temperature_bandpass(data)
+
+            if parameters['cal_period_samples']:
+                preprocess.remove_periodic(data,
+                                           parameters['cal_period_samples'])
+                #preprocess.noisecal_bandpass(data, self._cal_spec,
+                #                             parameters['cal_period_samples'])
+
+            if SIMULATE and block_ind in self._sim_source.coarse_event_schedule():
+                #do simulation
+                data += self._sim_source.generate_events(block_ind)
+
+            if DEV_PLOTS:
+                plt.figure()
+                plt.imshow(data[:2000,0:2000].copy())
+                plt.colorbar()
+                plt.figure()
+                plt.plot(np.mean(data[:1000], 0))
+
+            # 200 ms (hard coded) highpass filter
+            preprocess.remove_outliers(data, 5, 512)
+            data = preprocess.highpass_filter(data, 0.200 / parameters['delta_t'])
+
+            preprocess.remove_outliers(data, 5)
+            preprocess.remove_noisy_freq(data, 3)
+            #preprocess.remove_continuum(data)
+            #preprocess.remove_continuum_v2(data)
+
+            # Second round RFI flagging post continuum removal?
+            # Doesn't seem to help.
+            #preprocess.remove_outliers(data, 5)
+            #preprocess.remove_noisy_freq(data, 3)
+
+        # Dispersion measure transform.
+        dm_data = self._Transformer(data)
+        dm_data.start_record = start_record
+
+        if DEV_PLOTS:
+            plt.figure()
+            plt.imshow(dm_data.spec_data[:2000,0:2000].copy())
+            plt.colorbar()
+            plt.figure()
+            plt.imshow(dm_data.dm_data[:,0:2000].copy())
+            plt.colorbar()
+            plt.figure()
+            plt.plot(np.mean(dm_data.spec_data[:1000], 0))
+            plt.show()
+
+        return dm_data
 
     def get_records(self, start_record, end_record):
         hdulist = pyfits.open(self._filename, 'readonly')
@@ -257,7 +357,6 @@ class FileSearch(object):
         nrecords_block = int(math.ceil(time_block / record_length))
         nrecords_overlap = int(math.ceil(overlap / record_length))
         nrecords = self._nrecords
-
 
         for ii in xrange(0, nrecords, nrecords_block - nrecords_overlap):
             # XXX
@@ -292,8 +391,8 @@ class FileSearch(object):
                 wait_iterations += 1
         # Precess any leftovers that don't fill out a whole block.
         self.search_records(current_start_record, 
-                            current_start_record + nrecords_block)
-
+                            current_start_record + nrecords_block) 
+ 
 def parameters_from_header(hdulist):
     """Get data acqusition parameters for psrfits file header.
 
@@ -319,6 +418,7 @@ def parameters_from_header(hdulist):
     parameters['delta_t'] = dheader['TBIN']
     parameters['nfreq'] = dheader['NCHAN']
     parameters['freq0'] = mheader['OBSFREQ'] - mheader['OBSBW'] / 2.
+
     parameters['delta_f'] = dheader['CHAN_BW']
 
     record0 = hdulist[1].data[0]
@@ -332,7 +432,6 @@ def parameters_from_header(hdulist):
     parameters['dtype'] = np.uint8
 
     return parameters
-
 
 def read_records(hdulist, start_record=0, end_record=None):
     """Read and format records from GUPPI PSRFITS file."""
@@ -361,5 +460,3 @@ def get_nrecords(filename):
     nrecords = len(hdulist[1].data)
     hdulist.close()
     return nrecords
-
-

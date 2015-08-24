@@ -7,6 +7,7 @@ import time
 import argparse
 from os import path
 import logging
+import glob
 
 import numpy as np
 import h5py
@@ -21,13 +22,11 @@ logger.addHandler(logging.StreamHandler())
 
 try:
     from mpi4py import MPI
-    mpi = True
     mpi_size = MPI.COMM_WORLD.Get_size()
     mpi_rank = MPI.COMM_WORLD.Get_rank()
     logger.info("MPI available. Process size is %d. My rank is %d."
                 % (mpi_size, mpi_rank))
 except ImportError:
-    mpi = False
     mpi_size = 1
     mpi_rank = 0
     logger.info("MPI not available.")
@@ -62,17 +61,27 @@ if __name__ == "__main__":
         cal_spec = np.load(args.cal_spec_file)
     else:
         cal_spec = None
+	
+    files = args.files
+    if len(files) == 1:
+	files = glob.glob(files[0])
 
     if mpi_size > 1:
-        files = sorted(args.files)
+        files = sorted(files)
     else:
-        files = args.files
+        files = files
 
     for filename in files[mpi_rank::mpi_size]:
-        Searcher = guppi.FileSearch(filename)
+        print "Rank %d, file %s." % (mpi_rank, filename)
+        try:
+	    Searcher = guppi.FileSearch(filename)
+        except IOError:
+	    print "Rank %d, file can't be opened %s." % (mpi_rank, filename)
+            continue
         if not cal_spec is None:
             Searcher.set_cal_spectrum(cal_spec)
-        act_str = 'save_plot_dm, print'
+
+        act_str = 'save_plot_dm,print'
         if args.show_plot:
             act_str = act_str + ', show_plot_dm'
         print 'doing actions \n' + act_str
