@@ -117,6 +117,22 @@ class DMData(object):
     def delta_dm(self):
         return self._delta_dm
 
+    @property
+    def nfreq(self):
+        return self.spec_data.shape[0]
+
+    @property
+    def ndm(self):
+        return self.dm_data.shape[0]
+
+    @property
+    def freq(self):
+        return self.freq0 + self.delta_f * np.arange(self.nfreq, dtype=float)
+
+    @property
+    def dm(self):
+        return self.dm0 + self.delta_dm * np.arange(self.ndm, dtype=float)
+
     def __init__(self, spec_data, dm_data, delta_t, freq0, delta_f, dm0, delta_dm):
         self._spec_data = spec_data
         self._dm_data = dm_data

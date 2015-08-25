@@ -233,18 +233,8 @@ class FileSearch(object):
         fmin = self._f0 + self._df*self._nfreq
         fmax = self._f0
 
-        #if DO_SPEC_SEARCH:
-        #    print "control"
-        #dm_data = self._Transformer(data)
-        #dm_data.start_record = start_record
-
-        #triggers = self._search(dm_data)
-        #self._action(triggers, dm_data)
-        #del triggers
         if DO_SPEC_SEARCH:
             print "----------------------"
-
-        if DO_SPEC_SEARCH:
             spec_trigger = None
 
             complete = 1
@@ -280,6 +270,13 @@ class FileSearch(object):
                 #self._action(spec_triggers, dm_data)
             if spec_trigger != None:
                 self._action((spec_trigger,))
+        else:
+            dm_data = self._Transformer(data)
+            dm_data.start_record = start_record
+
+            triggers = self._search(dm_data)
+            self._action(triggers)
+            del triggers
 
     def dm_transform_records(self, start_record, end_record):
         parameters = self._parameters
