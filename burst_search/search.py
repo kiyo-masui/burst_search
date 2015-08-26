@@ -110,25 +110,20 @@ class Trigger(object):
         di, ti = self.centre
         delta_t = self.data.delta_t
         delta_dm = self.data.delta_dm
-        delta_f = self.data.delta_f
         ntime = self.data.spec_data.shape[1]
-        nfreq = self.data.spec_data.shape[0]
+        nfreq = self.data.nfreq
 
+        freq = self.data.freq
+        max_freq = np.max(freq)
 
-        df = -200.0/float(self.data.spec_data.shape[0])
-        f0 = 900
-        f1 = f0 + self.data.spec_data.shape[0]*(df+1)
-        freq = np.arange(f0, f1, nfreq)
-        max_freq = f0
-
-        the_dm = di * delta_dm
+        the_dm = self.data.dm[di]
         duration = self._duration
 
         spectrum = np.zeros(nfreq, dtype=float)
 
         for ii in range(nfreq):
-            freq = f0 + ii * delta_f
-            delay_ind = int(round((disp_delay(freq, the_dm)
+            f = freq[ii]
+            delay_ind = int(round((disp_delay(freq[ii], the_dm)
                                    - disp_delay(max_freq, the_dm)) / delta_t))
             # Jon's centre index seems to be the last bin in the window.
             start = ti + delay_ind - duration + 1
@@ -154,21 +149,17 @@ class Trigger(object):
         dside = 300
         delta_t = self.data.delta_t
         delta_dm = self.data.delta_dm
-        delta_f = self.data.delta_f
         ntime = self.data.spec_data.shape[1]
-        nfreq = self.data.spec_data.shape[0]
+        nfreq = self.data.nfreq
 
-        df = -200.0/float(self.data.spec_data.shape[0])
-        f0 = 900
-        f1 = f0 + self.data.spec_data.shape[0]*df
-        max_freq = f0
+        freq = self.data.freq
+        max_freq = np.max(freq)
 
-        the_dm = di * delta_dm
+        the_dm = self.data.dm[di]
 
         spec_data_delay = np.zeros((nfreq, tside), dtype=float)
         for ii in range(nfreq):
-            freq = f0 + ii * delta_f
-            delay_ind = int(round((disp_delay(freq, the_dm)
+            delay_ind = int(round((disp_delay(freq[ii], the_dm)
                                    - disp_delay(max_freq, the_dm)) / delta_t))
             start_i =  ti - tside // 2 + delay_ind
             stop_i = start_i + tside
@@ -203,7 +194,7 @@ class Trigger(object):
 
         plt.imshow(
                 spec_data_rebin,
-                extent=[tstart, tstop, f1, f0],
+                extent=[tstart, tstop, freq[-1], freq[0]],
                 vmin=vmin,
                 vmax=vmax,
                 aspect='auto',
