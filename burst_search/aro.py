@@ -1,4 +1,4 @@
-"""Driver scripts and IO for Greenbank GUPPI data.
+"""Driver scripts and IO for ARO data.
 
 """
 
@@ -8,10 +8,6 @@ import time
 
 import numpy as np
 from numpy import array, dot
-try:
-    import astropy.io.fits as pyfits
-except ImportError:
-    import pyfits
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
@@ -31,7 +27,7 @@ MIN_SEARCH_DM = 5
 
 TIME_BLOCK = 30.0
 
-MAX_DM = 2000
+MAX_DM = 400
 # For DM=4000, 13s delay across the band, so overlap searches by ~15s.
 
 # Overlap needs to account for the total delay across the band at max DM as
@@ -42,7 +38,7 @@ OVERLAP = 8.
 DO_SPEC_SEARCH = True
 SPEC_INDEX_MIN = -10
 SPEC_INDEX_MAX = 10
-SPEC_INDEX_SAMPLES = 11
+SPEC_INDEX_SAMPLES = 5
 
 THRESH_SNR = 8.0
 
@@ -52,16 +48,25 @@ DEV_PLOTS = False
 SIMULATE = False
 alpha = -5.0
 sim_rate = 50*1.0/6000.0
-f_m = 800
+f_m = 600.
 f_sd = 0
-bw_m = 200
+bw_m = 400.
 bw_sd = 0
-t_m = 0.003
-t_sd = 0.002
-s_m = 100*0.6
-s_sd = 0.1
+t_m = 0.010
+t_sd = 0.020
+s_m = 0.01
+s_sd = 0.01
 dm_m = 600
-dm_sd = 0
+dm_sd = 100
+
+
+# ARO hardcoded paraemters.
+NTIME_RECORD = 1024     # Arbitrary, doesn't matter.
+DELTA_T = 0.005
+NFREQ = 1024
+FREQ0 = 800.
+DELTA_F = -400. / 1024
+CAL_PERIOD_SAMPLES = 0
 
 
 class FileSearch(object):
@@ -69,9 +74,8 @@ class FileSearch(object):
     def __init__(self, filename):
 
         self._filename = filename
-        hdulist = pyfits.open(filename, 'readonly')
 
-        parameters = parameters_from_header(hdulist)
+        parameters = get_parameters(filename)
         #print parameters
         self._parameters = parameters
 
@@ -89,7 +93,7 @@ class FileSearch(object):
         self._record_length = (parameters['ntime_record'] * parameters['delta_t'])
         self._nrecords_block = int(math.ceil(TIME_BLOCK / self._record_length))
         self._nrecords_overlap = int(math.ceil(OVERLAP / self._record_length))
-        self._nrecords = len(hdulist[1].data)
+        self._nrecords = get_nrecords(filename)
         #also insert to parameters dict to keep things concise (sim code wants this)
         self._parameters['nrecords'] = self._nrecords
 
@@ -105,7 +109,6 @@ class FileSearch(object):
         self.set_search_method()
         self.set_trigger_action()
 
-        hdulist.close()
 
     def set_cal_spectrum(self, cal_spec):
         """Set spectrum of the noise-cal for band-pass calibration.
@@ -281,9 +284,7 @@ class FileSearch(object):
     def dm_transform_records(self, start_record, end_record):
         parameters = self._parameters
 
-        hdulist = pyfits.open(self._filename, 'readonly')
-        data = read_records(hdulist, start_record, end_record)
-        hdulist.close()
+        data = self.get_records(start_record, end_record)
 
         block_ind = start_record/self._nrecords_block
 
@@ -340,9 +341,7 @@ class FileSearch(object):
         return dm_data
 
     def get_records(self, start_record, end_record):
-        hdulist = pyfits.open(self._filename, 'readonly')
-        data = read_records(hdulist, start_record, end_record)
-        hdulist.close()
+        data = read_records(self._filename, start_record, end_record)
         return data
 
 
@@ -389,73 +388,53 @@ class FileSearch(object):
         # Precess any leftovers that don't fill out a whole block.
         self.search_records(current_start_record, 
                             current_start_record + nrecords_block) 
- 
-def parameters_from_header(hdulist):
-    """Get data acqusition parameters for psrfits file header.
 
-    Returns
-    -------
-    parameters : dict
 
-    """
 
+
+def get_parameters(filename):
     parameters = {}
 
-    #print repr(hdulist[0].header)
-    #print
-    #print repr(hdulist[1].header)
-    mheader = hdulist[0].header
-    dheader = hdulist[1].header
+    parameters['cal_period_samples'] = CAL_PERIOD_SAMPLES
+    parameters['delta_t'] = DELTA_T
+    parameters['nfreq'] = NFREQ
+    parameters['freq0'] = FREQ0
 
-    if mheader['CAL_FREQ']:
-        cal_period = 1. / mheader['CAL_FREQ']
-        parameters['cal_period_samples'] = int(round(cal_period / dheader['TBIN']))
-    else:
-        parameters['cal_period_samples'] = 0
-    parameters['delta_t'] = dheader['TBIN']
-    parameters['nfreq'] = dheader['NCHAN']
-    parameters['freq0'] = mheader['OBSFREQ'] - mheader['OBSBW'] / 2.
-
-    parameters['delta_f'] = dheader['CHAN_BW']
-
-    record0 = hdulist[1].data[0]
-    #print record0
-    #data0 = record0["DATA"]
-    #freq = record0["DAT_FREQ"]
-    ntime_record, npol, nfreq, one = eval(dheader["TDIM17"])[::-1]
-    parameters['npol'] = npol
-
-    parameters['ntime_record'] = ntime_record
-    parameters['dtype'] = np.uint8
-
-    print parameters
+    parameters['delta_f'] = DELTA_F
+    parameters['ntime_record'] = NTIME_RECORD
 
     return parameters
 
-def read_records(hdulist, start_record=0, end_record=None):
-    """Read and format records from GUPPI PSRFITS file."""
-
-    nrecords = len(hdulist[1].data)
-    if end_record is None or end_record > nrecords:
-        end_record = nrecords
-    nrecords_read = end_record - start_record
-    ntime_record, npol, nfreq, one = hdulist[1].data[0]["DATA"].shape
-
-    out_data = np.empty((nfreq, nrecords_read, ntime_record), dtype=np.float32)
-    for ii in xrange(nrecords_read):
-        # Read the record.
-        record = hdulist[1].data[start_record + ii]["DATA"]
-        # Interpret as unsigned int (for Stokes I only).
-        record = record.view(dtype=np.uint8)
-        # Select stokes I and copy.
-        out_data[:,ii,:] = np.transpose(record[:,0,:,0])
-    out_data.shape = (nfreq, nrecords_read * ntime_record)
-
-    return out_data
 
 
+def read_records(filename, start_record=0, end_record=None):
+    """Right now just generates fake data."""
+
+    nrecords_total = get_nrecords(filename)
+    if end_record is None or end_record > nrecords_total:
+        end_record = nrecords_total
+
+    nrecords = end_record - start_record
+    ntime = nrecords * NTIME_RECORD
+    out = np.empty((NFREQ, nrecords, NTIME_RECORD), dtype=np.float32)
+
+    # The fake part.
+    from numpy import random
+    # Every record is the same!
+    noise = random.randn(NTIME_RECORD, 2, NFREQ)
+    record_data = (noise + 32) * 10
+    record_data = record_data.astype(np.uint32)
+    for ii in range(nrecords):
+        out[:,ii,:] = np.transpose(record_data[:,0,:] + record_data[:,1,:])
+    out.shape = (NFREQ, nrecords * NTIME_RECORD)
+    return out
+
+
+start_time = -30
 def get_nrecords(filename):
-    hdulist = pyfits.open(filename, 'readonly')
-    nrecords = len(hdulist[1].data)
-    hdulist.close()
-    return nrecords
+    """Totally fake."""
+
+    global start_time
+    if start_time < 0:
+        start_time += time.time()
+    return int((time.time() - start_time) / (DELTA_T * NTIME_RECORD))
