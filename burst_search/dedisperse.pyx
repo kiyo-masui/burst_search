@@ -195,7 +195,7 @@ class DMTransform(object):
     def depth(self):
         return self._depth
 
-    def __init__(self, delta_t, nfreq, freq0, delta_f, max_dm):
+    def __init__(self, delta_t, nfreq, freq0, delta_f, max_dm, jon=False):
 
         cdef float cdelta_t = delta_t
         cdef int cnfreq = nfreq
@@ -220,10 +220,11 @@ class DMTransform(object):
         self._max_dm = max_dm
         self._ndm = cndm
         self._depth = depth
+        self._jon = jon
 
 
     def __call__(self, np.ndarray[ndim=2, dtype=DTYPE_t] data1 not None,
-            np.ndarray[ndim=2, dtype=DTYPE_t] data2=None,jon=0):
+            np.ndarray[ndim=2, dtype=DTYPE_t] data2=None):
 
         cdef int nfreq = self.nfreq
 
@@ -243,6 +244,7 @@ class DMTransform(object):
         cdef float delta_f = self.delta_f
         cdef int ndm = self.ndm
         cdef int depth = self.depth
+        cdef int jon = self._jon
 
         cdef np.ndarray[ndim=1, dtype=CM_DTYPE_t] chan_map
         chan_map = self._chan_map

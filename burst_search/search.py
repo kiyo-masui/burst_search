@@ -204,7 +204,7 @@ class Trigger(object):
         plt.ylabel("Frequency (MHz)")
         plt.colorbar()
 
-def basic(data, snr_threshold=5., min_dm=50.,spec_ind=None):
+def basic(data, snr_threshold=5., min_dm=50., length_limit=0, spec_ind=None):
     """Simple event search of DM data.
 
     Returns
@@ -222,7 +222,8 @@ def basic(data, snr_threshold=5., min_dm=50.,spec_ind=None):
         min_dm_ind = int(round(min_dm_ind))
         min_dm_ind = max(0, min_dm_ind)
 
-        snr, sample, duration = _search.sievers_find_peak(data, min_dm_ind)
+        snr, sample, duration = _search.sievers_find_peak(data, min_dm_ind,
+                length_limit)
 
         if snr > snr_threshold:
             triggers.append(Trigger(data, sample, snr,spec_ind=spec_ind,duration=duration))
