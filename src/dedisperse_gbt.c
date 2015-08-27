@@ -1565,11 +1565,13 @@ Peak find_peaks_wnoise_onedm(float *vec, int nsamples, int max_depth, int cur_de
 }
 
 /*--------------------------------------------------------------------------------*/
-Peak find_peak(Data *dat)
+Peak find_peak(Data *dat, int len_limit)
 {
   //find the longest segment to be searched for
   //can't have a 5-sigma event w/out at least 25 samples to search over
   int max_len=dat->ndata/20;
+  if ((len_limit > 0) && (len_limit < max_len))
+      max_len=len_limit;
   int max_seg=max_len/7;
   int max_depth=log2(max_seg);
   //printf("max_depth is %d from %d\n",max_depth,dat->ndata);
@@ -1598,7 +1600,7 @@ Peak find_peak(Data *dat)
   return best;
 }
 /*--------------------------------------------------------------------------------*/
-size_t find_peak_wrapper(float *data, int nchan, int ndata, float *peak_snr, int *peak_channel, int *peak_sample, int *peak_duration)
+size_t find_peak_wrapper(float *data, int nchan, int ndata, int len_limit, float *peak_snr, int *peak_channel, int *peak_sample, int *peak_duration)
 {
   Data dat;
   float **mat=(float **)malloc(sizeof(float *)*nchan);
@@ -1607,7 +1609,7 @@ size_t find_peak_wrapper(float *data, int nchan, int ndata, float *peak_snr, int
   dat.data=mat;
   dat.ndata=ndata;
   dat.nchan=nchan;
-  Peak best=find_peak(&dat);
+  Peak best=find_peak(&dat, len_limit);
   free(dat.data); //get rid of the pointer array
   *peak_snr=best.snr;
   *peak_channel=best.dm_channel;

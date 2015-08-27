@@ -14,10 +14,11 @@ ctypedef np.float32_t DTYPE_t
 
 # C prototypes.
 cdef extern size_t find_peak_wrapper(float *data, int nchan, int ndata,
-        float *peak_snr, int *peak_channel, int *peak_sample, int *peak_duration)
+        int len_lim, float *peak_snr, int *peak_channel, int *peak_sample,
+        int *peak_duration)
 
 
-def sievers_find_peak(data, low_dm_exclude=1):
+def sievers_find_peak(data, low_dm_exclude=1, length_limit=0):
 
     cdef np.ndarray[ndim=2, dtype=DTYPE_t] dm_data
     cdef int ndm = data.dm_data.shape[0]
@@ -27,6 +28,7 @@ def sievers_find_peak(data, low_dm_exclude=1):
     cdef int peak_dm
     cdef int peak_time
     cdef int peak_duration
+    cdef int len_lim = length_limit
 
     dm_data = data.dm_data[low_dm_exclude:,:]
     ndm -= low_dm_exclude
@@ -35,6 +37,7 @@ def sievers_find_peak(data, low_dm_exclude=1):
             <DTYPE_t *> dm_data.data,
             ndm,
             ntime,
+            len_lim,
             &peak_snr,
             &peak_dm,
             &peak_time,
