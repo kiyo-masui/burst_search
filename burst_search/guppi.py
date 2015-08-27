@@ -40,6 +40,7 @@ MAX_DM = 2000
 OVERLAP = 8.
 
 DO_SPEC_SEARCH = True
+USE_JON_DD = False
 SPEC_INDEX_MIN = -10
 SPEC_INDEX_MAX = 10
 SPEC_INDEX_SAMPLES = 11
@@ -81,6 +82,7 @@ class FileSearch(object):
                 parameters['freq0'],
                 parameters['delta_f'],
                 MAX_DM,
+                jon=USE_JON_DD,
                 )
 
         self._df = parameters['delta_f']
@@ -128,7 +130,13 @@ class FileSearch(object):
 
     def set_search_method(self, method='basic', **kwargs):
         if method == 'basic':
-            self._search = lambda dm_data,spec_ind=None : search.basic(dm_data, THRESH_SNR, MIN_SEARCH_DM,spec_ind=spec_ind)
+            self._search = lambda dm_data,spec_ind=None : search.basic(
+                    dm_data,
+                    THRESH_SNR,
+                    MIN_SEARCH_DM,
+                    int(0.100/self._parameters['delta_t']),
+                    spec_ind=spec_ind,
+                    )
         else:
             msg = "Unrecognized search method."
             raise ValueError(msg)
@@ -210,8 +218,8 @@ class FileSearch(object):
 
         preprocess.sys_temperature_bandpass(data)
         if self._parameters['cal_period_samples']:
-            preprocess.noisecal_bandpass(data, self._cal_spec,
-             self._parameters['cal_period_samples'])
+            preprocess.remove_periodic(data,
+                               self._parameters['cal_period_samples'])
 
         block_ind = start_record/self._nrecords_block
 
@@ -278,66 +286,6 @@ class FileSearch(object):
             self._action(triggers)
             del triggers
 
-    def dm_transform_records(self, start_record, end_record):
-        parameters = self._parameters
-
-        hdulist = pyfits.open(self._filename, 'readonly')
-        data = read_records(hdulist, start_record, end_record)
-        hdulist.close()
-
-        block_ind = start_record/self._nrecords_block
-
-        if (True):
-            # Preprocess.
-            preprocess.sys_temperature_bandpass(data)
-
-            if parameters['cal_period_samples']:
-                preprocess.remove_periodic(data,
-                                           parameters['cal_period_samples'])
-                #preprocess.noisecal_bandpass(data, self._cal_spec,
-                #                             parameters['cal_period_samples'])
-
-            if SIMULATE and block_ind in self._sim_source.coarse_event_schedule():
-                #do simulation
-                data += self._sim_source.generate_events(block_ind)
-
-            if DEV_PLOTS:
-                plt.figure()
-                plt.imshow(data[:2000,0:2000].copy())
-                plt.colorbar()
-                plt.figure()
-                plt.plot(np.mean(data[:1000], 0))
-
-            # 200 ms (hard coded) highpass filter
-            preprocess.remove_outliers(data, 5, 512)
-            data = preprocess.highpass_filter(data, 0.200 / parameters['delta_t'])
-
-            preprocess.remove_outliers(data, 5)
-            preprocess.remove_noisy_freq(data, 3)
-            #preprocess.remove_continuum(data)
-            #preprocess.remove_continuum_v2(data)
-
-            # Second round RFI flagging post continuum removal?
-            # Doesn't seem to help.
-            #preprocess.remove_outliers(data, 5)
-            #preprocess.remove_noisy_freq(data, 3)
-
-        # Dispersion measure transform.
-        dm_data = self._Transformer(data)
-        dm_data.start_record = start_record
-
-        if DEV_PLOTS:
-            plt.figure()
-            plt.imshow(dm_data.spec_data[:2000,0:2000].copy())
-            plt.colorbar()
-            plt.figure()
-            plt.imshow(dm_data.dm_data[:,0:2000].copy())
-            plt.colorbar()
-            plt.figure()
-            plt.plot(np.mean(dm_data.spec_data[:1000], 0))
-            plt.show()
-
-        return dm_data
 
     def get_records(self, start_record, end_record):
         hdulist = pyfits.open(self._filename, 'readonly')
