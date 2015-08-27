@@ -40,6 +40,7 @@ MAX_DM = 2000
 OVERLAP = 8.
 
 DO_SPEC_SEARCH = True
+USE_JON_DD = False
 SPEC_INDEX_MIN = -10
 SPEC_INDEX_MAX = 10
 SPEC_INDEX_SAMPLES = 11
@@ -81,6 +82,7 @@ class FileSearch(object):
                 parameters['freq0'],
                 parameters['delta_f'],
                 MAX_DM,
+                jon=USE_JON_DD,
                 )
 
         self._df = parameters['delta_f']

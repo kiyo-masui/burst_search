@@ -1,3 +1,5 @@
+//    Copyright Jonathan Sievers, 2015.  All rights reserved.  This code may only be used with permission of the owner.
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -197,8 +199,8 @@ Data *map_chans(Data *dat, int depth)
     for (int j=0;j<dat->nchan;j++) {
       float delt=fabs(1.0/(dat->chans[j]*dat->chans[j])-1.0/(dat->raw_chans[i]*dat->raw_chans[i]));
       if (delt<min_err) {
-	min_err=delt;
-	best=j;
+        min_err=delt;
+        best=j;
       }
 
     }
@@ -210,7 +212,7 @@ Data *map_chans(Data *dat, int depth)
 }
 /*--------------------------------------------------------------------------------*/
 void remap_data( Data *dat)
-{						
+{        					
   //double t0=omp_get_wtime();
   assert(dat->chan_map);
   memset(dat->data[0],0,sizeof(dat->data[0][0])*dat->nchan*dat->ndata);  
@@ -343,14 +345,158 @@ void dedisperse_block_kernel_2pass(const float **in, float **out, int n, int m)
 
 void dedisperse_kernel(float **in, float **out, int n, int m)
 {
+
   int npair=n/2;
   for (int jj=0;jj<npair;jj++) {
     for (int i=0;i<m;i++)
       out[jj][i]=in[2*jj][i]+in[2*jj+1][i];
-    for (int i=0;i<m-jj-2;i++) 
+    for (int i=0;i<m-jj-1;i++) 
       out[jj+npair][i]=in[2*jj][i+jj]+in[2*jj+1][i+jj+1];
+    
   }
 }
+/*--------------------------------------------------------------------------------*/
+
+void dedisperse_kernel_v2(float **in, float **out, int n, int m)
+{
+
+  int npair=n/2;
+  for (int jj=0;jj<npair;jj++) {
+    for (int i=0;i<jj;i++)
+      out[jj][i]=in[2*jj][i]+in[2*jj+1][i];
+    for (int i=jj;i<m-1;i++) {
+      out[jj][i]=in[2*jj][i]+in[2*jj+1][i];
+      out[jj+npair][i-jj]=in[2*jj][i]+in[2*jj+1][i+1];
+    }
+    
+  }
+}
+
+/*--------------------------------------------------------------------------------*/
+
+void dedisperse(float **inin, float **outout, int nchan,int ndat)
+{
+  //return;
+  int npass=get_npass(nchan);
+  //printf("need %d passes.\n",npass);
+  //npass=2;
+  int bs=nchan;
+  float **in=inin;
+  float **out=outout;
+
+  for (int i=0;i<npass;i++) {    
+    //#pragma omp parallel for
+    for (int j=0;j<nchan;j+=bs) {
+      dedisperse_kernel(in+j,out+j,bs,ndat);
+    }
+    bs/=2;
+    float **tmp=in;
+    in=out;
+    out=tmp;
+  }
+  memcpy(out[0],in[0],nchan*ndat*sizeof(float));
+  
+}
+
+/*--------------------------------------------------------------------------------*/
+void dedisperse_blocked_cached(float **dat, float **dat2, int nchan, int ndat)
+{
+  //int nchan1=128;
+  //int chunk_size=768;
+
+  int nchan1=128;
+  //int chunk_size=1536;
+  int chunk_size=1024;
+  int nchunk=ndat/chunk_size;
+  int npass1=get_npass(nchan1);
+  int npass=get_npass(nchan);
+  int npass2=npass-npass1;
+  int nchan2=nchan/nchan1;
+
+  int nblock=nchan/nchan1;
+  int nblock2=nchan/nchan2;
+
+
+  
+#pragma omp parallel 
+  {
+    float **tmp1=matrix(nchan1,chunk_size+nchan1);
+    float **tmp2=matrix(nchan1,chunk_size+nchan1); 
+    
+#pragma omp for collapse(2) schedule(dynamic,2)
+    for (int i=0;i<nblock;i++) {      
+      //printf("i is %d\n",i);
+      for (int j=0;j<nchunk;j++) {
+        int istart=j*chunk_size;
+        int istop=(j+1)*chunk_size+nchan1;
+        if (istop>ndat) {
+          istop=ndat;
+          for (int k=0;k<nchan1;k++)
+            memset(tmp1[k]+chunk_size,0,sizeof(float)*nchan1);
+        }
+        for (int k=0;k<nchan1;k++)
+          memcpy(tmp1[k],&(dat[i*nchan1+k][istart]),(istop-istart)*sizeof(float));
+        
+        dedisperse(tmp1,tmp2,nchan1,chunk_size+nchan1);
+        
+        for (int k=0;k<nchan1;k++)
+          memcpy(&(dat2[i*nchan1+k][istart]),tmp1[k],chunk_size*sizeof(float));
+      }
+    }
+#if 1
+    free(tmp1[0]);   
+    free(tmp1);
+    free(tmp2[0]);
+    free(tmp2);
+#endif
+  }
+  
+  
+
+  float **dat_shift=(float **)malloc(sizeof(float *)*nchan);
+  for (int i=0;i<nblock;i++)
+    for (int j=0;j<nchan1;j++)
+      dat_shift[j*nblock+i]=dat2[i*nchan1+j]+i*j;  
+
+
+  //recalculate block sizes to keep amount in cache about the same
+  int nelem=nchan1*chunk_size;
+  chunk_size=nelem/nchan2;
+  nchunk=ndat/chunk_size;
+
+#pragma omp parallel 
+  {
+    float **tmp1=matrix(nchan2,chunk_size+nchan2);
+    float **tmp2=matrix(nchan2,chunk_size+nchan2); 
+
+#pragma omp for  collapse(2) schedule(dynamic,4)
+    for (int i=0;i<nblock2;i++) {      
+      //printf("i is now %d\n",i);
+      for (int j=0;j<nchunk;j++) {
+        int istart=j*chunk_size;
+        int istop=(j+1)*chunk_size+nchan2;
+        if (istop>ndat) {
+          istop=ndat;
+          for (int k=0;k<nchan2;k++)
+            memset(tmp1[k]+chunk_size,0,sizeof(float)*nchan2);
+        }
+        for (int k=0;k<nchan2;k++) {
+          memcpy(tmp1[k],dat_shift[i*nchan2+k]+istart,(istop-istart)*sizeof(float));
+        }
+        dedisperse(tmp1,tmp2,nchan2,chunk_size+nchan2);
+        for (int k=0;k<nchan2;k++)
+          memcpy(dat[i*nchan2+k]+istart,tmp2[k],chunk_size*sizeof(float));
+      }
+    }
+    free(tmp1[0]);
+    free(tmp1);
+    free(tmp2[0]);
+    free(tmp2);
+    
+  }
+  //printf("Finished dedispersion.\n");
+}
+
 
 /*--------------------------------------------------------------------------------*/
 
@@ -634,7 +780,8 @@ void dedisperse_gbt_jon(Data *dat, float *outdata)
   //memcpy(ip_dat[0],dat->data[0],dat->nchan*dat->ndata*sizeof(dat->data[0][0]));
 
   //dedisperse_inplace(ip_dat,dat->nchan,dat->ndata);  
-  dedisperse_single(dat->data,tmp,dat->nchan,dat->ndata);
+  //dedisperse_single(dat->data,tmp,dat->nchan,dat->ndata);
+  dedisperse_blocked_cached(dat->data,tmp,dat->nchan,dat->ndata);
   
   //printf("took %12.4f seconds to dedisperse.\n",omp_get_wtime()-t1);
   for(int i = 0; i < dat->nchan; i++){
@@ -676,7 +823,7 @@ void clean_rows_weighted(Data *dat,float *weights)
 #pragma omp for
     for (int i=0;i<dat->raw_nchan;i++) {
       for (int j=0;j<dat->ndata;j++) {
-	mytot[j]+=dat->raw_data[i][j]*weights[i];
+        mytot[j]+=dat->raw_data[i][j]*weights[i];
       }
     }
 #pragma omp critical
@@ -747,7 +894,7 @@ void clean_rows_2pass(float *vec, size_t nchan, size_t ndata)
     
     for (int i=0;i<nchan;i++)
       for (int j=imin;j<imax;j++)
-	tot[j]+=dat[i][j];
+        tot[j]+=dat[i][j];
     
     for (int j=imin;j<imax;j++)
       tot[j]/=nchan;
@@ -796,8 +943,8 @@ void clean_rows_2pass(float *vec, size_t nchan, size_t ndata)
 
     for (int i=0;i<nchan;i++) {
       if ((amps[i]>amp_min)&&(amps[i]<amp_max))
-	for (int j=imin;j<imax;j++)
-	  tot[j]+=dat[i][j]/amps[i];
+        for (int j=imin;j<imax;j++)
+          tot[j]+=dat[i][j]/amps[i];
     }
   }
   float tot_sum=0;
@@ -821,8 +968,8 @@ void clean_rows_2pass(float *vec, size_t nchan, size_t ndata)
 #pragma omp parallel for
     for (int i=0;i<nchan;i++)
       for (int j=0;j<ndata;j++) {
-	chansum[i]+=dat[i][j];
-	chansumsqr[i]+=dat[i][j]*dat[i][j];
+        chansum[i]+=dat[i][j];
+        chansumsqr[i]+=dat[i][j]*dat[i][j];
       }
     outfile=fopen("chan_variances_pre.txt","w");
     for (int i=0;i<nchan;i++)
@@ -860,8 +1007,8 @@ void clean_rows_2pass(float *vec, size_t nchan, size_t ndata)
 #pragma omp parallel for
     for (int i=0;i<nchan;i++)
       for (int j=0;j<ndata;j++) {
-	chansum[i]+=dat[i][j];
-	chansumsqr[i]+=dat[i][j]*dat[i][j];
+        chansum[i]+=dat[i][j];
+        chansumsqr[i]+=dat[i][j]*dat[i][j];
       }
     outfile=fopen("chan_variances_post.txt","w");
     for (int i=0;i<nchan;i++)
@@ -953,7 +1100,7 @@ void remove_noisecal(Data *dat, int period, int apply_calib) //, float *cal_facs
       nn[i][jj]++;
       jj++;
       if (jj==period)
-	jj=0;
+        jj=0;
     }
   }
   
@@ -967,7 +1114,7 @@ void remove_noisecal(Data *dat, int period, int apply_calib) //, float *cal_facs
     FILE *outfile=fopen("noise_cal_template.txt","w");
     for (int i=0;i<dat->raw_nchan;i++) {
       for (int j=0;j<period;j++)
-	fprintf(outfile,"%14.6e ",tot[i][j]);
+        fprintf(outfile,"%14.6e ",tot[i][j]);
       fprintf(outfile,"\n");
     }
     fclose(outfile);
@@ -981,7 +1128,7 @@ void remove_noisecal(Data *dat, int period, int apply_calib) //, float *cal_facs
       dat->raw_data[i][j]-=tot[i][jj];
       jj++;
       if (jj==period)
-	jj=0;
+        jj=0;
     }
   }
   
@@ -998,14 +1145,14 @@ void remove_noisecal(Data *dat, int period, int apply_calib) //, float *cal_facs
 #pragma omp parallel for
     for (int i=0;i<dat->raw_nchan;i++) 
       if (calib[i]>0)
-	for (int j=0;j<dat->ndata;j++)
-	  dat->raw_data[i][j]/=calib[i];
+        for (int j=0;j<dat->ndata;j++)
+          dat->raw_data[i][j]/=calib[i];
     free(calib);
     
     //memset(cal_facs,0,sizeof(cal_facs[0]*dat->raw_nchan));
     //for (int i=0;i<dat->raw_nchan;i++) {
     //  for (int j=0;j<period/2;j++
-    //	   }
+    //           }
   }
 
   free(nn[0]);
@@ -1060,7 +1207,7 @@ void clean_outliers(Data *dat, float sig_thresh, float *sigs_out)
   for (int i=0;i<dat->raw_nchan;i++)
     for (int j=0;j<dat->ndata;j++) {
       if (dat->raw_data[i][j]>sigs[i])
-	dat->raw_data[i][j]=0;       
+        dat->raw_data[i][j]=0;       
     }
   
   free(sigs);
@@ -1101,7 +1248,7 @@ void sigs2weights(float *sigs, int nchan, float thresh)
   if (thresh>0)
     for (int i=0;i<nchan;i++)
       if (sigs[i]<tot*thresh)
-	sigs[i]=0;
+        sigs[i]=0;
   
 }
 /*--------------------------------------------------------------------------------*/
@@ -1317,22 +1464,22 @@ Peak find_peaks_wnoise_onedm(float *vec, int nsamples, int max_depth, int cur_de
       best1=vec[1];
     for (int i=2;i<nsamples;i++) {
       if (vec[i]>best1) {
-	best1=vec[i];
-	i1=i;
+        best1=vec[i];
+        i1=i;
       }
       s1+=vec[i];
       v1+=vec[i]*vec[i];
       tmp+=vec[i];
       if (tmp>best3) {
-	best3=tmp;
-	i3=i;
+        best3=tmp;
+        i3=i;
       }
       s3+=tmp;
       v3+=tmp*tmp;
       tmp-=vec[i-2];
       if (tmp>best2) {
-	best2=tmp;
-	i2=i;
+        best2=tmp;
+        i2=i;
       }
       s2+=tmp;
       v2+=tmp*tmp;
@@ -1438,14 +1585,14 @@ Peak find_peak(Data *dat)
     for (int i=0;i<dat->nchan;i++) {
       Peak dm_best=find_peaks_wnoise_onedm(dat->data[i],dat->ndata-dat->nchan,max_depth,0);
       if (dm_best.snr>mybest.snr) {
-	mybest=dm_best;
-	mybest.dm_channel=i;
+        mybest=dm_best;
+        mybest.dm_channel=i;
       }
     }
 #pragma omp critical
     {
       if (mybest.snr>best.snr)
-	best=mybest;
+        best=mybest;
     }
   }
   return best;
@@ -1473,8 +1620,8 @@ size_t find_peak_wrapper(float *data, int nchan, int ndata, float *peak_snr, int
 }
 /*--------------------------------------------------------------------------------*/
 size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
-			     size_t ntime1, size_t ntime2, float delta_t,
-			     size_t nfreq, size_t *chan_map, int depth,int jon) 
+                             size_t ntime1, size_t ntime2, float delta_t,
+                             size_t nfreq, size_t *chan_map, int depth,int jon) 
 {
 
   double t1=omp_get_wtime();
