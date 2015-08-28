@@ -25,9 +25,9 @@ from simulate import *
 #Additions:
 MIN_SEARCH_DM = 5
 
-TIME_BLOCK = 30.0
+TIME_BLOCK = 100.0
 
-MAX_DM = 400
+MAX_DM = 2000
 # For DM=4000, 13s delay across the band, so overlap searches by ~15s.
 
 # Overlap needs to account for the total delay across the band at max DM as
@@ -36,31 +36,35 @@ MAX_DM = 400
 OVERLAP = 8.
 
 DO_SPEC_SEARCH = True
-SPEC_INDEX_MIN = -10
-SPEC_INDEX_MAX = 10
+USE_JON_DD = True
+
+SPEC_INDEX_MIN = -8
+SPEC_INDEX_MAX = 8
 SPEC_INDEX_SAMPLES = 5
 
 THRESH_SNR = 8.0
 
 DEV_PLOTS = False
 
+HPF_WIDTH = 0.2    # s
+
 #Event simulation params, speculative/contrived
-SIMULATE = False
-alpha = -5.0
+SIMULATE = True
+alpha = -1.0
 sim_rate = 50*1.0/6000.0
 f_m = 600.
 f_sd = 0
 bw_m = 400.
 bw_sd = 0
 t_m = 0.010
-t_sd = 0.020
-s_m = 0.01
-s_sd = 0.01
+t_sd = 0.002
+s_m = 0.008
+s_sd = 0.001
 dm_m = 600
-dm_sd = 100
+dm_sd = 400
 
 
-# ARO hardcoded paraemters.
+# ARO hardcoded parameters.
 NTIME_RECORD = 1024     # Arbitrary, doesn't matter.
 DELTA_T = 0.005
 NFREQ = 1024
@@ -71,9 +75,17 @@ CAL_PERIOD_SAMPLES = 0
 
 class FileSearch(object):
 
-    def __init__(self, filename):
+    def __init__(self, **kwargs):
 
+        self._run_parameters = kwargs
+
+        filename = kwargs['filename']
         self._filename = filename
+
+        self._time_block = kwargs.get('time_block', TIME_BLOCK)
+        self._overlap = kwargs.get('overlap', OVERLAP)
+        self._max_dm = kwargs.get('max_dm', MAX_DM)
+        self._min_search_dm = kwargs.get('min_search_dm', MIN_SEARCH_DM)
 
         parameters = get_parameters(filename)
         #print parameters
@@ -84,24 +96,20 @@ class FileSearch(object):
                 parameters['nfreq'],
                 parameters['freq0'],
                 parameters['delta_f'],
-                MAX_DM,
+                self._max_dm,
+                jon=USE_JON_DD,
                 )
 
         self._df = parameters['delta_f']
         self._nfreq = parameters['nfreq']
         self._f0 = parameters['freq0']
-        self._record_length = (parameters['ntime_record'] * parameters['delta_t'])
-        self._nrecords_block = int(math.ceil(TIME_BLOCK / self._record_length))
-        self._nrecords_overlap = int(math.ceil(OVERLAP / self._record_length))
-        self._nrecords = get_nrecords(filename)
-        #also insert to parameters dict to keep things concise (sim code wants this)
-        self._parameters['nrecords'] = self._nrecords
+        nrecords_block = int(math.ceil(self._time_block / (parameters['ntime_record'] * parameters['delta_t'])))
 
         #initialize sim object, if there are to be simulated events
         if SIMULATE:
             self._sim_source = simulate.RandSource(alpha=alpha, f_m=f_m,f_sd=f_sd,bw_m=bw_m,bw_sd=bw_sd,t_m=t_m,
                 t_sd=t_sd,s_m=s_m,s_sd=s_sd,dm_m=dm_m,dm_sd=dm_sd,
-                event_rate=sim_rate,file_params=self._parameters,t_overlap=OVERLAP,nrecords_block=self._nrecords_block)
+                event_rate=sim_rate,file_params=self._parameters,t_overlap=self._overlap,nrecords_block=nrecords_block)
 
         self._cal_spec = 1.
         self._dedispersed_out_group = None
@@ -131,7 +139,14 @@ class FileSearch(object):
 
     def set_search_method(self, method='basic', **kwargs):
         if method == 'basic':
-            self._search = lambda dm_data,spec_ind=None : search.basic(dm_data, THRESH_SNR, MIN_SEARCH_DM,spec_ind=spec_ind)
+            self._search = lambda dm_data,spec_ind=None : search.basic(
+                    dm_data,
+                    THRESH_SNR,
+                    self._min_search_dm,
+                    int(HPF_WIDTH / 2 / self._parameters['delta_t']),
+                    spec_ind=spec_ind,
+                    )
+
         else:
             msg = "Unrecognized search method."
             raise ValueError(msg)
@@ -213,10 +228,14 @@ class FileSearch(object):
 
         preprocess.sys_temperature_bandpass(data)
         if self._parameters['cal_period_samples']:
-            preprocess.noisecal_bandpass(data, self._cal_spec,
-             self._parameters['cal_period_samples'])
+            preprocess.remove_periodic(data,
+                               self._parameters['cal_period_samples'])
 
-        block_ind = start_record/self._nrecords_block
+
+        nrecords_block = int(math.ceil(
+            self._time_block / (parameters['ntime_record'] * parameters['delta_t'])))
+
+        block_ind = start_record/nrecords_block
 
         # Preprocess.
         #preprocess.sys_temperature_bandpass(data)
@@ -226,7 +245,7 @@ class FileSearch(object):
             data += self._sim_source.generate_events(block_ind)[:,0:data.shape[1]]
 
         preprocess.remove_outliers(data, 5, 512)
-        data = preprocess.highpass_filter(data, 0.200 / parameters['delta_t'])
+        data = preprocess.highpass_filter(data, HPF_WIDTH / parameters['delta_t'])
 
         preprocess.remove_outliers(data, 5)
         preprocess.remove_noisy_freq(data, 3)
@@ -281,78 +300,23 @@ class FileSearch(object):
             self._action(triggers)
             del triggers
 
-    def dm_transform_records(self, start_record, end_record):
-        parameters = self._parameters
-
-        data = self.get_records(start_record, end_record)
-
-        block_ind = start_record/self._nrecords_block
-
-        if (True):
-            # Preprocess.
-            preprocess.sys_temperature_bandpass(data)
-
-            if parameters['cal_period_samples']:
-                preprocess.remove_periodic(data,
-                                           parameters['cal_period_samples'])
-                #preprocess.noisecal_bandpass(data, self._cal_spec,
-                #                             parameters['cal_period_samples'])
-
-            if SIMULATE and block_ind in self._sim_source.coarse_event_schedule():
-                #do simulation
-                data += self._sim_source.generate_events(block_ind)
-
-            if DEV_PLOTS:
-                plt.figure()
-                plt.imshow(data[:2000,0:2000].copy())
-                plt.colorbar()
-                plt.figure()
-                plt.plot(np.mean(data[:1000], 0))
-
-            # 200 ms (hard coded) highpass filter
-            preprocess.remove_outliers(data, 5, 512)
-            data = preprocess.highpass_filter(data, 0.200 / parameters['delta_t'])
-
-            preprocess.remove_outliers(data, 5)
-            preprocess.remove_noisy_freq(data, 3)
-            #preprocess.remove_continuum(data)
-            #preprocess.remove_continuum_v2(data)
-
-            # Second round RFI flagging post continuum removal?
-            # Doesn't seem to help.
-            #preprocess.remove_outliers(data, 5)
-            #preprocess.remove_noisy_freq(data, 3)
-
-        # Dispersion measure transform.
-        dm_data = self._Transformer(data)
-        dm_data.start_record = start_record
-
-        if DEV_PLOTS:
-            plt.figure()
-            plt.imshow(dm_data.spec_data[:2000,0:2000].copy())
-            plt.colorbar()
-            plt.figure()
-            plt.imshow(dm_data.dm_data[:,0:2000].copy())
-            plt.colorbar()
-            plt.figure()
-            plt.plot(np.mean(dm_data.spec_data[:1000], 0))
-            plt.show()
-
-        return dm_data
 
     def get_records(self, start_record, end_record):
         data = read_records(self._filename, start_record, end_record)
         return data
 
 
-    def search_all_records(self, time_block=TIME_BLOCK, overlap=OVERLAP):
+    def search_all_records(self):
+
+        time_block = self._time_block
+        overlap = self._overlap
 
         parameters = self._parameters
 
         record_length = (parameters['ntime_record'] * parameters['delta_t'])
         nrecords_block = int(math.ceil(time_block / record_length))
         nrecords_overlap = int(math.ceil(overlap / record_length))
-        nrecords = self._nrecords
+        nrecords = get_nrecords(self._filename)
 
         for ii in xrange(0, nrecords, nrecords_block - nrecords_overlap):
             # XXX
@@ -360,8 +324,11 @@ class FileSearch(object):
             #print "Progress: {0}".format(float(ii)/float(nrecords))
             self.search_records(ii, ii + nrecords_block)
 
-    def search_real_time(self, time_block=TIME_BLOCK, overlap=OVERLAP):
+    def search_real_time(self):
         parameters = self._parameters
+
+        time_block = self._time_block
+        overlap = self._overlap
 
         record_length = (parameters['ntime_record'] * parameters['delta_t'])
         nrecords_block = int(math.ceil(time_block / record_length))
@@ -402,6 +369,7 @@ def get_parameters(filename):
 
     parameters['delta_f'] = DELTA_F
     parameters['ntime_record'] = NTIME_RECORD
+    parameters['nrecords'] = get_nrecords(filename)
 
     return parameters
 
@@ -430,7 +398,7 @@ def read_records(filename, start_record=0, end_record=None):
     return out
 
 
-start_time = -30
+start_time = -200
 def get_nrecords(filename):
     """Totally fake."""
 
