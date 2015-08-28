@@ -24,9 +24,7 @@ logger.addHandler(logging.StreamHandler())
 parser = argparse.ArgumentParser(description='Search GUPPI data for FRBs.')
 parser.add_argument(
         "file",
-        metavar="filename",
         type=str,
-        nargs=1,
         help="GUPPI PSRFITS files to search.",
         )
 parser.add_argument(
@@ -46,6 +44,7 @@ if __name__ == "__main__":
 
 
     Searcher = aro.FileSearch(filename=filename)
+    print filename
 
     act_str = 'print,save_plot_dm'
     if args.show_plot:
