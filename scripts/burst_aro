@@ -23,10 +23,10 @@ logger.addHandler(logging.StreamHandler())
 # Command line arguments.
 parser = argparse.ArgumentParser(description='Search GUPPI data for FRBs.')
 parser.add_argument(
-        "files",
-        metavar="GUPPI_files",
+        "file",
+        metavar="filename",
         type=str,
-        nargs='+',
+        nargs=1,
         help="GUPPI PSRFITS files to search.",
         )
 parser.add_argument(
@@ -40,37 +40,24 @@ parser.add_argument(
 if __name__ == "__main__":
     args = parser.parse_args()
     
-    files = args.files
+    filename = args.file
     #if len(files) == 1:
     #    files = glob.glob(files[0])
 
 
-    if mpi_size > 1:
-        files = sorted(files)
-    else:
-        files = files
+    Searcher = aro.FileSearch(filename=filename)
 
-    for filename in files[mpi_rank::mpi_size]:
-        print "Rank %d, file %s." % (mpi_rank, filename)
-        try:
-            Searcher = aro.FileSearch(filename=filename)
-        except IOError:
-            print "Rank %d, file can't be opened %s." % (mpi_rank, filename)
-            continue
-        if not cal_spec is None:
-            Searcher.set_cal_spectrum(cal_spec)
+    act_str = 'print,save_plot_dm'
+    if args.show_plot:
+        act_str = act_str + ', show_plot_dm'
+    print 'doing actions \n' + act_str
+    Searcher.set_trigger_action(act_str)
 
-        act_str = 'print,save_plot_dm'
-        if args.show_plot:
-            act_str = act_str + ', show_plot_dm'
-        print 'doing actions \n' + act_str
-        Searcher.set_trigger_action(act_str)
+    # To write dedispered data to disk.
+    #out_filename = path.splitext(path.basename(filename))[0] + ".h5"
+    #out_file = h5py.File(out_filename)
+    #Searcher.set_dedispersed_h5(out_file)
 
-        # To write dedispered data to disk.
-        #out_filename = path.splitext(path.basename(filename))[0] + ".h5"
-        #out_file = h5py.File(out_filename)
-        #Searcher.set_dedispersed_h5(out_file)
-
-        Searcher.search_real_time()
+    Searcher.search_real_time()
 
 
