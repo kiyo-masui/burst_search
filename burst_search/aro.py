@@ -11,6 +11,7 @@ from numpy import array, dot
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
+from aro_tools import power_data_io
 
 from . import preprocess
 from . import dedisperse
@@ -22,13 +23,11 @@ from simulate import *
 # XXX Eventually a parameter, seconds.
 #TIME_BLOCK = 30.
 
-#Additions:
 MIN_SEARCH_DM = 5
 
-TIME_BLOCK = 100.0
+TIME_BLOCK = 20.0
 
-MAX_DM = 2000
-# For DM=4000, 13s delay across the band, so overlap searches by ~15s.
+MAX_DM = 400
 
 # Overlap needs to account for the total delay across the band at max DM as
 # well as any data invalidated by FIR filtering of the data.
@@ -49,7 +48,7 @@ DEV_PLOTS = False
 HPF_WIDTH = 0.2    # s
 
 #Event simulation params, speculative/contrived
-SIMULATE = True
+SIMULATE = False
 alpha = -1.0
 sim_rate = 50*1.0/6000.0
 f_m = 600.
@@ -65,12 +64,12 @@ dm_sd = 400
 
 
 # ARO hardcoded parameters.
-NTIME_RECORD = 1024     # Arbitrary, doesn't matter.
-DELTA_T = 0.005
-NFREQ = 1024
-FREQ0 = 800.
-DELTA_F = -400. / 1024
-CAL_PERIOD_SAMPLES = 0
+#NTIME_RECORD = 1024     # Arbitrary, doesn't matter.
+#DELTA_T = 0.005
+#NFREQ = 1024
+#FREQ0 = 800.
+#DELTA_F = -400. / 1024
+#CAL_PERIOD_SAMPLES = 0
 
 
 class FileSearch(object):
@@ -81,14 +80,17 @@ class FileSearch(object):
 
         filename = kwargs['filename']
         self._filename = filename
+        scrunch = kwargs.get('scrunch', 1)
+        self._data_ring = power_data_io.Ring(filename, scrunch)
 
         self._time_block = kwargs.get('time_block', TIME_BLOCK)
         self._overlap = kwargs.get('overlap', OVERLAP)
         self._max_dm = kwargs.get('max_dm', MAX_DM)
         self._min_search_dm = kwargs.get('min_search_dm', MIN_SEARCH_DM)
 
-        parameters = get_parameters(filename)
+        #parameters = get_parameters(filename)
         #print parameters
+        parameters = self._data_ring.get_parameters()
         self._parameters = parameters
 
         self._Transformer = dedisperse.DMTransform(
@@ -302,7 +304,8 @@ class FileSearch(object):
 
 
     def get_records(self, start_record, end_record):
-        data = read_records(self._filename, start_record, end_record)
+        #data = read_records(self._filename, start_record, end_record)
+        data = self._data_ring.read_records(start_record, end_record)
         return data
 
 
@@ -316,7 +319,7 @@ class FileSearch(object):
         record_length = (parameters['ntime_record'] * parameters['delta_t'])
         nrecords_block = int(math.ceil(time_block / record_length))
         nrecords_overlap = int(math.ceil(overlap / record_length))
-        nrecords = get_nrecords(self._filename)
+        nrecords = self._data_ring.current_records()[1]
 
         for ii in xrange(0, nrecords, nrecords_block - nrecords_overlap):
             # XXX
@@ -342,7 +345,7 @@ class FileSearch(object):
         current_start_record = 0
         wait_iterations = 0
         while wait_iterations < max_wait_iterations:
-            nrecords = get_nrecords(self._filename)
+            nrecords = self._data_ring.current_records()[1]
             if nrecords - current_start_record >= nrecords_block:
                 print "Block starting with record: %d" % current_start_record
                 self.search_records(current_start_record,
@@ -358,6 +361,9 @@ class FileSearch(object):
 
 
 
+
+
+#### Mocked up IO. Shouldn't be used. ####
 
 def get_parameters(filename):
     parameters = {}
