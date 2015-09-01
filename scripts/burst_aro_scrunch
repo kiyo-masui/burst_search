@@ -20,6 +20,9 @@ logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
 
 
+MAX_DM = 2000.
+
+
 # Command line arguments.
 parser = argparse.ArgumentParser(description='Search ARO intensity ring for FRBs.')
 parser.add_argument(
@@ -35,18 +38,9 @@ parser.add_argument(
         )
 
 
+def init_search(max_dm_queue, **kwargs):
 
-if __name__ == "__main__":
-    args = parser.parse_args()
-
-    filename = args.file
-    #if len(files) == 1:
-    #    files = glob.glob(files[0])
-
-
-    Searcher = aro.FileSearch(filename=filename)
-    print filename
-
+    Searcher = aro.FileSearch(**kwargs)
     act_str = 'print,save_plot_dm'
     if args.show_plot:
         act_str = act_str + ', show_plot_dm'
@@ -57,7 +51,36 @@ if __name__ == "__main__":
     #out_filename = path.splitext(path.basename(filename))[0] + ".h5"
     #out_file = h5py.File(out_filename)
     #Searcher.set_dedispersed_h5(out_file)
-
+    
+    max_dm = Searcher._max_dm
+    max_dm_queue.put(max_dm)
     Searcher.search_real_time()
+
+
+if __name__ == "__main__":
+    args = parser.parse_args()
+
+    filename = args.file
+
+    kwargs = {
+            'filename' : filename,
+            'to_2_DM_diag' : True,
+            'scrunch' : 1,
+            }
+
+    last_max_dm = 0.
+    max_dm_queue = multiprocessing.Queue()
+    while last_max_dm < MAX_DM:
+        p = multiprocessing.Process(target=init_search,
+                args=(max_dm_queue,), kwargs=kwargs)
+        p.start()
+        last_max_dm = max_dm_queue.get()
+        kwargs['min_search_dm'] = last_max_dm
+        kwargs['scrunch'] = kwargs['scrunch'] * 2
+    # Keep the process from exiting by waiting for the last one.  This may be
+    # very hard to kill.
+    p.join()
+
+
 
 

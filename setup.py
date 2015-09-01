@@ -66,6 +66,7 @@ EXTENSIONS = [ext_dedisperse, ext_search, ext_preprocess]
 SCRIPTS = [
     "scripts/burst_guppi",
     "scripts/burst_aro",
+    "scripts/burst_aro_scrunch",
     "scripts/burst_watch_guppi",
     "scripts/burst_bench",
     ]

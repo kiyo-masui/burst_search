@@ -11,7 +11,7 @@ from numpy import array, dot
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
-from aro_tools import power_data_io
+from aro_tools import power_data_io, misc
 
 from . import preprocess
 from . import dedisperse
@@ -25,14 +25,14 @@ from simulate import *
 
 MIN_SEARCH_DM = 5
 
-TIME_BLOCK = 20.0
+TIME_BLOCK = 30.0
 
 MAX_DM = 400
 
 # Overlap needs to account for the total delay across the band at max DM as
 # well as any data invalidated by FIR filtering of the data.
 #OVERLAP = 15.
-OVERLAP = 8.
+OVERLAP = 10
 
 DO_SPEC_SEARCH = True
 USE_JON_DD = True
@@ -57,10 +57,10 @@ bw_m = 400.
 bw_sd = 0
 t_m = 0.010
 t_sd = 0.002
-s_m = 0.008
+s_m = 0.1
 s_sd = 0.001
-dm_m = 600
-dm_sd = 400
+dm_m = 200
+dm_sd = 100
 
 
 # ARO hardcoded parameters.
@@ -83,16 +83,33 @@ class FileSearch(object):
         scrunch = kwargs.get('scrunch', 1)
         self._data_ring = power_data_io.Ring(filename, scrunch)
 
-        self._time_block = kwargs.get('time_block', TIME_BLOCK)
-        self._overlap = kwargs.get('overlap', OVERLAP)
-        self._max_dm = kwargs.get('max_dm', MAX_DM)
-        self._min_search_dm = kwargs.get('min_search_dm', MIN_SEARCH_DM)
 
         #parameters = get_parameters(filename)
         #print parameters
         parameters = self._data_ring.get_parameters()
         self._parameters = parameters
+        ####
 
+        if kwargs.get('to_2_DM_diag', False):
+            freq0 = parameters['freq0']
+            delta_f = parameters['delta_f']
+            nfreq = parameters['nfreq']
+            freq_max = max(freq0, freq0 + delta_f * (nfreq - 1))
+            freq_min = min(freq0, freq0 + delta_f * (nfreq - 1))
+            dm_diag = misc.diag_dm(parameters['delta_t'], delta_f, freq_max)
+            self._max_dm = 0.9 * 2 * dm_diag
+            self._overlap = 1.5 * (misc.disp_delay(2 * dm_diag, freq_max)
+                                   - misc.disp_delay(2 * dm_diag, freq_min))
+            self._time_block = 3.0 * self._overlap
+        else:
+            self._time_block = kwargs.get('time_block', TIME_BLOCK)
+            self._overlap = kwargs.get('overlap', OVERLAP)
+            self._max_dm = kwargs.get('max_dm', MAX_DM)
+
+
+        self._min_search_dm = kwargs.get('min_search_dm', MIN_SEARCH_DM)
+
+        
         self._Transformer = dedisperse.DMTransform(
                 parameters['delta_t'],
                 parameters['nfreq'],
@@ -102,9 +119,14 @@ class FileSearch(object):
                 jon=USE_JON_DD,
                 )
 
-        self._df = parameters['delta_f']
-        self._nfreq = parameters['nfreq']
-        self._f0 = parameters['freq0']
+        print ("Filename: %s, delta_t: %f, min_dm: %f, max_dm: %f, ndm: %d"
+                % (filename, parameters['delta_t'], self._min_search_dm,
+                    self._max_dm, self._Transformer.ndm))
+
+        #self._df = parameters['delta_f']
+        #self._nfreq = parameters['nfreq']
+        #self._f0 = parameters['freq0']
+
         nrecords_block = int(math.ceil(self._time_block / (parameters['ntime_record'] * parameters['delta_t'])))
 
         #initialize sim object, if there are to be simulated events
@@ -253,9 +275,14 @@ class FileSearch(object):
         preprocess.remove_noisy_freq(data, 3)
 
         #from here we weight channels by spectral index
-        center_f = self._f0 + (self._df*self._nfreq/2.0)
-        fmin = self._f0 + self._df*self._nfreq
-        fmax = self._f0
+        #center_f = self._f0 + (self._df*self._nfreq/2.0)
+        #fmin = self._f0 + self._df*self._nfreq
+        #fmax = self._f0
+
+        nfreq = self._parameters['nfreq']
+        delta_f = self._parameters['delta_f']
+        freq0 = self._parameters['freq0']
+        freq = np.arange(nfreq) * delta_f + freq0
 
         if DO_SPEC_SEARCH:
             print "----------------------"
@@ -264,16 +291,15 @@ class FileSearch(object):
             complete = 1
             for alpha in np.linspace(SPEC_INDEX_MIN,SPEC_INDEX_MAX,SPEC_INDEX_SAMPLES):
                 #for i in xrange(0,3):
-                weights = array([math.pow(f/center_f, alpha) for f in np.linspace(fmax,fmin,self._nfreq)])
+                #weights = array([math.pow(f/center_f, alpha) for f in np.linspace(fmax,fmin,self._nfreq)])
 
                 
-                f = lambda x: weights*x
-                this_dat = np.matrix(np.apply_along_axis(f, axis=0, arr=data),dtype=np.float32)
+                #f = lambda x: weights*x
+                #this_dat = np.matrix(np.apply_along_axis(f, axis=0, arr=data),dtype=np.float32)
 
-                #if self._dedispersed_out_group:
-                 #   g = self._dedispersed_out_group.create_group("%d-%d"
-                  #          % (start_record, end_record))
-                   # data.to_hdf5(g)
+                spec_weights = ((freq / freq0)**alpha).astype(data.dtype)
+                this_dat = data * spec_weights[:,None]
+                
                 dm_data = self._Transformer(this_dat)
                 del this_dat
                 dm_data.start_record = start_record
