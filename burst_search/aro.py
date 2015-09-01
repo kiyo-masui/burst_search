@@ -82,6 +82,7 @@ class FileSearch(object):
         self._filename = filename
         scrunch = kwargs.get('scrunch', 1)
         self._data_ring = power_data_io.Ring(filename, scrunch)
+        #self._data_ring = power_data_io.MockRing(filename, scrunch)
 
 
         #parameters = get_parameters(filename)
@@ -98,13 +99,15 @@ class FileSearch(object):
             freq_min = min(freq0, freq0 + delta_f * (nfreq - 1))
             dm_diag = misc.diag_dm(parameters['delta_t'], delta_f, freq_max)
             self._max_dm = 0.9 * 2 * dm_diag
-            self._overlap = 1.5 * (misc.disp_delay(2 * dm_diag, freq_max)
-                                   - misc.disp_delay(2 * dm_diag, freq_min))
+            self._overlap = 1.5 * (misc.disp_delay(2 * dm_diag, freq_min)
+                                   - misc.disp_delay(2 * dm_diag, freq_max))
             self._time_block = 3.0 * self._overlap
         else:
             self._time_block = kwargs.get('time_block', TIME_BLOCK)
             self._overlap = kwargs.get('overlap', OVERLAP)
             self._max_dm = kwargs.get('max_dm', MAX_DM)
+
+        print self._overlap, self._time_block, dm_diag
 
 
         self._min_search_dm = kwargs.get('min_search_dm', MIN_SEARCH_DM)
@@ -119,9 +122,10 @@ class FileSearch(object):
                 jon=USE_JON_DD,
                 )
 
-        print ("Filename: %s, delta_t: %f, min_dm: %f, max_dm: %f, ndm: %d"
+        print ("Filename: %s, delta_t: %f, min_dm: %f, max_dm: %f, ndm: %d,"
+               " time_block: %f"
                 % (filename, parameters['delta_t'], self._min_search_dm,
-                    self._max_dm, self._Transformer.ndm))
+                    self._max_dm, self._Transformer.ndm, self._time_block))
 
         #self._df = parameters['delta_f']
         #self._nfreq = parameters['nfreq']
@@ -374,8 +378,11 @@ class FileSearch(object):
             nrecords = self._data_ring.current_records()[1]
             if nrecords - current_start_record >= nrecords_block:
                 print "Block starting with record: %d" % current_start_record
-                self.search_records(current_start_record,
-                                    current_start_record + nrecords_block)
+                try:
+                    self.search_records(current_start_record,
+                                        current_start_record + nrecords_block)
+                except power_data_io.DataGone:
+                    print "Missed some data."
                 current_start_record += nrecords_block - nrecords_overlap
                 wait_iterations = 0
             else:
@@ -386,55 +393,3 @@ class FileSearch(object):
                             current_start_record + nrecords_block) 
 
 
-
-
-
-#### Mocked up IO. Shouldn't be used. ####
-
-def get_parameters(filename):
-    parameters = {}
-
-    parameters['cal_period_samples'] = CAL_PERIOD_SAMPLES
-    parameters['delta_t'] = DELTA_T
-    parameters['nfreq'] = NFREQ
-    parameters['freq0'] = FREQ0
-
-    parameters['delta_f'] = DELTA_F
-    parameters['ntime_record'] = NTIME_RECORD
-    parameters['nrecords'] = get_nrecords(filename)
-
-    return parameters
-
-
-
-def read_records(filename, start_record=0, end_record=None):
-    """Right now just generates fake data."""
-
-    nrecords_total = get_nrecords(filename)
-    if end_record is None or end_record > nrecords_total:
-        end_record = nrecords_total
-
-    nrecords = end_record - start_record
-    ntime = nrecords * NTIME_RECORD
-    out = np.empty((NFREQ, nrecords, NTIME_RECORD), dtype=np.float32)
-
-    # The fake part.
-    from numpy import random
-    # Every record is the same!
-    noise = random.randn(NTIME_RECORD, 2, NFREQ)
-    record_data = (noise + 32) * 10
-    record_data = record_data.astype(np.uint32)
-    for ii in range(nrecords):
-        out[:,ii,:] = np.transpose(record_data[:,0,:] + record_data[:,1,:])
-    out.shape = (NFREQ, nrecords * NTIME_RECORD)
-    return out
-
-
-start_time = -200
-def get_nrecords(filename):
-    """Totally fake."""
-
-    global start_time
-    if start_time < 0:
-        start_time += time.time()
-    return int((time.time() - start_time) / (DELTA_T * NTIME_RECORD))
