@@ -133,6 +133,22 @@ class DMData(object):
     def dm(self):
         return self.dm0 + self.delta_dm * np.arange(self.ndm, dtype=float)
 
+    @property
+    def spec_ind(self):
+        return self._spec_ind
+
+    @spec_ind.setter
+    def spec_ind(self, value):
+        self._spec_ind = value
+
+    @property
+    def t0(self):
+        return self._t0
+
+    @t0.setter
+    def t0(self, value):
+        self._t0 = value
+
     def __init__(self, spec_data, dm_data, delta_t, freq0, delta_f, dm0, delta_dm):
         self._spec_data = spec_data
         self._dm_data = dm_data
@@ -141,6 +157,9 @@ class DMData(object):
         self._delta_f = delta_f
         self._dm0 = dm0
         self._delta_dm = delta_dm
+
+        self.spec_ind = 0
+        self.t0 = 0.
 
     @classmethod
     def from_hdf5(cls, group):

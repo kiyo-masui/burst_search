@@ -13,15 +13,13 @@ def disp_delay(f,dm):
 
 class Trigger(object):
 
-    def __init__(self, data, centre, snr=0., duration=1, spec_ind=0, time0=0):
+    def __init__(self, data, centre, snr=0., duration=1):
 
         self._data = data
         self._dm_ind = centre[0]
         self._time_ind = centre[1]
         self._snr = snr
         self._duration = duration
-        self._spec_ind = spec_ind
-        self._time0 = time0
 
     @property 
     def snr(self):
@@ -42,12 +40,13 @@ class Trigger(object):
     @property
     def dm(self):
         di, ti = self.centre
-        return di * self.data.delta_dm
+        print self.data.delta_dm, self.data.dm0
+        return self.data.dm[di]
 
     @property
     def time(self):
         di, ti = self.centre
-        return self._time0, + ti + self.data.delta_t
+        return self.data.t0, + ti * self.data.delta_t
 
     def __str__(self):
         return str((self._snr, self._spec_ind, self.dm, self.time))
@@ -186,7 +185,7 @@ class Trigger(object):
                 spec_data_delay[ii,start_o:stop_o] = self.data.spec_data[ii,
                         start_i:stop_i]
             except ValueError:
-                print start_i, stop_i, start_o, stop_o
+                print (start_i, stop_i), (start_o, stop_o), (ntime, tside)
                 raise
 
         rebin_factor_freq = 64

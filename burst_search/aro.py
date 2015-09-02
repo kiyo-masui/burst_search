@@ -210,9 +210,7 @@ class FileSearch(object):
             def action_fun(triggers):
                 for t in triggers:
                     parameters = self._parameters
-                    t_offset = (parameters['ntime_record'] * t.data.start_record)
-                    t_offset += t.centre[1]
-                    t_offset *= parameters['delta_t']
+                    t_offset = t.time
                     f = plt.figure(1)
                     plt.subplot(411)
                     t.plot_dm()
@@ -251,7 +249,7 @@ class FileSearch(object):
 
     #simple method to replace nested structure
     def search_records(self, start_record, end_record):
-        data = self.get_records(start_record, end_record)
+        data, time = self.get_records(start_record, end_record)
         parameters = self._parameters
         
         if DEV_PLOTS:
@@ -288,6 +286,11 @@ class FileSearch(object):
         preprocess.remove_noisy_freq(data, 2)
         preprocess.remove_bad_times(data, 2)
         preprocess.remove_continuum_v2(data)
+        preprocess.remove_noisy_freq(data, 2)
+
+        # Readjust time axis.
+        times_lost = len(time) - data.shape[-1]
+        time = time[times_lost // 2: times_lost // 2 + data.shape[-1]]
 
 
         if DEV_PLOTS:
@@ -322,14 +325,15 @@ class FileSearch(object):
                 this_dat = data * spec_weights[:,None]
                 
                 dm_data = self._Transformer(this_dat)
+                dm_data.spec_ind = alpha
+                dm_data.t0 = time[0]
                 del this_dat
-                dm_data.start_record = start_record
-                these_triggers = self._search(dm_data,spec_ind=alpha)
+                these_triggers = self._search(dm_data)
                 del dm_data
                 #print 'complete indices: {0} of {1} ({2})'.format(complete,SPEC_INDEX_SAMPLES,alpha)
                 if len(these_triggers)  > 0:
                     print ("%d: alpha %2f, SNR %4.1f" % (self._scrunch,
-                            these_triggers[0].snr, alpha))
+                            alpha, these_triggers[0].snr))
                     if spec_trigger == None or these_triggers[0].snr > spec_trigger.snr:
                         spec_trigger = these_triggers[0]
                 del these_triggers
@@ -344,7 +348,7 @@ class FileSearch(object):
                 self._action((spec_trigger,))
         else:
             dm_data = self._Transformer(data)
-            dm_data.start_record = start_record
+            dm_data.t0 = time[0]
 
             triggers = self._search(dm_data)
             self._action(triggers)
