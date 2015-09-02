@@ -13,7 +13,7 @@ def disp_delay(f,dm):
 
 class Trigger(object):
 
-    def __init__(self, data, centre, snr=0., duration=1 ,spec_ind=None):
+    def __init__(self, data, centre, snr=0., duration=1, spec_ind=0, time0=0):
 
         self._data = data
         self._dm_ind = centre[0]
@@ -21,6 +21,7 @@ class Trigger(object):
         self._snr = snr
         self._duration = duration
         self._spec_ind = spec_ind
+        self._time0 = time0
 
     @property 
     def snr(self):
@@ -38,11 +39,21 @@ class Trigger(object):
     def spec_ind(self):
         return self._spec_ind
 
+    @property
+    def dm(self):
+        di, ti = self.centre
+        return di * self.data.delta_dm
+
+    @property
+    def time(self):
+        di, ti = self.centre
+        return self._time0, + ti + self.data.delta_t
+
     def __str__(self):
-        return str((self._snr, self._spec_ind, self.centre))
+        return str((self._snr, self._spec_ind, self.dm, self.time))
 
     def __repr__(self):
-        return str((self._snr, self._spec_ind, self.centre))
+        return str((self._snr, self._spec_ind, self.dm, self.time))
 
     def plot_dm(self):
         di, ti = self.centre
@@ -169,10 +180,14 @@ class Trigger(object):
                 start_o = -start_i
                 start_i = 0
             if stop_i > ntime:
-                stop_o -= (ntime - stop_i)
+                stop_o -= (stop_i - ntime)
                 stop_i = ntime
-            spec_data_delay[ii,start_o:stop_o] = self.data.spec_data[ii,
-                    start_i:stop_i]
+            try:
+                spec_data_delay[ii,start_o:stop_o] = self.data.spec_data[ii,
+                        start_i:stop_i]
+            except ValueError:
+                print start_i, stop_i, start_o, stop_o
+                raise
 
         rebin_factor_freq = 64
         rebin_factor_time = 1

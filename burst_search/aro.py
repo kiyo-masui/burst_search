@@ -23,7 +23,7 @@ from simulate import *
 # XXX Eventually a parameter, seconds.
 #TIME_BLOCK = 30.
 
-MIN_SEARCH_DM = 5
+MIN_SEARCH_DM = 20
 
 TIME_BLOCK = 30.0
 
@@ -37,13 +37,13 @@ OVERLAP = 10
 DO_SPEC_SEARCH = True
 USE_JON_DD = True
 
-SPEC_INDEX_MIN = -8
-SPEC_INDEX_MAX = 8
-SPEC_INDEX_SAMPLES = 5
+SPEC_INDEX_MIN = -4
+SPEC_INDEX_MAX = 4
+SPEC_INDEX_SAMPLES = 3
 
 THRESH_SNR = 8.0
 
-DEV_PLOTS = True
+DEV_PLOTS = False
 
 HPF_WIDTH = 0.2    # s
 
@@ -81,6 +81,7 @@ class FileSearch(object):
         filename = kwargs['filename']
         self._filename = filename
         scrunch = kwargs.get('scrunch', 1)
+        self._scrunch = scrunch    # For identifying process.
         self._data_ring = power_data_io.Ring(filename, scrunch)
         #self._data_ring = power_data_io.MockRing(filename, scrunch)
 
@@ -188,7 +189,7 @@ class FileSearch(object):
     def _get_trigger_action(self,action):
         if action == 'print':
             def action_fun(triggers):
-                print triggers
+                print ("%d:" % self._scrunch), triggers
             return action_fun
             self._action = action_fun
         elif action == 'show_plot_dm':
@@ -280,11 +281,14 @@ class FileSearch(object):
             #do simulation
             data += self._sim_source.generate_events(block_ind)[:,0:data.shape[1]]
 
-        preprocess.remove_outliers(data, 5, 512)
+        preprocess.remove_outliers(data, 5, 128)
         data = preprocess.highpass_filter(data, HPF_WIDTH / parameters['delta_t'])
 
         preprocess.remove_outliers(data, 5)
-        preprocess.remove_noisy_freq(data, 3)
+        preprocess.remove_noisy_freq(data, 2)
+        preprocess.remove_bad_times(data, 2)
+        preprocess.remove_continuum_v2(data)
+
 
         if DEV_PLOTS:
             plt.figure()
@@ -302,7 +306,7 @@ class FileSearch(object):
         freq = np.arange(nfreq) * delta_f + freq0
 
         if DO_SPEC_SEARCH:
-            print "----------------------"
+            #print "----------------------"
             spec_trigger = None
 
             complete = 1
@@ -322,9 +326,10 @@ class FileSearch(object):
                 dm_data.start_record = start_record
                 these_triggers = self._search(dm_data,spec_ind=alpha)
                 del dm_data
-                print 'complete indices: {0} of {1} ({2})'.format(complete,SPEC_INDEX_SAMPLES,alpha)
+                #print 'complete indices: {0} of {1} ({2})'.format(complete,SPEC_INDEX_SAMPLES,alpha)
                 if len(these_triggers)  > 0:
-                    print 'max snr: {0}'.format(these_triggers[0].snr)
+                    print ("%d: alpha %2f, SNR %4.1f" % (self._scrunch,
+                            these_triggers[0].snr, alpha))
                     if spec_trigger == None or these_triggers[0].snr > spec_trigger.snr:
                         spec_trigger = these_triggers[0]
                 del these_triggers
@@ -390,12 +395,13 @@ class FileSearch(object):
         while wait_iterations < max_wait_iterations:
             nrecords = self._data_ring.current_records()[1]
             if nrecords - current_start_record >= nrecords_block:
-                print "Block starting with record: %d" % current_start_record
+                print ("%d: Block starting with record: %d of %d"
+                        % (self._scrunch, current_start_record, nrecords))
                 try:
                     self.search_records(current_start_record,
                                         current_start_record + nrecords_block)
                 except power_data_io.DataGone:
-                    print "Missed some data."
+                    print "%d: MISSED A BLOCK" % self._scrunch
                 current_start_record += nrecords_block - nrecords_overlap
                 wait_iterations = 0
             else:
@@ -416,7 +422,8 @@ def imshow_data(data):
             data,
             vmin=vmin,
             vmax=vmax,
-            extent=[400., 800., 0, 1000],
+            extent=[0, 1000, 400., 800.,],
             aspect='auto',
             )
-
+    plt.xlabel('time (samples)')
+    plt.ylabel('frequency (MHz)')
