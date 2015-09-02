@@ -79,7 +79,7 @@ setup(
     ext_modules = EXTENSIONS,
     scripts = SCRIPTS,
     cmdclass = {'build_ext': build_ext},
-    install_requires = ['numpy', 'pyfits', 'Cython'],
+    install_requires = ['numpy', 'Cython'],
 
     # metadata for upload to PyPI
     author = "Kiyoshi Wesley Masui, Jonathan Sievers",

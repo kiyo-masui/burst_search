@@ -43,7 +43,7 @@ SPEC_INDEX_SAMPLES = 5
 
 THRESH_SNR = 8.0
 
-DEV_PLOTS = False
+DEV_PLOTS = True
 
 HPF_WIDTH = 0.2    # s
 
@@ -107,8 +107,7 @@ class FileSearch(object):
             self._overlap = kwargs.get('overlap', OVERLAP)
             self._max_dm = kwargs.get('max_dm', MAX_DM)
 
-        print self._overlap, self._time_block, dm_diag
-
+        #print self._overlap, self._time_block, dm_diag
 
         self._min_search_dm = kwargs.get('min_search_dm', MIN_SEARCH_DM)
 
@@ -253,8 +252,17 @@ class FileSearch(object):
     def search_records(self, start_record, end_record):
         data = self.get_records(start_record, end_record)
         parameters = self._parameters
+        
+        if DEV_PLOTS:
+            plt.figure()
+            imshow_data(data)
 
         preprocess.sys_temperature_bandpass(data)
+
+        if DEV_PLOTS:
+            plt.figure()
+            imshow_data(data)
+
         if self._parameters['cal_period_samples']:
             preprocess.remove_periodic(data,
                                self._parameters['cal_period_samples'])
@@ -277,6 +285,11 @@ class FileSearch(object):
 
         preprocess.remove_outliers(data, 5)
         preprocess.remove_noisy_freq(data, 3)
+
+        if DEV_PLOTS:
+            plt.figure()
+            imshow_data(data[:,:2000])
+            plt.show()
 
         #from here we weight channels by spectral index
         #center_f = self._f0 + (self._df*self._nfreq/2.0)
@@ -392,4 +405,18 @@ class FileSearch(object):
         self.search_records(current_start_record, 
                             current_start_record + nrecords_block) 
 
+
+def imshow_data(data):
+    data = data[:,:1000].copy()
+    s = np.std(data)
+    m = np.mean(data)
+    vmin = m - 2*s
+    vmax = m + 2*s
+    plt.imshow(
+            data,
+            vmin=vmin,
+            vmax=vmax,
+            extent=[400., 800., 0, 1000],
+            aspect='auto',
+            )
 
