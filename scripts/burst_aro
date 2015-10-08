@@ -47,7 +47,7 @@ if __name__ == "__main__":
     Searcher = aro.FileSearch(filename=filename)
     print filename
 
-    act_str = 'print,save_plot_dm'
+    act_str = 'print,save_plot_dm,link_squirrel,link_chime'
     if args.show_plot:
         act_str = act_str + ', show_plot_dm'
     print 'doing actions \n' + act_str

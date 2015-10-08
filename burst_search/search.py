@@ -1,5 +1,6 @@
 """Search DM space data for events."""
 
+import subprocess
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -33,10 +34,6 @@ class Trigger(object):
     def centre(self):
         return (self._dm_ind, self._time_ind)
 
-    @property 
-    def spec_ind(self):
-        return self._spec_ind
-
     @property
     def dm(self):
         di, ti = self.centre
@@ -46,13 +43,27 @@ class Trigger(object):
     @property
     def time(self):
         di, ti = self.centre
-        return self.data.t0, + ti * self.data.delta_t
+        return self.data.t0 + ti * self.data.delta_t
 
     def __str__(self):
-        return str((self._snr, self._spec_ind, self.dm, self.time))
+        return str((self._snr, self.dm, self.time, self.data.spec_ind))
 
     def __repr__(self):
-        return str((self._snr, self._spec_ind, self.dm, self.time))
+        return str((self._snr, self.dm, self.time, self.data.spec_ind))
+
+    def link_baseband(self, host, port, location):
+
+        process = subprocess.Popen(
+            [
+                'ssh',
+                '-p %d' % port,
+                host,
+                "cd %s; ./triggerlink.py --time " % location,
+                str(self.time),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            )
 
     def plot_dm(self):
         di, ti = self.centre
@@ -75,7 +86,7 @@ class Trigger(object):
         duration_value = ",width ="
         duration_value += str(round(duration*delta_t, 3))
         duration_value += " (s)"
-        spec_ind = self._spec_ind
+        spec_ind = self.data.spec_ind
         spec_ind_value = ",spec_ind ="
         spec_ind_value += str(spec_ind)
         text = dm_value + snr_value + duration_value + spec_ind_value
@@ -218,7 +229,7 @@ class Trigger(object):
         plt.ylabel("Frequency (MHz)")
         plt.colorbar()
 
-def basic(data, snr_threshold=5., min_dm=50., length_limit=0, spec_ind=None):
+def basic(data, snr_threshold=5., min_dm=50., length_limit=0):
     """Simple event search of DM data.
 
     Returns
@@ -240,5 +251,5 @@ def basic(data, snr_threshold=5., min_dm=50., length_limit=0, spec_ind=None):
                 length_limit)
 
         if snr > snr_threshold:
-            triggers.append(Trigger(data, sample, snr,spec_ind=spec_ind,duration=duration))
+            triggers.append(Trigger(data, sample, snr, duration=duration))
     return triggers

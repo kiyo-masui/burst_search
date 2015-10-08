@@ -41,7 +41,7 @@ parser.add_argument(
 def init_search(max_dm_queue, **kwargs):
 
     Searcher = aro.FileSearch(**kwargs)
-    act_str = 'print,save_plot_dm'
+    act_str = 'print,save_plot_dm,link_squirrel,link_chime'
     if args.show_plot:
         act_str = act_str + ', show_plot_dm'
     print 'doing actions \n' + act_str
@@ -75,7 +75,7 @@ if __name__ == "__main__":
                 args=(max_dm_queue,), kwargs=kwargs)
         p.start()
         last_max_dm = max_dm_queue.get()
-        kwargs['min_search_dm'] = last_max_dm
+        #kwargs['min_search_dm'] = last_max_dm
         kwargs['scrunch'] = kwargs['scrunch'] * 2
     # Keep the process from exiting by waiting for the last one.  This may be
     # very hard to kill.

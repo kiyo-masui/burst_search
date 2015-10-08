@@ -23,11 +23,11 @@ from simulate import *
 # XXX Eventually a parameter, seconds.
 #TIME_BLOCK = 30.
 
-MIN_SEARCH_DM = 20
+MIN_SEARCH_DM = 5.
 
-TIME_BLOCK = 30.0
+TIME_BLOCK = 100.0
 
-MAX_DM = 400
+MAX_DM = 1000
 
 # Overlap needs to account for the total delay across the band at max DM as
 # well as any data invalidated by FIR filtering of the data.
@@ -47,6 +47,11 @@ DEV_PLOTS = False
 
 HPF_WIDTH = 0.2    # s
 
+
+# Host login info.
+SQUIRREL = ('squirrel@10.1.1.100', 22, '/home/squirrel/linkingscripts')
+CHIME = ('moose@localhost', 10022, '/home/connor')
+
 #Event simulation params, speculative/contrived
 SIMULATE = False
 alpha = -1.0
@@ -55,12 +60,12 @@ f_m = 600.
 f_sd = 0
 bw_m = 400.
 bw_sd = 0
-t_m = 0.010
-t_sd = 0.002
-s_m = 0.1
-s_sd = 0.001
-dm_m = 200
-dm_sd = 100
+t_m = 0.003
+t_sd = 0.001
+s_m = 0.01
+s_sd = 0.005
+dm_m = 300
+dm_sd = 200
 
 
 # ARO hardcoded parameters.
@@ -167,12 +172,11 @@ class FileSearch(object):
 
     def set_search_method(self, method='basic', **kwargs):
         if method == 'basic':
-            self._search = lambda dm_data,spec_ind=None : search.basic(
+            self._search = lambda dm_data : search.basic(
                     dm_data,
                     THRESH_SNR,
                     self._min_search_dm,
                     int(HPF_WIDTH / 2 / self._parameters['delta_t']),
-                    spec_ind=spec_ind,
                     )
 
         else:
@@ -232,11 +236,21 @@ class FileSearch(object):
                     else:
                         out_filename = "DM300-2000_" 
                     out_filename += path.splitext(path.basename(self._filename))[0]
-                    if not t.spec_ind is None:
-                                    out_filename += "+a=%02.f" % t.spec_ind
+                    if not t.data.spec_ind is None:
+                                    out_filename += "+a=%02.f" % t.data.spec_ind
                     out_filename += "+%06.2fs.png" % t_offset
                     plt.savefig(out_filename, bbox_inches='tight')
                     plt.close(f)
+            return action_fun
+        elif action == 'link_squirrel':
+            def action_fun(triggers):
+                for t in triggers:
+                    t.link_baseband(*SQUIRREL)
+            return action_fun
+        elif action == 'link_chime':
+            def action_fun(triggers):
+                for t in triggers:
+                    t.link_baseband(*CHIME)
             return action_fun
         else:
             msg = "Unrecognized trigger action: " + action
