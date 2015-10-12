@@ -75,7 +75,7 @@ if __name__ == "__main__":
         print "Rank %d, file %s." % (mpi_rank, filename)
         try:
 	    Searcher = guppi.FileSearch(filename)
-        except IOError:
+        except IOError as e:
 	    print "Rank %d, file can't be opened %s." % (mpi_rank, filename)
             continue
         if not cal_spec is None:

@@ -1,15 +1,8 @@
 import h5py
 import os
-from os import listdir
-from os.path import isfile, join
+from os import listdir, makedirs
+from os.path import isfile, join, exists
 import numpy as np
-
-#time !
-#dm !
-#spec ind !
-#width (index units) !
-#fluence #
-
 
 ind_t = np.int16
 float_t = np.float32
@@ -24,45 +17,50 @@ resize_increment = 128
 
 
 def ensure_dir(path):
-	if not isfile(path):
-		if not os.path.exists(path):
-			os.makedirs(path)
+	if path == '':
+		return
+	elif not isfile(path) and not '.' in path:
+		if not exists(path):
+			makedirs(path)
 	else:
 		ensure_dir(os.sep.join(path.split(os.sep)[:-1]))
 
 def ensure_structure(hfile):
 	if not dset_name in hfile.keys():
-		dset = hfile.create_dataset(dset_name,(resize_increment,1),maxshape=(None,1))
+		dset = hfile.create_dataset(dset_name,(resize_increment,1),maxshape=(None,1),dtype=md_t)
 		dset.attrs['ind'] = 0
+		return dset
 	else:
 		return hfile[dset_name]
 
 
 class Catalog(object):
-	def __init__(self,path='burst_catalog.h5py',parent_name):
+	def __init__(self,parent_name,path='burst_catalog.h5py'):
 		ensure_dir(path)
 		self._outpath = path
 		self._parent_name = parent_name
-		self._of = h5py.File(path,'a')
-		#dset
+		if isfile(path):
+			self._of = h5py.File(path,'r+')
+		else:
+			self._of = h5py.File(path,'w')
 		self._event_data = ensure_structure(self._of)
 
-	def simple_write(triggers):
+	def simple_write(self, triggers):
 		for trig in triggers:
 			dt = trig.data.delta_t
 			ddm = trig.data.delta_dm
-			t_ind = trig.centre[1] + trig.data_start_record
+			t_ind = trig.centre[1] + trig.data.start_record
 			dm_ind = trig.centre[0]
 			snr = trig.snr
 			spec_ind = trig.spec_ind
-			t_width = trig.duration
+			t_width = trig._duration
 			try:
 				fluence = trig.fluence
 			except:
 				fluence = None
-			self.write(snr,t_ind,dt,dm_int,ddm,spec_ind,t_width,fluence)
+			self.write(snr,t_ind,dt,dm_ind,ddm,spec_ind,t_width,fluence)
 
-	def raw_write(snr,t_ind,dt,dm_ind,ddm,spec_ind,t_width,fluence,loc=(0,0)):
+	def write(self, snr,t_ind,dt,dm_ind,ddm,spec_ind,t_width,fluence,loc=(0,0)):
 		if spec_ind == None: spec_ind = 0.0
 		if fluence == None: fluence = 0.0
 		dset = self._event_data
@@ -70,7 +68,7 @@ class Catalog(object):
 		if ind > dset.len() - 1:
 			dset.resize(dset.len() + resize_increment,axis=0)
 		self._of.flush()
-		dset[i] = np.array((self._parent_name,snr,t_ind,dt,dm_ind,ddm,spec_ind,t_width,fluence,loc),
+		dset[ind] = np.array((self._parent_name,snr,t_ind,dt,dm_ind,ddm,spec_ind,t_width,fluence,loc),
 			dtype=md_t)
 		dset.attrs['ind'] = ind + 1
 
