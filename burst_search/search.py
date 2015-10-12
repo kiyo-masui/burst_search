@@ -130,6 +130,8 @@ class Trigger(object):
             stop = start + duration
             spectrum[ii] = np.mean(self.data.spec_data[ii,start:stop])
         
+        self.fluence = sum(spectrum)
+
         colors = ['blue','red','darkgreen','orange']
         rebin_factors = [ 4**ii for ii in range(4) ]
 

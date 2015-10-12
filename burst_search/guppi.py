@@ -3,6 +3,7 @@
 """
 
 import math
+import os
 from os import path
 import time
 
@@ -21,6 +22,7 @@ from . import dedisperse
 from . import search
 from . import simulate
 from simulate import *
+from catalog import Catalog
 
 
 # XXX Eventually a parameter, seconds.
@@ -63,6 +65,7 @@ s_sd = 0.1
 dm_m = 600
 dm_sd = 0
 
+CATALOG = True
 
 class FileSearch(object):
 
@@ -98,6 +101,11 @@ class FileSearch(object):
             self._sim_source = simulate.RandSource(alpha=alpha, f_m=f_m,f_sd=f_sd,bw_m=bw_m,bw_sd=bw_sd,t_m=t_m,
                 t_sd=t_sd,s_m=s_m,s_sd=s_sd,dm_m=dm_m,dm_sd=dm_sd,
                 event_rate=sim_rate,file_params=self._parameters,t_overlap=OVERLAP,nrecords_block=self._nrecords_block)
+
+        if CATALOG:
+            reduced_name = '.'.join(self._filename.split(os.sep)[-1].split('.')[:-1])
+            self._catalog = Catalog(parent_name=reduced_name)
+
 
         self._cal_spec = 1.
         self._dedispersed_out_group = None
@@ -269,14 +277,19 @@ class FileSearch(object):
                 #spec_triggers = [spec_triggers[0],]
                 #self._action(spec_triggers, dm_data)
             if spec_trigger != None:
-                self._action((spec_trigger,))
+                triggers = (spec_trigger,)
+            else: triggers = []
+                #self._action((spec_trigger,))
         else:
             dm_data = self._Transformer(data)
             dm_data.start_record = start_record
 
             triggers = self._search(dm_data)
-            self._action(triggers)
-            del triggers
+        
+        self._action(triggers)
+        if CATALOG:
+            self._catalog.simple_write(triggers)
+        del triggers
 
     def dm_transform_records(self, start_record, end_record):
         parameters = self._parameters
