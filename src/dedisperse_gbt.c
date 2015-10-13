@@ -89,10 +89,10 @@ int get_nchan_from_depth(int depth)
 }
 
 /*--------------------------------------------------------------------------------*/
-float get_diagonal_dm_simple(float nu1, float nu2, float dt, int depth)
+float get_diagonal_dm_simple(float nu1, float nu2, float dt, int depth, float disp_ind)
 {
-  float d1=1.0/nu1/nu1;
-  float d2=1.0/nu2/nu2;
+  float d1=pow(1.0/nu1,disp_ind);
+  float d2=pow(1.0/nu2,disp_ind);
   int nchan=get_nchan_from_depth(depth);
   //printf("nchan is %d from %d\n",nchan,depth);
   //printf("freqs are %12.4f %12.4f\n",nu1,nu2);
@@ -117,8 +117,11 @@ float get_diagonal_dm(Data *dat) {
   //is equal to the sampling time
   //delay = dm0*dm/nu^2
   // delta delay = dm0*dm*(1//nu1^2 - 1/nu2^2) = dt
-  float d1=1.0/dat->chans[0]/dat->chans[0];
-  float d2=1.0/dat->chans[1]/dat->chans[1];
+  float l1 = 1.0/dat->chans[0];
+  float l2 = 1.0/dat->chans[1];
+  float disp_ind = 2.0;
+  float d1= pow(l1,disp_ind);
+  float d2= pow(l2,disp_ind);
   float dm_max=dat->dt/DM0/(d2-d1);
   return dm_max;
 }

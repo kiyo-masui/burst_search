@@ -67,6 +67,11 @@ dm_sd = 0
 
 CATALOG = True
 
+#Use to test different dispersions
+#of the form l^DISP_IND
+#where l is wavelength
+DISP_IND = 2.0
+
 class FileSearch(object):
 
     def __init__(self, filename):
@@ -84,6 +89,7 @@ class FileSearch(object):
                 parameters['freq0'],
                 parameters['delta_f'],
                 MAX_DM,
+                DISP_IND,
                 )
 
         self._df = parameters['delta_f']
@@ -288,7 +294,7 @@ class FileSearch(object):
         
         self._action(triggers)
         if CATALOG:
-            self._catalog.simple_write(triggers)
+            self._catalog.simple_write(triggers,disp_ind = DISP_IND)
         del triggers
 
     def dm_transform_records(self, start_record, end_record):

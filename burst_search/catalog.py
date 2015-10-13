@@ -9,7 +9,7 @@ float_t = np.float32
 
 dset_name = 'burst_metadata'
 md_t = np.dtype([('file_name','S32'),('snr',float_t),('t_ind', ind_t),('dt', float_t),('dm_ind', ind_t),
-	('ddm', float_t), ('spec_ind', float_t), ('t_width', ind_t), ('fluence', float_t),
+	('ddm', float_t), ('spec_ind', float_t), ('t_width', ind_t), ('fluence', float_t), ('disp_ind', float_t)
 	('loc',float_t,(2,)),
 	])
 
@@ -60,7 +60,7 @@ class Catalog(object):
 				fluence = None
 			self.write(snr,t_ind,dt,dm_ind,ddm,spec_ind,t_width,fluence)
 
-	def write(self, snr,t_ind,dt,dm_ind,ddm,spec_ind,t_width,fluence,loc=(0,0)):
+	def write(self, snr,t_ind,dt,dm_ind,ddm,spec_ind,t_width,fluence,disp_ind=2.0,loc=(0,0)):
 		if spec_ind == None: spec_ind = 0.0
 		if fluence == None: fluence = 0.0
 		dset = self._event_data

@@ -19,14 +19,14 @@ cdef extern int burst_get_num_dispersions(size_t nfreq, float freq0,
         float delta_f, int depth)
 
 cdef extern int burst_depth_for_max_dm(float max_dm, float delta_t,
-        size_t nfreq, float freq0, float delta_f)
+        size_t nfreq, float freq0, float delta_f, float disp_ind)
 
 cdef extern int  burst_dm_transform(DTYPE_t *indata1, DTYPE_t *indata2,
         CM_DTYPE_t *chan_map, DTYPE_t *outdata, size_t ntime1, int ntime2,
-        float delta_t, size_t nfreq, float freq0, float delta_f, int depth,int jon)
+        float delta_t, size_t nfreq, float freq0, float delta_f, int depth, float disp_ind, int jon)
 
 cdef extern void burst_setup_channel_mapping(CM_DTYPE_t *chan_map, size_t nfreq,
-        float freq0, float delta_f, int depth)
+        float freq0, float delta_f, int depth, float disp_ind)
 
 
 def dm_transform(
@@ -195,7 +195,7 @@ class DMTransform(object):
     def depth(self):
         return self._depth
 
-    def __init__(self, delta_t, nfreq, freq0, delta_f, max_dm):
+    def __init__(self, delta_t, nfreq, freq0, delta_f, max_dm, disp_ind):
 
         cdef float cdelta_t = delta_t
         cdef int cnfreq = nfreq
@@ -204,14 +204,14 @@ class DMTransform(object):
         cdef float cmax_dm = max_dm
 
         cdef int depth = burst_depth_for_max_dm(cmax_dm, cdelta_t, cnfreq, cfreq0,
-                                                cdelta_f)
+                                                cdelta_f, disp_ind)
 
         cdef int cndm =  burst_get_num_dispersions(cnfreq, cfreq0, cdelta_f, depth)
 
         cdef np.ndarray[ndim=1, dtype=CM_DTYPE_t] chan_map
         chan_map = np.empty(2**depth, dtype=CM_DTYPE)
         burst_setup_channel_mapping(<CM_DTYPE_t *> chan_map.data, cnfreq, cfreq0,
-                cdelta_f, depth)
+                cdelta_f, depth, disp_ind)
         self._chan_map = chan_map
         self._delta_t = delta_t
         self._nfreq = nfreq
@@ -220,12 +220,15 @@ class DMTransform(object):
         self._max_dm = max_dm
         self._ndm = cndm
         self._depth = depth
+        self._disp_ind = disp_ind
 
 
     def __call__(self, np.ndarray[ndim=2, dtype=DTYPE_t] data1 not None,
             np.ndarray[ndim=2, dtype=DTYPE_t] data2=None,jon=0):
 
         cdef int nfreq = self.nfreq
+
+        disp_ind = self._disp_ind
 
         if data2 is None:
             data2 = np.empty(shape=(nfreq, 0), dtype=DTYPE)
@@ -262,6 +265,7 @@ class DMTransform(object):
                 freq0,
                 delta_f,
                 depth,
+                disp_ind,
                 jon,
                 )
 
