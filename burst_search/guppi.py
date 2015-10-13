@@ -70,7 +70,7 @@ CATALOG = True
 #Use to test different dispersions
 #of the form l^DISP_IND
 #where l is wavelength
-DISP_IND = 2.0
+DISP_IND = 3.0
 
 class FileSearch(object):
 

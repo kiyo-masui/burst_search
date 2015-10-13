@@ -52,14 +52,14 @@ def dm_transform(
     cdef int ntime2 = data2.shape[1]
 
     cdef int depth = burst_depth_for_max_dm(max_dm, delta_t, nfreq, freq0,
-                                            delta_f)
+                                            delta_f, 2.0)
 
     cdef int ndm =  burst_get_num_dispersions(nfreq, freq0, delta_f, depth)
 
     cdef np.ndarray[ndim=1, dtype=CM_DTYPE_t] chan_map
     chan_map = np.empty(2**depth, dtype=CM_DTYPE)
     burst_setup_channel_mapping(<CM_DTYPE_t *> chan_map.data, nfreq, freq0,
-            delta_f, depth)
+            delta_f, depth, 2.0)
 
     cdef np.ndarray[ndim=2, dtype=DTYPE_t] out
     out = np.empty(shape=(ndm, ntime1), dtype=DTYPE)
@@ -76,6 +76,7 @@ def dm_transform(
             freq0,
             delta_f,
             depth,
+            2.0,
             jon,
             )
 

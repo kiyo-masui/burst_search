@@ -9,7 +9,7 @@ float_t = np.float32
 
 dset_name = 'burst_metadata'
 md_t = np.dtype([('file_name','S32'),('snr',float_t),('t_ind', ind_t),('dt', float_t),('dm_ind', ind_t),
-	('ddm', float_t), ('spec_ind', float_t), ('t_width', ind_t), ('fluence', float_t), ('disp_ind', float_t)
+	('ddm', float_t), ('spec_ind', float_t), ('t_width', ind_t), ('fluence', float_t), ('disp_ind', float_t),
 	('loc',float_t,(2,)),
 	])
 
@@ -45,7 +45,7 @@ class Catalog(object):
 			self._of = h5py.File(path,'w')
 		self._event_data = ensure_structure(self._of)
 
-	def simple_write(self, triggers):
+	def simple_write(self, triggers, disp_ind = 2.0):
 		for trig in triggers:
 			dt = trig.data.delta_t
 			ddm = trig.data.delta_dm
@@ -58,7 +58,7 @@ class Catalog(object):
 				fluence = trig.fluence
 			except:
 				fluence = None
-			self.write(snr,t_ind,dt,dm_ind,ddm,spec_ind,t_width,fluence)
+			self.write(snr,t_ind,dt,dm_ind,ddm,spec_ind,t_width,fluence,disp_ind=disp_ind)
 
 	def write(self, snr,t_ind,dt,dm_ind,ddm,spec_ind,t_width,fluence,disp_ind=2.0,loc=(0,0)):
 		if spec_ind == None: spec_ind = 0.0
@@ -68,7 +68,7 @@ class Catalog(object):
 		if ind > dset.len() - 1:
 			dset.resize(dset.len() + resize_increment,axis=0)
 		self._of.flush()
-		dset[ind] = np.array((self._parent_name,snr,t_ind,dt,dm_ind,ddm,spec_ind,t_width,fluence,loc),
+		dset[ind] = np.array((self._parent_name,snr,t_ind,dt,dm_ind,ddm,spec_ind,t_width,fluence,disp_ind,loc),
 			dtype=md_t)
 		dset.attrs['ind'] = ind + 1
 

@@ -19,7 +19,7 @@ class RandSource(object):
 
 	
 
-	def __init__(self,alpha=0.0,**kwargs):
+	def __init__(self,alpha=0.0, disp_ind=2.0,**kwargs):
 		"""
 		Initialize a RandSource object
 
@@ -55,6 +55,7 @@ class RandSource(object):
 			Number of records per block.
 		"""
 		# user-provided
+		self._disp_ind = disp_ind
 		self.event_rate = kwargs['event_rate']
 		self.f_m = kwargs['f_m']
 		self.f_sd = kwargs['f_sd']
@@ -138,9 +139,10 @@ class RandSource(object):
 			for j in xrange(0,nfreq):
 				sim_dat[j,t_start:t_start + nt_width] = math.pow(((f0 + j*delta_f)/center_f), self.alpha)*params['s_max']
 
+			disp_ind = self._disp_ind
 			# disperse data in time
 			for j in xrange(0,sim_dat.shape[0]):
-				nt_disp = round(disp_delay(f0 + j*delta_f,dm)/delta_t)
+				nt_disp = round(disp_delay(f0 + j*delta_f,dm,disp_ind)/delta_t)
 				sim_dat[j,nt_disp:ntime_block] = sim_dat[j,0:ntime_block - nt_disp]
 				sim_dat[j,0:nt_disp] = 0.0
 
@@ -191,9 +193,9 @@ class RandSource(object):
 		"""Return the block index for all blocks with scheduled events"""
 		return set(map(lambda ind: int(ind/self.ntime_block), self.event_schedule))
 
-def disp_delay(f,dm):
+def disp_delay(f,dm,disp_ind):
 	"""Compute the dispersion delay (s) as a function of frequency (MHz)"""
-	return 4.149*dm*(10.0**3)/(f**2)
+	return 4.149*dm*(10.0**3)/(math.pow(f,disp_ind))
 
 def uniform_range(center, halfwidth):
 	return random.uniform(center - halfwidth, center + halfwidth)
