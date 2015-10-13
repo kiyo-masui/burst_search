@@ -86,8 +86,8 @@ class RandSource(object):
 
 		# Note that this line depends on the stat model used to generate simulated params. Right now things are simple with defined extremal values
 		# for all params
-		self.max_twidth_event = disp_delay(self.f_m - self.f_sd - 0.5*(self.bw_m + self.bw_sd),self.dm_m + self.dm_sd) \
-		- disp_delay(self.f_m + self.f_sd + 0.5*(self.bw_m + self.bw_sd),self.dm_m - self.dm_sd)
+		self.max_twidth_event = disp_delay(self.f_m - self.f_sd - 0.5*(self.bw_m + self.bw_sd),self.dm_m + self.dm_sd,self._disp_ind) \
+		- disp_delay(self.f_m + self.f_sd + 0.5*(self.bw_m + self.bw_sd),self.dm_m - self.dm_sd,self._disp_ind)
 
 		# create the schedule of events, in terms of time index (absolute from start of file)
 		self.make_event_schedule()

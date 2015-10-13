@@ -33,6 +33,7 @@ MIN_SEARCH_DM = 5
 
 TIME_BLOCK = 30.0
 
+#Must scale with disp_ind
 MAX_DM = 2000
 # For DM=4000, 13s delay across the band, so overlap searches by ~15s.
 
@@ -70,11 +71,20 @@ CATALOG = True
 #Use to test different dispersions
 #of the form l^DISP_IND
 #where l is wavelength
-DISP_IND = 3.0
+#Be sure to alter 'MAX_DM' accordingly.
+#Large DISP_IND decreases depth
+#DISP_IND is now set via a command line argument
+DISP_IND = 2.0
 
 class FileSearch(object):
 
-    def __init__(self, filename):
+    def __init__(self, filename, disp_ind=DISP_IND, max_dm = MAX_DM, sim = SIMULATE):
+        DISP_IND = disp_ind
+        SIMULATE = sim
+        MAX_DM = max_dm
+        #compute the invariant DM:
+        MAX_DM *= (math.pow(1.0/400.0,2.0) - math.pow(1.0/800.0,2.0))
+        MAX_DM /= (math.pow(1.0/400.0,DISP_IND) - math.pow(1.0/800.0,DISP_IND))
 
         self._filename = filename
         hdulist = pyfits.open(filename, 'readonly')
@@ -91,7 +101,7 @@ class FileSearch(object):
                 MAX_DM,
                 DISP_IND,
                 )
-
+        
         self._df = parameters['delta_f']
         self._nfreq = parameters['nfreq']
         self._f0 = parameters['freq0']

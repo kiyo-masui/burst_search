@@ -51,7 +51,21 @@ parser.add_argument(
         type=bool,
         default=False
         )
-
+parser.add_argument(
+        '--disp_ind',
+        type=float,
+        default=2.0
+        )
+parser.add_argument(
+        '--max_dm',
+        type=float,
+        default=2000.0
+        )
+parser.add_argument(
+        '--sim',
+        action='store_true',
+        default=False,
+        )
 
 
 if __name__ == "__main__":
@@ -74,7 +88,8 @@ if __name__ == "__main__":
     for filename in files[mpi_rank::mpi_size]:
         print "Rank %d, file %s." % (mpi_rank, filename)
         try:
-	    Searcher = guppi.FileSearch(filename)
+	    Searcher = guppi.FileSearch(filename,disp_ind=args.disp_ind,
+                max_dm=args.max_dm,sim=args.sim)
         except IOError as e:
 	    print "Rank %d, file can't be opened %s." % (mpi_rank, filename)
             continue

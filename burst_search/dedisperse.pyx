@@ -207,13 +207,21 @@ class DMTransform(object):
         cdef int depth = burst_depth_for_max_dm(cmax_dm, cdelta_t, cnfreq, cfreq0,
                                                 cdelta_f, disp_ind)
 
+
+        if 2**depth < nfreq:
+            raise ValueError("""Choose higher max_dm and/or lower disp_ind; 
+            Effective channels {0} must be greater than {1}""".format(2**depth, nfreq))
+        else:
+            print "using {0} effective channels with a memory footprint of {1} MB/s".format(2**depth,(4.0e-6)*(2**depth)/delta_t)
         cdef int cndm =  burst_get_num_dispersions(cnfreq, cfreq0, cdelta_f, depth)
 
         cdef np.ndarray[ndim=1, dtype=CM_DTYPE_t] chan_map
         chan_map = np.empty(2**depth, dtype=CM_DTYPE)
         burst_setup_channel_mapping(<CM_DTYPE_t *> chan_map.data, cnfreq, cfreq0,
                 cdelta_f, depth, disp_ind)
+
         self._chan_map = chan_map
+
         self._delta_t = delta_t
         self._nfreq = nfreq
         self._freq0 = freq0
@@ -269,7 +277,6 @@ class DMTransform(object):
                 disp_ind,
                 jon,
                 )
-
         dm_data = np.ascontiguousarray(out[:,:ntime_out])
         spec_data = np.ascontiguousarray(data1[:, :ntime_out])
 

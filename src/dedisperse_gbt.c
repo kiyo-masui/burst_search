@@ -96,7 +96,7 @@ float get_diagonal_dm_simple(float nu1, float nu2, float dt, int depth, float di
   int nchan=get_nchan_from_depth(depth);
   //printf("nchan is %d from %d\n",nchan,depth);
   //printf("freqs are %12.4f %12.4f\n",nu1,nu2);
-  float dm_max=dt/DM0/( (d2-d1)/nchan);
+  float dm_max= ((dt*nchan)/DM0)/(d2-d1);
   //printf("current dm is %12.4f\n",dm_max);
   return fabs(dm_max);
   
