@@ -75,16 +75,23 @@ CATALOG = True
 #Large DISP_IND decreases depth
 #DISP_IND is now set via a command line argument
 DISP_IND = 2.0
+DISP_MAX = None
+DISP_IND_SAMPLES = None
+dump_snrs = True
 
 class FileSearch(object):
 
-    def __init__(self, filename, disp_ind=DISP_IND, max_dm = MAX_DM, sim = SIMULATE):
-        DISP_IND = disp_ind
+    def __init__(self, filename, disp_ind=DISP_IND, disp_max = DISP_MAX, disp_ind_samples = DISP_IND_SAMPLES, 
+        max_dm = MAX_DM, sim = SIMULATE):
+        self._disp_ind = disp_ind
+        self._disp_max = disp_max
+        self._disp_ind_samples = disp_ind_samples
         SIMULATE = sim
         MAX_DM = max_dm
         #compute the invariant DM:
-        MAX_DM *= (math.pow(1.0/400.0,2.0) - math.pow(1.0/800.0,2.0))
-        MAX_DM /= (math.pow(1.0/400.0,DISP_IND) - math.pow(1.0/800.0,DISP_IND))
+        if self._disp_max == None:
+            MAX_DM *= (math.pow(1.0/700.0,2.0) - math.pow(1.0/900.0,2.0))
+            MAX_DM /= (math.pow(1.0/700.0,DISP_IND) - math.pow(1.0/900.0,DISP_IND))
 
         self._filename = filename
         hdulist = pyfits.open(filename, 'readonly')
@@ -93,14 +100,37 @@ class FileSearch(object):
         #print parameters
         self._parameters = parameters
 
-        self._Transformer = dedisperse.DMTransform(
-                parameters['delta_t'],
-                parameters['nfreq'],
-                parameters['freq0'],
-                parameters['delta_f'],
-                MAX_DM,
-                DISP_IND,
-                )
+        if self._disp_max == None:
+            self._Transformer = dedisperse.DMTransform(
+                    parameters['delta_t'],
+                    parameters['nfreq'],
+                    parameters['freq0'],
+                    parameters['delta_f'],
+                    MAX_DM,
+                    DISP_IND,
+                    )
+        else:
+            self._Transformer = {}
+            for ind in np.linspace(self._disp_ind,self._disp_max,self._disp_ind_samples):
+                this_dm = MAX_DM*(math.pow(1.0/700.0,2.0) - math.pow(1.0/900.0,2.0))
+                this_dm /= (math.pow(1.0/700.0,ind) - math.pow(1.0/900.0,ind))
+                self._Transformer[ind] = dedisperse.DMTransform(
+                    parameters['delta_t'],
+                    parameters['nfreq'],
+                    parameters['freq0'],
+                    parameters['delta_f'],
+                    this_dm,
+                    ind,
+                    )
+            if not 2.0 in np.linspace(self._disp_ind,self._disp_max,self._disp_ind_samples):
+                self._Transformer[2.0] = dedisperse.DMTransform(
+                    parameters['delta_t'],
+                    parameters['nfreq'],
+                    parameters['freq0'],
+                    parameters['delta_f'],
+                    MAX_DM,
+                    2.0,
+                    )
         
         self._df = parameters['delta_f']
         self._nfreq = parameters['nfreq']
@@ -152,7 +182,7 @@ class FileSearch(object):
 
     def set_search_method(self, method='basic', **kwargs):
         if method == 'basic':
-            self._search = lambda dm_data,spec_ind=None : search.basic(dm_data, THRESH_SNR, MIN_SEARCH_DM,spec_ind=spec_ind)
+            self._search = lambda dm_data,spec_ind=None,disp_ind=2.0 : search.basic(dm_data, THRESH_SNR, MIN_SEARCH_DM,spec_ind=spec_ind,disp_ind=disp_ind)
         else:
             msg = "Unrecognized search method."
             raise ValueError(msg)
@@ -257,50 +287,77 @@ class FileSearch(object):
         fmin = self._f0 + self._df*self._nfreq
         fmax = self._f0
 
-        if DO_SPEC_SEARCH:
-            print "----------------------"
-            spec_trigger = None
+        if self._disp_max == None:
+            if DO_SPEC_SEARCH:
+                print "----------------------"
+                spec_trigger = None
 
-            complete = 1
-            for alpha in np.linspace(SPEC_INDEX_MIN,SPEC_INDEX_MAX,SPEC_INDEX_SAMPLES):
-                #for i in xrange(0,3):
-                weights = array([math.pow(f/center_f, alpha) for f in np.linspace(fmax,fmin,self._nfreq)])
+                complete = 1
+                for alpha in np.linspace(SPEC_INDEX_MIN,SPEC_INDEX_MAX,SPEC_INDEX_SAMPLES):
+                    #for i in xrange(0,3):
+                    weights = array([math.pow(f/center_f, alpha) for f in np.linspace(fmax,fmin,self._nfreq)])
 
-                
-                f = lambda x: weights*x
-                this_dat = np.matrix(np.apply_along_axis(f, axis=0, arr=data),dtype=np.float32)
+                    
+                    f = lambda x: weights*x
+                    this_dat = np.matrix(np.apply_along_axis(f, axis=0, arr=data),dtype=np.float32)
 
-                #if self._dedispersed_out_group:
-                 #   g = self._dedispersed_out_group.create_group("%d-%d"
-                  #          % (start_record, end_record))
-                   # data.to_hdf5(g)
-                dm_data = self._Transformer(this_dat)
-                del this_dat
+                    #if self._dedispersed_out_group:
+                     #   g = self._dedispersed_out_group.create_group("%d-%d"
+                      #          % (start_record, end_record))
+                       # data.to_hdf5(g)
+                    dm_data = self._Transformer(this_dat)
+                    del this_dat
+                    dm_data.start_record = start_record
+                    these_triggers = self._search(dm_data,spec_ind=alpha,disp_ind=self._disp_ind)
+                    del dm_data
+                    print 'complete spectral indices: {0} of {1} ({2})'.format(complete,SPEC_INDEX_SAMPLES,alpha)
+                    if len(these_triggers)  > 0:
+                        print 'max snr: {0}'.format(these_triggers[0].snr)
+                        if spec_trigger == None or these_triggers[0].snr > spec_trigger.snr:
+                            spec_trigger = these_triggers[0]
+                    del these_triggers
+                    complete += 1
+
+                #spec_triggers = [t[0] for t in spec_triggers if len(t) > 0]
+                #spec_triggers = sorted(spec_triggers, key= lambda x: -x.snr)
+                #if len(spec_triggers) > 0:
+                    #spec_triggers = [spec_triggers[0],]
+                    #self._action(spec_triggers, dm_data)
+                if spec_trigger != None:
+                    triggers = (spec_trigger,)
+                else: triggers = []
+                    #self._action((spec_trigger,))
+            else:
+                dm_data = self._Transformer(data,disp_ind=self._disp_ind)
                 dm_data.start_record = start_record
-                these_triggers = self._search(dm_data,spec_ind=alpha)
-                del dm_data
-                print 'complete indices: {0} of {1} ({2})'.format(complete,SPEC_INDEX_SAMPLES,alpha)
-                if len(these_triggers)  > 0:
-                    print 'max snr: {0}'.format(these_triggers[0].snr)
-                    if spec_trigger == None or these_triggers[0].snr > spec_trigger.snr:
-                        spec_trigger = these_triggers[0]
-                del these_triggers
+
+                triggers = self._search(dm_data)
+
+        #Do dispersion index search
+        else:
+            disp_trigger = None
+            complete = 1
+            snrs = []
+            for ind in sorted(self._Transformer.keys()):
+                dm_data = self._Transformer[ind](data)
+                dm_data.start_record = start_record
+                these_triggers = self._search(dm_data,disp_ind=ind)
+                if len(these_triggers) > 0:
+                    print "this snr: {0}".format(these_triggers[0].snr)
+                    snrs.append([ind,these_triggers[0].snr])
+                    if disp_trigger == None or these_triggers[0].snr > disp_trigger.snr:
+                        disp_trigger = these_triggers[0]
+                    del these_triggers
+                print 'complete dispersion indices: {0} of {1} ({2})'.format(complete,self._disp_ind_samples,ind)
                 complete += 1
 
-            #spec_triggers = [t[0] for t in spec_triggers if len(t) > 0]
-            #spec_triggers = sorted(spec_triggers, key= lambda x: -x.snr)
-            #if len(spec_triggers) > 0:
-                #spec_triggers = [spec_triggers[0],]
-                #self._action(spec_triggers, dm_data)
-            if spec_trigger != None:
-                triggers = (spec_trigger,)
-            else: triggers = []
-                #self._action((spec_trigger,))
-        else:
-            dm_data = self._Transformer(data)
-            dm_data.start_record = start_record
-
-            triggers = self._search(dm_data)
+                if disp_trigger != None:
+                    triggers = (disp_trigger,)
+                else: triggers = []
+                
+            if dump_snrs:
+                print snrs
+            del snrs
         
         self._action(triggers)
         if CATALOG:

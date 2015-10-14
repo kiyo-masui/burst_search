@@ -13,7 +13,7 @@ def disp_delay(f,dm):
 
 class Trigger(object):
 
-    def __init__(self, data, centre, snr=0., duration=1 ,spec_ind=None):
+    def __init__(self, data, centre, snr=0., duration=1 ,spec_ind=None, disp_ind = 2.0):
 
         self._data = data
         self._dm_ind = centre[0]
@@ -21,6 +21,11 @@ class Trigger(object):
         self._snr = snr
         self._duration = duration
         self._spec_ind = spec_ind
+        self._disp_ind = disp_ind
+
+    @property 
+    def disp_ind(self):
+        return self._disp_ind
 
     @property 
     def snr(self):
@@ -206,7 +211,7 @@ class Trigger(object):
         plt.ylabel("Frequency (MHz)")
         plt.colorbar()
 
-def basic(data, snr_threshold=5., min_dm=50.,spec_ind=None):
+def basic(data, snr_threshold=5., min_dm=50.,spec_ind=None,disp_ind=2.0):
     """Simple event search of DM data.
 
     Returns
@@ -227,5 +232,5 @@ def basic(data, snr_threshold=5., min_dm=50.,spec_ind=None):
         snr, sample, duration = _search.sievers_find_peak(data, min_dm_ind)
 
         if snr > snr_threshold:
-            triggers.append(Trigger(data, sample, snr,spec_ind=spec_ind,duration=duration))
+            triggers.append(Trigger(data, sample, snr,spec_ind=spec_ind,duration=duration,disp_ind=disp_ind))
     return triggers

@@ -1,4 +1,5 @@
 import h5py
+import time
 import os
 from os import listdir, makedirs
 from os.path import isfile, join, exists
@@ -8,7 +9,7 @@ ind_t = np.int16
 float_t = np.float32
 
 dset_name = 'burst_metadata'
-md_t = np.dtype([('file_name','S32'),('snr',float_t),('t_ind', ind_t),('dt', float_t),('dm_ind', ind_t),
+md_t = np.dtype([('file_name','S32'),('run_time',float),('snr',float_t),('t_ind', ind_t),('dt', float_t),('dm_ind', ind_t),
 	('ddm', float_t), ('spec_ind', float_t), ('t_width', ind_t), ('fluence', float_t), ('disp_ind', float_t),
 	('loc',float_t,(2,)),
 	])
@@ -35,10 +36,11 @@ def ensure_structure(hfile):
 
 
 class Catalog(object):
-	def __init__(self,parent_name,path='burst_catalog.h5py'):
+	def __init__(self,parent_name,path='burst_catalog.h5py',run_time=time.time()):
 		ensure_dir(path)
 		self._outpath = path
 		self._parent_name = parent_name
+		self._run_time = run_time
 		if isfile(path):
 			self._of = h5py.File(path,'r+')
 		else:
@@ -68,7 +70,7 @@ class Catalog(object):
 		if ind > dset.len() - 1:
 			dset.resize(dset.len() + resize_increment,axis=0)
 		self._of.flush()
-		dset[ind] = np.array((self._parent_name,snr,t_ind,dt,dm_ind,ddm,spec_ind,t_width,fluence,disp_ind,loc),
+		dset[ind] = np.array((self._parent_name,self._run_time,snr,t_ind,dt,dm_ind,ddm,spec_ind,t_width,fluence,disp_ind,loc),
 			dtype=md_t)
 		dset.attrs['ind'] = ind + 1
 
