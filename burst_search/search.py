@@ -44,10 +44,10 @@ class Trigger(object):
         return self._spec_ind
 
     def __str__(self):
-        return str((self._snr, self._spec_ind, self.centre))
+        return str((self._snr, self._spec_ind, self._disp_ind, self.centre))
 
     def __repr__(self):
-        return str((self._snr, self._spec_ind, self.centre))
+        return str((self._snr, self._spec_ind, self._disp_ind, self.centre))
 
     def plot_dm(self):
         di, ti = self.centre
