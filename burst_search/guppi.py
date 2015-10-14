@@ -42,7 +42,7 @@ MAX_DM = 2000
 #OVERLAP = 15.
 OVERLAP = 8.
 
-DO_SPEC_SEARCH = True
+DO_SPEC_SEARCH = False
 SPEC_INDEX_MIN = -10
 SPEC_INDEX_MAX = 10
 SPEC_INDEX_SAMPLES = 11
@@ -74,9 +74,9 @@ CATALOG = True
 #Be sure to alter 'MAX_DM' accordingly.
 #Large DISP_IND decreases depth
 #DISP_IND is now set via a command line argument
-DISP_IND = 2.0
-DISP_MAX = None
-DISP_IND_SAMPLES = None
+DISP_IND = 0.0
+DISP_MAX = 3.0
+DISP_IND_SAMPLES = 9
 dump_snrs = True
 
 class FileSearch(object):
@@ -244,6 +244,9 @@ class FileSearch(object):
                     out_filename += path.splitext(path.basename(self._filename))[0]
                     if not t.spec_ind is None:
                                     out_filename += "+a=%02.f" % t.spec_ind
+                    #out_filename += "+%06.2fs.png" % t_offset
+                    if not t.disp_ind is None:
+                                    out_filename += "+n=%02.f" % t.disp_ind
                     out_filename += "+%06.2fs.png" % t_offset
                     plt.savefig(out_filename, bbox_inches='tight')
                     plt.close(f)

@@ -7,9 +7,9 @@ import matplotlib.cm as cm
 
 import _search
 
-def disp_delay(f,dm):
+def disp_delay(f,dm,disp_ind):
     """Compute the dispersion delay (s) as a function of frequency (MHz) and DM"""
-    return 4.148808*dm*(10.0**3)/(f**2)
+    return 4.148808*dm*(10.0**3)/(f**disp_ind)
 
 class Trigger(object):
 
@@ -73,7 +73,10 @@ class Trigger(object):
         spec_ind = self._spec_ind
         spec_ind_value = ",spec_ind ="
         spec_ind_value += str(spec_ind)
-        text = dm_value + snr_value + duration_value + spec_ind_value
+        disp_ind = self.disp_ind
+        disp_ind_value = ",disp_ind ="
+        disp_ind_value += str(disp_ind)
+        text = dm_value + snr_value + duration_value + spec_ind_value + disp_ind_value
 
         dm_data_cut = self.data.dm_data[start_di:end_di,start_ti:end_ti].copy()
         dm_lower_std_index = 1
@@ -126,10 +129,12 @@ class Trigger(object):
 
         spectrum = np.zeros(nfreq, dtype=float)
 
+        disp_ind = self._disp_ind
+
         for ii in range(nfreq):
             f = freq[ii]
-            delay_ind = int(round((disp_delay(freq[ii], the_dm)
-                                   - disp_delay(max_freq, the_dm)) / delta_t))
+            delay_ind = int(round((disp_delay(freq[ii], the_dm, disp_ind)
+                                   - disp_delay(max_freq, the_dm, disp_ind)) / delta_t))
             # Jon's centre index seems to be the last bin in the window.
             start = ti + delay_ind - duration + 1
             stop = start + duration
@@ -164,10 +169,12 @@ class Trigger(object):
 
         the_dm = self.data.dm[di]
 
+        disp_ind = self._disp_ind
+
         spec_data_delay = np.zeros((nfreq, tside), dtype=float)
         for ii in range(nfreq):
-            delay_ind = int(round((disp_delay(freq[ii], the_dm)
-                                   - disp_delay(max_freq, the_dm)) / delta_t))
+            delay_ind = int(round((disp_delay(freq[ii], the_dm, disp_ind)
+                                   - disp_delay(max_freq, the_dm, disp_ind)) / delta_t))
             start_i =  ti - tside // 2 + delay_ind
             stop_i = start_i + tside
             start_o = 0
