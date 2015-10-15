@@ -10,13 +10,15 @@ ind_t = np.int16
 float_t = np.float32
 
 dset_name = 'burst_metadata'
-md_t = np.dtype([('file_name','S32'),('run_time',float),('mjd_start',float),('unix_start',float),('snr',float_t),('t_ind', ind_t),('dt', float_t),('dm_ind', ind_t),
+md_t = np.dtype([('file_name','S32'),('run_time',float),('mjd_start',float),('unix_start',float),('track_mode','S8'),('snr',float_t),('t_ind', ind_t),('dt', float_t),('dm_ind', ind_t),
 	('ddm', float_t), ('spec_ind', float_t), ('t_width', ind_t), ('fluence', float_t), ('disp_ind', float_t),
-	('loc',float_t,(2,)),
+	('loc_0',float_t,(2,)),('loc_1',float_t,(2,)),
 	])
 
 resize_increment = 128
 
+def convert_deg(hms):
+	return (360.0/24.0)*float(hms.split(':')[0]) + (360.0/24.0/60.0)*float(hms.split(':')[1]) + (360.0/24.0/60.0/60.0)*float(hms.split(':')[2])
 
 def ensure_dir(path):
 	if path == '':
@@ -82,7 +84,7 @@ class Catalog(object):
 		if ind > dset.len() - 1:
 			dset.resize(dset.len() + resize_increment,axis=0)
 		self._of.flush()
-		dset[ind] = np.array((self._parent_name,self._run_time,self._params['mjd_start'],self._params['unix_start'],snr,t_ind,dt,dm_ind,ddm,spec_ind,t_width,fluence,disp_ind,loc),
+		dset[ind] = np.array((self._parent_name,self._run_time,self._params['mjd_start'],self._params['unix_start'],self._params['track_mode'],snr,t_ind,dt,dm_ind,ddm,spec_ind,t_width,fluence,disp_ind,self._params['loc_0'],self._params['loc_1']),
 			dtype=md_t)
 		dset.attrs['ind'] = ind + 1
 

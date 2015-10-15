@@ -22,7 +22,7 @@ from . import dedisperse
 from . import search
 from . import simulate
 from simulate import *
-from catalog import Catalog
+from catalog import Catalog, convert_deg
 
 
 # XXX Eventually a parameter, seconds.
@@ -509,6 +509,10 @@ def parameters_from_header(hdulist):
     parameters['delta_f'] = dheader['CHAN_BW']
     parameters['mjd_start'] = mheader['STT_IMJD'] + (mheader['STT_SMJD'] + mheader['STT_OFFS'])/86400.0
     parameters['unix_start'] = (parameters['mjd_start'] - 40587.0)*86400.0
+
+    parameters['track_mode'] = mheader['TRK_MODE']
+    parameters['loc_0'] = (convert_deg(mheader['STT_CRD1']),convert_deg(mheader['STT_CRD2']))
+    parameters['loc_1'] = (convert_deg(mheader['STP_CRD1']),convert_deg(mheader['STP_CRD2']))
 
     record0 = hdulist[1].data[0]
     #print record0
