@@ -74,9 +74,9 @@ CATALOG = True
 #Be sure to alter 'MAX_DM' accordingly.
 #Large DISP_IND decreases depth
 #DISP_IND is now set via a command line argument
-DISP_IND = 2.0
-DISP_MAX = None
-DISP_IND_SAMPLES = None
+DISP_IND = 1.0
+DISP_MAX = 3.0
+DISP_IND_SAMPLES = 10
 dump_snrs = True
 
 class FileSearch(object):

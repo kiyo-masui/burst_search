@@ -54,7 +54,7 @@ parser.add_argument(
 parser.add_argument(
         '--disp_ind',
         type=float,
-        default=2.0
+        default=None
         )
 parser.add_argument(
         '--disp_search',
