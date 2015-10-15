@@ -141,17 +141,32 @@ def remove_noisy_freq(data, sigma_threshold):
         var[ii] = np.var(data[ii,:])
         skew[ii] = np.mean((data[ii,:] - np.mean(data[ii,:])**3))
     # Find the bad channels.
-    
-    bad_chans = var > sigma_threshold * np.std(var) + np.mean(var)
-    bad_chans_skew = skew > sigma_threshold * np.std(skew) + np.mean(skew)
-    # Iterate twice, lest bad channels contaminate the mean.
-    var[bad_chans] = np.mean(var)
-    skew[bad_chans_skew] = np.mean(skew)
-    bad_chans_2 = var > sigma_threshold * np.std(var) + np.mean(var)
-    bad_chans_2_skew = skew > sigma_threshold * np.std(skew) + np.mean(skew)
-    bad_chans = np.logical_or(np.logical_or(bad_chans, bad_chans_2), np.logical_or(bad_chans_skew, bad_chans_2_skew))
-
+    bad_chans = False
+    for ii in range(3):
+        bad_chans_var = abs(var - np.mean(var)) > sigma_threshold * np.std(var)
+        bad_chans_skew = abs(skew - np.mean(skew)) > sigma_threshold * np.std(skew)
+        bad_chans = np.logical_or(bad_chans, bad_chans_var)
+        bad_chans = np.logical_or(bad_chans, bad_chans_skew)
+        var[bad_chans] = np.mean(var)
+        skew[bad_chans] = np.mean(skew)
     data[bad_chans,:] = 0
+
+def remove_bad_times(data, sigma_threshold):
+
+    nfreq = data.shape[0]
+    ntime = data.shape[1]
+
+    # Calculate time means and frequency means with no copies.
+    mean = np.empty(nfreq, dtype=np.float64)
+    freq_sum = 0.
+    for ii in range(nfreq):
+        mean[ii] = np.mean(data[ii])
+        freq_sum += data[ii]
+
+    bad_times = (abs(freq_sum - np.mean(freq_sum))
+                 > sigma_threshold * np.std(freq_sum))
+    data[:,bad_times] = mean[:,None]
+
 
 
 def remove_continuum(data):
