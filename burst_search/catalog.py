@@ -3,13 +3,14 @@ import time
 import os
 from os import listdir, makedirs
 from os.path import isfile, join, exists
+import pyfits
 import numpy as np
 
 ind_t = np.int16
 float_t = np.float32
 
 dset_name = 'burst_metadata'
-md_t = np.dtype([('file_name','S32'),('run_time',float),('snr',float_t),('t_ind', ind_t),('dt', float_t),('dm_ind', ind_t),
+md_t = np.dtype([('file_name','S32'),('run_time',float),('mjd_start',float),('unix_start',float),('snr',float_t),('t_ind', ind_t),('dt', float_t),('dm_ind', ind_t),
 	('ddm', float_t), ('spec_ind', float_t), ('t_width', ind_t), ('fluence', float_t), ('disp_ind', float_t),
 	('loc',float_t,(2,)),
 	])
@@ -36,22 +37,33 @@ def ensure_structure(hfile):
 
 
 class Catalog(object):
-	def __init__(self,parent_name,path='burst_catalog.h5py',run_time=time.time()):
+	def __init__(self,parent_name,parameters,path='burst_catalog.hdf5',run_time=time.time()):
 		ensure_dir(path)
 		self._outpath = path
 		self._parent_name = parent_name
 		self._run_time = run_time
+		self._params = parameters
 		if isfile(path):
 			self._of = h5py.File(path,'r+')
 		else:
 			self._of = h5py.File(path,'w')
 		self._event_data = ensure_structure(self._of)
 
+	@property 
+	def mjd_start():
+		return self._mjd_start
+
+	# def get_metadata(f):
+	# 	obs_info = f[0].header
+	# 	self._mdj_start = obs_info['STT_IMJD'] + (obs_info['STT_SMJD'] + obs_info['STT_OFFS'])/86400
+	# 	self._unix_start = 
+	# 	self._nsamples_rec = f[1].header['']
+
 	def simple_write(self, triggers, disp_ind = 2.0):
 		for trig in triggers:
 			dt = trig.data.delta_t
 			ddm = trig.data.delta_dm
-			t_ind = trig.centre[1] + trig.data.start_record
+			t_ind = trig.centre[1] + trig.data.start_record*self._params['ntime_record']
 			dm_ind = trig.centre[0]
 			snr = trig.snr
 			spec_ind = trig.spec_ind
@@ -70,7 +82,7 @@ class Catalog(object):
 		if ind > dset.len() - 1:
 			dset.resize(dset.len() + resize_increment,axis=0)
 		self._of.flush()
-		dset[ind] = np.array((self._parent_name,self._run_time,snr,t_ind,dt,dm_ind,ddm,spec_ind,t_width,fluence,disp_ind,loc),
+		dset[ind] = np.array((self._parent_name,self._run_time,self._params['mjd_start'],self._params['unix_start'],snr,t_ind,dt,dm_ind,ddm,spec_ind,t_width,fluence,disp_ind,loc),
 			dtype=md_t)
 		dset.attrs['ind'] = ind + 1
 

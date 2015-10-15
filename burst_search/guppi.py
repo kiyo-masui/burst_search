@@ -74,9 +74,9 @@ CATALOG = True
 #Be sure to alter 'MAX_DM' accordingly.
 #Large DISP_IND decreases depth
 #DISP_IND is now set via a command line argument
-DISP_IND = 0.0
-DISP_MAX = 3.0
-DISP_IND_SAMPLES = 9
+DISP_IND = 2.0
+DISP_MAX = None
+DISP_IND_SAMPLES = None
 dump_snrs = True
 
 class FileSearch(object):
@@ -88,10 +88,7 @@ class FileSearch(object):
         self._disp_ind_samples = disp_ind_samples
         SIMULATE = sim
         MAX_DM = max_dm
-        #compute the invariant DM:
-        if self._disp_max == None:
-            MAX_DM *= (math.pow(1.0/700.0,2.0) - math.pow(1.0/900.0,2.0))
-            MAX_DM /= (math.pow(1.0/700.0,DISP_IND) - math.pow(1.0/900.0,DISP_IND))
+        
 
         self._filename = filename
         hdulist = pyfits.open(filename, 'readonly')
@@ -101,13 +98,17 @@ class FileSearch(object):
         self._parameters = parameters
 
         if self._disp_max == None:
+            #compute the invariant DM:
+            MAX_DM *= (math.pow(1.0/700.0,2.0) - math.pow(1.0/900.0,2.0))
+            MAX_DM /= (math.pow(1.0/700.0,self._disp_ind) - math.pow(1.0/900.0,self._disp_ind))
+
             self._Transformer = dedisperse.DMTransform(
                     parameters['delta_t'],
                     parameters['nfreq'],
                     parameters['freq0'],
                     parameters['delta_f'],
                     MAX_DM,
-                    DISP_IND,
+                    self._disp_ind,
                     )
         else:
             self._Transformer = {}
@@ -150,7 +151,7 @@ class FileSearch(object):
 
         if CATALOG:
             reduced_name = '.'.join(self._filename.split(os.sep)[-1].split('.')[:-1])
-            self._catalog = Catalog(parent_name=reduced_name)
+            self._catalog = Catalog(parent_name=reduced_name, parameters=parameters)
 
 
         self._cal_spec = 1.
@@ -331,10 +332,10 @@ class FileSearch(object):
                 else: triggers = []
                     #self._action((spec_trigger,))
             else:
-                dm_data = self._Transformer(data,disp_ind=self._disp_ind)
+                dm_data = self._Transformer(data)
                 dm_data.start_record = start_record
 
-                triggers = self._search(dm_data)
+                triggers = self._search(dm_data,disp_ind=self._disp_ind)
 
         #Do dispersion index search
         else:
@@ -506,6 +507,8 @@ def parameters_from_header(hdulist):
     parameters['freq0'] = mheader['OBSFREQ'] - mheader['OBSBW'] / 2.
 
     parameters['delta_f'] = dheader['CHAN_BW']
+    parameters['mjd_start'] = mheader['STT_IMJD'] + (mheader['STT_SMJD'] + mheader['STT_OFFS'])/86400.0
+    parameters['unix_start'] = (parameters['mjd_start'] - 40587.0)*86400.0
 
     record0 = hdulist[1].data[0]
     #print record0
