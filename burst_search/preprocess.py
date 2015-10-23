@@ -1,7 +1,5 @@
 """Preprocessing data for fast radio burst searches.
-
 This module contains, bandpass calibration, RFI flagging, etc.
-
 """
 
 import numpy as np
@@ -12,13 +10,11 @@ from _preprocess import remove_continuum_v2
 
 def remove_periodic(data, period):
     """Remove periodic time compenent from data.
-
     Parameters
     ----------
     data : array with shape ``(nfreq, ntime)``.
     period : integer
         Must be greater than or equal to *ntime*.
-
     Returns
     -------
     profile : array with shape ``(nfreq, period)``.
@@ -50,10 +46,8 @@ def remove_periodic(data, period):
 
 def noisecal_bandpass(data, cal_spectrum, cal_period):
     """Remove noise-cal and use to bandpass calibrate.
-
     Do not use this function. The estimate of the cal amplitude is very noisy.
     Need an algorithm to find the square wave.
-
     Parameters
     ----------
     data : array with shape ``(nfreq, ntime)``
@@ -62,7 +56,6 @@ def noisecal_bandpass(data, cal_spectrum, cal_period):
         Calibrated spectrum of the noise cal.
     cal_period : int
         Noise cal switching period, Must be an integer number of samples.
-
     """
 
     cal_profile = remove_periodic(data, cal_period)
@@ -79,7 +72,6 @@ def noisecal_bandpass(data, cal_spectrum, cal_period):
 
 def sys_temperature_bandpass(data):
     """Bandpass calibrate based on system temperature.
-
     The lowest noise way to flatten the bandpass. Very good if T_sys is
     relatively constant accross the band.
     """
@@ -92,20 +84,18 @@ def sys_temperature_bandpass(data):
 
 def remove_outliers(data, sigma_threshold, block=None):
     """Flag outliers within frequency channels.
-
     Replace outliers with that frequency's mean.
-
     """
 
     nfreq0 = data.shape[0]
     ntime0 = data.shape[1]
 
     if block is None:
-	block = ntime0
+        block = ntime0
 
     if ntime0 % block:
-	raise ValueError("Time axis must be divisible by block."
-			 " (ntime, block) = (%d, %d)." % (ntime0, block))
+        raise ValueError("Time axis must be divisible by block."
+                         " (ntime, block) = (%d, %d)." % (ntime0, block))
 
     ntime = block
     nfreq = nfreq0 * (ntime0 // block)
@@ -126,9 +116,7 @@ def remove_outliers(data, sigma_threshold, block=None):
 
 def remove_noisy_freq(data, sigma_threshold):
     """Flag frequency channels with high variance.
-
     To be effective, data should be bandpass calibrated in some way.
-
     """
 
     nfreq = data.shape[0]
@@ -140,6 +128,7 @@ def remove_noisy_freq(data, sigma_threshold):
     for ii in range(nfreq):
         var[ii] = np.var(data[ii,:])
         skew[ii] = np.mean((data[ii,:] - np.mean(data[ii,:])**3))
+
     # Find the bad channels.
     bad_chans = False
     for ii in range(3):
@@ -150,6 +139,7 @@ def remove_noisy_freq(data, sigma_threshold):
         var[bad_chans] = np.mean(var)
         skew[bad_chans] = np.mean(skew)
     data[bad_chans,:] = 0
+
 
 def remove_bad_times(data, sigma_threshold):
 
@@ -168,12 +158,9 @@ def remove_bad_times(data, sigma_threshold):
     data[:,bad_times] = mean[:,None]
 
 
-
 def remove_continuum(data):
     """Calculates a contiuum template and removes it from the data.
-
     Also removes the time mean from each channel.
-
     """
 
     nfreq = data.shape[0]
@@ -198,9 +185,7 @@ def remove_continuum(data):
 
 def highpass_filter(data, width):
     """Highpass filter on *width* scales using blackman window.
-
     Finite impulse response filter *that discards invalid data* at the ends.
-
     """
 
     ntime = data.shape[-1]
@@ -229,5 +214,3 @@ def highpass_filter(data, width):
         out[ii] = d_lpf[-ntime_out:].real
 
     return out
-
-

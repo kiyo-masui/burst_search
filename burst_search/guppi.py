@@ -42,7 +42,7 @@ MAX_DM = 2000
 #OVERLAP = 15.
 OVERLAP = 8.
 
-DO_SPEC_SEARCH = False
+DO_SPEC_SEARCH = True
 SPEC_INDEX_MIN = -10
 SPEC_INDEX_MAX = 10
 SPEC_INDEX_SAMPLES = 11
@@ -74,10 +74,12 @@ CATALOG = True
 #Be sure to alter 'MAX_DM' accordingly.
 #Large DISP_IND decreases depth
 #DISP_IND is now set via a command line argument
-DISP_IND = 1.0
-DISP_MAX = 3.0
-DISP_IND_SAMPLES = 10
+DISP_IND = 2.0
+DISP_MAX = None
+DISP_IND_SAMPLES = None
 dump_snrs = True
+
+HPF_WIDTH = 0.2    # s
 
 class FileSearch(object):
 
@@ -280,10 +282,13 @@ class FileSearch(object):
             #do simulation
             data += self._sim_source.generate_events(block_ind)[:,0:data.shape[1]]
 
-        preprocess.remove_outliers(data, 5, 512)
-        data = preprocess.highpass_filter(data, 0.200 / parameters['delta_t'])
+        preprocess.remove_outliers(data, 5, 128)
+        data = preprocess.highpass_filter(data, HPF_WIDTH / parameters['delta_t'])
 
         preprocess.remove_outliers(data, 5)
+        preprocess.remove_noisy_freq(data, 3)
+        preprocess.remove_bad_times(data, 2)
+        preprocess.remove_continuum_v2(data)
         preprocess.remove_noisy_freq(data, 3)
 
         #from here we weight channels by spectral index
