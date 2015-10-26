@@ -125,19 +125,24 @@ def remove_noisy_freq(data, sigma_threshold):
     # Calculate variances without making full data copy (as numpy does).
     var = np.empty(nfreq, dtype=np.float64)
     skew = np.empty(nfreq, dtype=np.float64)
+    kurt = np.empty(nfreq, dtype=np.float64)
     for ii in range(nfreq):
         var[ii] = np.var(data[ii,:])
         skew[ii] = np.mean((data[ii,:] - np.mean(data[ii,:])**3))
+        kurt[ii] = np.mean((data[ii,:] - np.mean(data[ii,:])**4))
 
     # Find the bad channels.
     bad_chans = False
     for ii in range(3):
         bad_chans_var = abs(var - np.mean(var)) > sigma_threshold * np.std(var)
         bad_chans_skew = abs(skew - np.mean(skew)) > sigma_threshold * np.std(skew)
+        bad_chans_kurt = abs(kurt - np.mean(kurt)) > sigma_threshold * np.std(kurt)
         bad_chans = np.logical_or(bad_chans, bad_chans_var)
         bad_chans = np.logical_or(bad_chans, bad_chans_skew)
+        bad_chans = np.logical_or(bad_chans, bad_chans_kurt)
         var[bad_chans] = np.mean(var)
         skew[bad_chans] = np.mean(skew)
+        kurt[bad_chans] = np.mean(kurt)
     data[bad_chans,:] = 0
 
 
