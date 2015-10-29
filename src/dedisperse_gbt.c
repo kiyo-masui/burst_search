@@ -200,6 +200,7 @@ Data *map_chans(Data *dat, int depth)
       float delt=fabs(1.0/(dat->chans[j]*dat->chans[j])-1.0/(dat->raw_chans[i]*dat->raw_chans[i]));
       if (delt<min_err) {
         min_err=delt;
+
         best=j;
       }
 
@@ -215,7 +216,14 @@ void remap_data( Data *dat)
 {        					
   //double t0=omp_get_wtime();
   assert(dat->chan_map);
+#if 0
   memset(dat->data[0],0,sizeof(dat->data[0][0])*dat->nchan*dat->ndata);  
+#else
+#pragma omp parallel for
+  for (int i=0;i<dat->nchan;i++)
+    memset(dat->data[i],0,sizeof(dat->data[0][0])*dat->ndata);
+#endif
+  #pragma omp parallel for
   for (int i=0;i<dat->raw_nchan;i++) {
     int ii=dat->chan_map[i];
     for (int j=0;j<dat->ndata;j++)
@@ -1627,6 +1635,7 @@ size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
 {
 
   double t1=omp_get_wtime();
+  //printf("starting dedispersion.\n");
 
   //clean_rows_2pass(indata1,nfreq,ntime1);
   //if (ntime2>0)
@@ -1635,7 +1644,7 @@ size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
 
   //t1=omp_get_wtime();
   Data *dat=put_data_into_burst_struct(indata1,indata2,ntime1,ntime2,nfreq,chan_map,depth);
-  
+  //printf("data are in struct.\n");
 
   //setup_data does a bunch of cleaning, like removal of noise-cal, glitch finding, 
   //calibration off the noise cal, channel weighting...  If that has been done, just
@@ -1643,15 +1652,19 @@ size_t my_burst_dm_transform(float *indata1, float *indata2, float *outdata,
 
   //setup_data(dat);
   remap_data(dat);
+  //printf("data are remapped.\n");
 
   if(jon == 1){
+    //printf("calling jon.\n");
     dedisperse_gbt_jon(dat,outdata);
   }
   else{
+    //printf("calling something else.\n");
     dedisperse_gbt(dat,outdata);
   }
   double t2=omp_get_wtime();
   //Peak best=find_peak(dat);
+  //printf("dedispersion time was %12.4f seconds.\n",(t2-t1));
 
 #if 0
   Peak best;

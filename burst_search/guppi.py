@@ -29,15 +29,18 @@ from simulate import *
 #Additions:
 MIN_SEARCH_DM = 5
 
-TIME_BLOCK = 30.0
+#TIME_BLOCK = 30.0
+TIME_BLOCK = 5.0
 
-MAX_DM = 2000
+MAX_DM = 200
+#MAX_DM = 2000
 # For DM=4000, 13s delay across the band, so overlap searches by ~15s.
 
 # Overlap needs to account for the total delay across the band at max DM as
 # well as any data invalidated by FIR filtering of the data.
 #OVERLAP = 15.
-OVERLAP = 8.
+OVERLAP = 1.
+#OVERLAP = 8.
 
 DO_SPEC_SEARCH = True
 USE_JON_DD = False
