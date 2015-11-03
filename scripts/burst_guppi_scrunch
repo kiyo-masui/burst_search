@@ -1,0 +1,191 @@
+#! /usr/bin/python
+"""Search a GBT FITS file for fast radio bursts.
+
+"""
+
+import time
+import argparse
+from os import path
+import sys
+import logging
+import multiprocessing
+import glob
+
+import numpy as np
+import h5py
+import pyfits
+
+from burst_search.guppi import FileSearch, parameters_from_header
+from burst_search.datasource import ScrunchFileSource
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+logger.addHandler(logging.StreamHandler())
+
+try:
+    from mpi4py import MPI
+    mpi_size = MPI.COMM_WORLD.Get_size()
+    mpi_rank = MPI.COMM_WORLD.Get_rank()
+    logger.info("MPI available. Process size is %d. My rank is %d."
+                % (mpi_size, mpi_rank))
+except ImportError:
+    mpi_size = 1
+    mpi_rank = 0
+    logger.info("MPI not available.")
+
+
+MAX_DM = 2000.
+DM0 = 4148.8
+
+
+# Command line arguments.
+parser = argparse.ArgumentParser(description='Search a GBT FITS file for fast radio bursts.')
+parser.add_argument(
+        "files",
+        metavar="GUPPI_files",
+        type=str,
+        nargs='+',
+        help="GUPPI PSRFITS files to search.",
+        )
+parser.add_argument(
+        '-c', '--cal-spec-file',
+        help=('.npy file containing the noise-cal spectrum for bandpass'
+              ' calibration.'),
+        )
+parser.add_argument(
+        '-p', '--show_plot',
+        type=bool,
+        default=False
+        )
+parser.add_argument(
+        '--disp_ind',
+        type=float,
+        default=None
+        )
+parser.add_argument(
+        '--disp_search',
+        type=float,
+        default=None,
+        nargs=3
+        )
+parser.add_argument(
+        '--max_dm',
+        type=float,
+        default=MAX_DM
+        )
+parser.add_argument(
+        '--sim',
+        action='store_true',
+        default=False,
+        )
+
+
+def init_search(filename, datasource, max_dm, scrunch, args, **kwargs):
+
+    # To write dedispered data to disk.
+    #out_filename = path.splitext(path.basename(filename))[0] + ".h5"
+    #out_file = h5py.File(out_filename)
+    #Searcher.set_dedispersed_h5(out_file)
+    
+
+    print "Rank %d, file %s." % (mpi_rank, filename)
+    try:
+        if args.disp_search == None and not args.disp_ind == None:
+            Searcher = FileSearch(filename,datasource=datasource,disp_ind=args.disp_ind,
+            max_dm=max_dm,sim=args.sim)
+        elif args.disp_search != None:
+            print args.disp_search
+            disp_min, disp_max, disp_num = args.disp_search
+            Searcher = FileSearch(filename,datasource=datasource,disp_ind=disp_min,
+                disp_max = disp_max, disp_ind_samples=int(disp_num),
+                max_dm=max_dm,sim=args.sim)
+        else:
+            Searcher = FileSearch(filename,datasource=datasource,max_dm=max_dm,sim=args.sim)
+
+    except IOError as e:
+        print "Rank %d, file can't be opened %s." % (mpi_rank, filename)
+    #removed the continue here
+    #this exception is a bit of a nightmare since we don't track the individual threads
+    if not cal_spec is None:
+        Searcher.set_cal_spectrum(cal_spec)
+
+    act_str = 'save_plot_dm,print'
+    if args.show_plot:
+        act_str = act_str + ', show_plot_dm'
+    print 'doing actions \n' + act_str
+    Searcher.set_trigger_action(act_str)
+    #Searcher.set_trigger_action('print')
+
+    # To write dedispered data to disk.
+    #out_filename = path.splitext(path.basename(filename))[0] + ".h5"
+    #out_file = h5py.File(out_filename)
+    #Searcher.set_dedispersed_h5(out_file)
+
+    Searcher.search_all_records()
+    sys.exit()
+
+def get_nscrunch(filename,max_dm):
+    hdulist = pyfits.open(filename, 'readonly')
+    params = parameters_from_header(hdulist)
+    hdulist.close()
+    nscrunch = 1
+    dt = params['delta_t']
+    df = params['delta_f']
+    f0 = params['freq0']
+    nfreq = params['nfreq']
+    test_dm = 2*diagonal_dm(dt,nfreq,f0 + nfreq*df,f0)
+    base_dm = test_dm
+    while test_dm < max_dm:
+        nscrunch += 1
+        test_dm *= 2
+    return nscrunch, test_dm, base_dm
+
+def diagonal_dm(dt,nchan,nu1,nu2):
+    d1 = (1/min(nu1,nu2))**2
+    d2 = (1/max(nu1,nu2))**2
+    return dt*nchan/DM0/(d1 - d2)
+
+if __name__ == "__main__":
+    args = parser.parse_args()
+    total_max_dm = args.max_dm
+
+    if args.cal_spec_file:
+        cal_spec = np.load(args.cal_spec_file)
+    else:
+        cal_spec = None
+    
+    files = args.files
+    if len(files) == 1:
+        files = glob.glob(files[0])
+
+    if mpi_size > 1:
+        files = sorted(files)
+    else:
+        files = files
+
+    for filename in files[mpi_rank::mpi_size]:
+
+        nscrunch, real_max_dm, base_2diag_dm = get_nscrunch(filename,total_max_dm)
+        print "using {0} scrunches to achieve a max dm of {1}".format(nscrunch,real_max_dm)
+
+        datasource = ScrunchFileSource(filename, nscrunch)
+
+        last_max_dm = base_2diag_dm
+        scrunch = 1
+        ps = []
+        while scrunch <= nscrunch:
+            p = multiprocessing.Process(target=init_search,
+                    args=(filename,datasource,last_max_dm,scrunch,args))
+            p.start()
+            ps.append(p)
+            last_max_dm = 2*last_max_dm
+            #kwargs['min_search_dm'] = last_max_dm
+            scrunch *= 2
+
+        # Keep the process from exiting by waiting for the last one.  This may be
+        # very hard to kill.
+        for p in ps:
+            p.join()
+            p.terminate()
+
+        print "finished file " + filename

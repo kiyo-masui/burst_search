@@ -63,7 +63,7 @@ ext_preprocess = Extension(
 EXTENSIONS = [ext_dedisperse, ext_search, ext_preprocess]
 
 
-SCRIPTS = ["scripts/burst_guppi", "scripts/burst_watch_guppi", "scripts/burst_bench"]
+SCRIPTS = ["scripts/burst_guppi","scripts/burst_guppi_scrunch", "scripts/burst_watch_guppi", "scripts/burst_bench"]
 
 
 setup(

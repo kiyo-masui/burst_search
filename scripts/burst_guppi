@@ -7,7 +7,7 @@ import time
 import argparse
 from os import path
 import logging
-import glob
+
 
 import numpy as np
 import h5py
