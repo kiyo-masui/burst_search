@@ -8,7 +8,7 @@ import argparse
 from os import path
 import sys
 import logging
-import multiprocessing
+from multiprocessing import Pool, Process, Lock
 import glob
 
 import numpy as np
@@ -80,14 +80,14 @@ parser.add_argument(
         )
 
 
-def init_search(filename, datasource, max_dm, scrunch, args, **kwargs):
+def init_search(filename, datasource, max_dm, scrunch, args, lock,**kwargs):
 
     # To write dedispered data to disk.
     #out_filename = path.splitext(path.basename(filename))[0] + ".h5"
     #out_file = h5py.File(out_filename)
     #Searcher.set_dedispersed_h5(out_file)
     
-
+    lock.acquire()
     print "Rank %d, file %s." % (mpi_rank, filename)
     try:
         if args.disp_search == None and not args.disp_ind == None:
@@ -122,7 +122,8 @@ def init_search(filename, datasource, max_dm, scrunch, args, **kwargs):
     #Searcher.set_dedispersed_h5(out_file)
 
     Searcher.search_all_records()
-    sys.exit()
+    del Searcher
+    lock.release()
 
 def get_nscrunch(filename,max_dm):
     hdulist = pyfits.open(filename, 'readonly')
@@ -163,29 +164,36 @@ if __name__ == "__main__":
     else:
         files = files
 
+    pool = None
     for filename in files[mpi_rank::mpi_size]:
 
         nscrunch, real_max_dm, base_2diag_dm = get_nscrunch(filename,total_max_dm)
         print "using {0} scrunches to achieve a max dm of {1}".format(nscrunch,real_max_dm)
 
+        if pool == None:
+            pool = Pool(processes=nscrunch)
+
         datasource = ScrunchFileSource(filename, nscrunch)
 
         last_max_dm = base_2diag_dm
         scrunch = 1
-        ps = []
+        pending = []
+        procs = []
         while scrunch <= nscrunch:
-            p = multiprocessing.Process(target=init_search,
-                    args=(filename,datasource,last_max_dm,scrunch,args))
+            lock = Lock()
+            p = Process(target=init_search,
+                    args=(filename,datasource,last_max_dm,scrunch,args,lock))
             p.start()
-            ps.append(p)
+            pending.append(lock)
+            procs.append(p)
             last_max_dm = 2*last_max_dm
             #kwargs['min_search_dm'] = last_max_dm
             scrunch *= 2
 
         # Keep the process from exiting by waiting for the last one.  This may be
         # very hard to kill.
-        for p in ps:
-            p.join()
+        for l in pending:
+            l.acquire()
+        for p in procs:
             p.terminate()
-
         print "finished file " + filename
