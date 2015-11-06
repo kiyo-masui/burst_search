@@ -190,10 +190,11 @@ if __name__ == "__main__":
             #kwargs['min_search_dm'] = last_max_dm
             scrunch *= 2
 
-        # Keep the process from exiting by waiting for the last one.  This may be
-        # very hard to kill.
+        #Really ugly
+        time.sleep(0.5)
         for l in pending:
             l.acquire()
+            print "re-acquired lock"
         for p in procs:
             p.terminate()
         print "finished file " + filename
