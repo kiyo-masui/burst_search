@@ -39,7 +39,7 @@ class Trigger(object):
     def centre(self):
         return (self._dm_ind, self._time_ind)
 
-    @property 
+    @property
     def spec_ind(self):
         return self._spec_ind
 
@@ -98,6 +98,19 @@ class Trigger(object):
         plt.xlabel("time (s)")
         plt.ylabel("DM (Pc/cm^3)")
         plt.colorbar()
+
+    def dm_data_cut(self):
+        di, ti = self.centre
+        tside = 250
+        dside = 300
+        delta_t = self.data.delta_t
+        delta_dm = self.data.delta_dm
+        start_ti = max(0, ti - tside)
+        end_ti = min(self.data.dm_data.shape[1], ti + tside)
+        start_di = max(0, di - dside)
+        end_di = min(self.data.dm_data.shape[0], di + dside)
+        dm_data_cut = self.data.dm_data[start_di:end_di,start_ti:end_ti].copy()
+        return dm_data_cut
 
     def plot_time(self):
         di, ti = self.centre
