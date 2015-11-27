@@ -17,6 +17,8 @@ import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 
+import cProfile, pstats, StringIO
+
 from . import preprocess
 from . import dedisperse
 from . import datasource
@@ -24,6 +26,7 @@ from . import search
 from . import simulate
 from simulate import *
 from catalog import Catalog, convert_deg
+from _preprocess import remove_outliers
 from datasource import ScrunchFileSource, FileSource
 
 
@@ -93,13 +96,14 @@ class FileSearch(object):
         SIMULATE = sim
         MAX_DM = max_dm
         
+        self._filename = filename
+
         if datasource == None:
             datasource = FileSource(self._filename)
         self._datasource = datasource
 
         self._scrunch = scrunch
 
-        self._filename = filename
         hdulist = pyfits.open(filename, 'readonly')
 
         parameters = self.parameters_from_header(hdulist)
@@ -289,10 +293,11 @@ class FileSearch(object):
             #do simulation
             data += self._sim_source.generate_events(block_ind)[:,0:data.shape[1]]
 
-        preprocess.remove_outliers(data, 5, 128)
+        remove_outliers(data, 5, 128)
+
         data = preprocess.highpass_filter(data, HPF_WIDTH / parameters['delta_t'])
 
-        preprocess.remove_outliers(data, 5)
+        remove_outliers(data, 5)
         preprocess.remove_noisy_freq(data, 3)
         preprocess.remove_bad_times(data, 2)
         preprocess.remove_continuum_v2(data)
@@ -321,7 +326,11 @@ class FileSearch(object):
                      #   g = self._dedispersed_out_group.create_group("%d-%d"
                       #          % (start_record, end_record))
                        # data.to_hdf5(g)
-                    dm_data = self._Transformer(this_dat)
+
+                    dm_fun = lambda x: self._Transformer(x)
+                    #dm_data = self._Transformer(this_dat)
+                    dm_data = dm_fun(this_dat)
+
                     del this_dat
                     dm_data.start_record = start_record
                     these_triggers = self._search(dm_data,spec_ind=alpha,disp_ind=self._disp_ind)
