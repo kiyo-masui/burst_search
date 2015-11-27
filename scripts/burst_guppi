@@ -75,12 +75,18 @@ parser.add_argument(
         action='store_true',
         default=False,
         )
+parser.add_argument(
+        '--profile',
+        action='store_true',
+        default=False,
+        )
 
 
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    
+    prof = args.profile
+
     if args.cal_spec_file:
         cal_spec = np.load(args.cal_spec_file)
     else:
@@ -127,16 +133,18 @@ if __name__ == "__main__":
         #out_filename = path.splitext(path.basename(filename))[0] + ".h5"
         #out_file = h5py.File(out_filename)
         #Searcher.set_dedispersed_h5(out_file)
-        pr = cProfile.Profile()
-        pr.enable()
+        if prof:
+            pr = cProfile.Profile()
+            pr.enable()
 
         Searcher.search_all_records()
 
-        pr.disable()
-        s = StringIO.StringIO()
-        sortby = 'cumulative'
-        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-        ps.print_stats()
-        print '\n'.join(s.getvalue().split('\n')[:200])
-        #out_file.close()
+        if prof:
+            pr.disable()
+            s = StringIO.StringIO()
+            sortby = 'cumulative'
+            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+            ps.print_stats()
+            print '\n'.join(s.getvalue().split('\n')[:200])
+            #out_file.close()
 

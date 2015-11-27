@@ -47,7 +47,7 @@ MAX_DM = 2000
 #OVERLAP = 15.
 OVERLAP = 8.
 
-DO_SPEC_SEARCH = True
+DO_SPEC_SEARCH = False
 SPEC_INDEX_MIN = -10
 SPEC_INDEX_MAX = 10
 SPEC_INDEX_SAMPLES = 11
@@ -261,9 +261,12 @@ class FileSearch(object):
                     #out_filename += "+%06.2fs.png" % t_offset
                     if not t.disp_ind is None:
                                     out_filename += "+n=%02.f" % t.disp_ind
-                    out_filename += "+%06.2fs.png" % t_offset
-                    plt.savefig(out_filename, bbox_inches='tight')
+                    out_filename_png = out_filename + "+%06.2fs.png" % t_offset
+                    out_filename_txt = out_filename + "+%06.2fs.txt" % t_offset
+                    plt.savefig(out_filename_png, bbox_inches='tight')
                     plt.close(f)
+                    dm_data_cut = t.dm_data_cut()
+                    np.savetxt(out_filename_txt, dm_data_cut, fmt='%1.3f')
             return action_fun
         else:
             msg = "Unrecognized trigger action: " + action
@@ -327,9 +330,7 @@ class FileSearch(object):
                       #          % (start_record, end_record))
                        # data.to_hdf5(g)
 
-                    dm_fun = lambda x: self._Transformer(x)
-                    #dm_data = self._Transformer(this_dat)
-                    dm_data = dm_fun(this_dat)
+                    dm_data = self._Transformer(this_dat)
 
                     del this_dat
                     dm_data.start_record = start_record
