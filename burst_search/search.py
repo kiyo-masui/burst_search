@@ -231,6 +231,50 @@ class Trigger(object):
         plt.ylabel("Frequency (MHz)")
         plt.colorbar()
 
+    def spec_data_rebin(self):
+        di, ti = self.centre
+        tside = int(250 * 1.)
+        dside = 300
+        delta_t = self.data.delta_t
+        delta_dm = self.data.delta_dm
+        ntime = self.data.spec_data.shape[1]
+        nfreq = self.data.nfreq
+
+        freq = self.data.freq
+        max_freq = np.max(freq)
+
+        the_dm = self.data.dm[di]
+
+        disp_ind = self._disp_ind
+
+        spec_data_delay = np.zeros((nfreq, tside), dtype=float)
+        for ii in range(nfreq):
+            delay_ind = int(round((disp_delay(freq[ii], the_dm, disp_ind)
+                                   - disp_delay(max_freq, the_dm, disp_ind)) / delta_t))
+            start_i =  ti - tside // 2 + delay_ind
+            stop_i = start_i + tside
+            start_o = 0
+            stop_o = tside
+            if start_i < 0:
+                start_o = -start_i
+                start_i = 0
+            if stop_i > ntime:
+                stop_o -= (ntime - stop_i)
+                stop_i = ntime
+            spec_data_delay[ii,start_o:stop_o] = self.data.spec_data[ii,
+                    start_i:stop_i]
+
+        rebin_factor_freq = 64
+        rebin_factor_time = 1
+        spec_data_delay.shape = (
+                nfreq // rebin_factor_freq,
+                rebin_factor_freq,
+                tside // rebin_factor_time,
+                rebin_factor_time,
+                )
+        spec_data_rebin = np.mean(np.mean(spec_data_delay, 3), 1)
+        print spec_data_rebin
+
 def basic(data, snr_threshold=5., min_dm=50.,spec_ind=None,disp_ind=2.0):
     """Simple event search of DM data.
 

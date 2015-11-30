@@ -42,7 +42,7 @@ MAX_DM = 2000
 #OVERLAP = 15.
 OVERLAP = 8.
 
-DO_SPEC_SEARCH = False
+DO_SPEC_SEARCH = True
 SPEC_INDEX_MIN = -10
 SPEC_INDEX_MAX = 10
 SPEC_INDEX_SAMPLES = 11
@@ -250,11 +250,15 @@ class FileSearch(object):
                     if not t.disp_ind is None:
                                     out_filename += "+n=%02.f" % t.disp_ind
                     out_filename_png = out_filename + "+%06.2fs.png" % t_offset
-                    out_filename_txt = out_filename + "+%06.2fs.txt" % t_offset                   
+                    out_filename_DMT = out_filename + "_DM-T_ "+ "+%06.2fs.npy" % t_offset             
+                    out_filename_FT  = out_filename + "_Freq-T_" + "+%06.2fs.npy" % t_offset
+                    
                     plt.savefig(out_filename_png, bbox_inches='tight')
                     plt.close(f)
                     dm_data_cut = t.dm_data_cut()
-                    np.savetxt(out_filename_txt, dm_data_cut, fmt='%1.3f')
+                    np.save(out_filename_DMT, dm_data_cut)
+                    spec_data_rebin = t.spec_data_rebin()
+                    np.save(out_filename_FT, spec_data_rebin)
             return action_fun
         else:
             msg = "Unrecognized trigger action: " + action
