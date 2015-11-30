@@ -257,6 +257,19 @@ class FileSearch(object):
                     #out_filename += "+%06.2fs.png" % t_offset
                     if not t.disp_ind is None:
                                     out_filename += "+n=%02.f" % t.disp_ind
+                    out_filename_png = out_filename + "+%06.2fs.png" % t_offset
+                    out_filename_DMT = out_filename + "_DM-T_ "+ "+%06.2fs.npy" % t_offset             
+                    out_filename_FT  = out_filename + "_Freq-T_" + "+%06.2fs.npy" % t_offset
+ 
+                    plt.savefig(out_filename_png, bbox_inches='tight')
+                    plt.close(f)
+                    dm_data_cut = t.dm_data_cut()
+                    np.save(out_filename_DMT, dm_data_cut)
+                    spec_data_rebin = t.spec_data_rebin()
+                    np.save(out_filename_FT, spec_data_rebin)
+             return action_fun
+                    if not t.disp_ind is None:
+                                    out_filename += "+n=%02.f" % t.disp_ind
                     out_filename += "+%06.2fs.png" % t_offset
                     plt.savefig(out_filename, bbox_inches='tight')
                     plt.close(f)
