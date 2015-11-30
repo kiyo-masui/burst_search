@@ -17,6 +17,8 @@ import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 
+import cProfile, pstats, StringIO
+
 from . import preprocess
 from . import dedisperse
 from . import datasource
@@ -24,6 +26,7 @@ from . import search
 from . import simulate
 from simulate import *
 from catalog import Catalog, convert_deg
+from _preprocess import remove_outliers
 from datasource import ScrunchFileSource, FileSource
 
 
@@ -44,7 +47,7 @@ MAX_DM = 2000
 #OVERLAP = 15.
 OVERLAP = 8.
 
-DO_SPEC_SEARCH = True
+DO_SPEC_SEARCH = False
 SPEC_INDEX_MIN = -10
 SPEC_INDEX_MAX = 10
 SPEC_INDEX_SAMPLES = 11
@@ -93,13 +96,14 @@ class FileSearch(object):
         SIMULATE = sim
         MAX_DM = max_dm
         
+        self._filename = filename
+
         if datasource == None:
             datasource = FileSource(self._filename)
         self._datasource = datasource
 
         self._scrunch = scrunch
 
-        self._filename = filename
         hdulist = pyfits.open(filename, 'readonly')
 
         parameters = self.parameters_from_header(hdulist)
@@ -258,6 +262,7 @@ class FileSearch(object):
                     if not t.disp_ind is None:
                                     out_filename += "+n=%02.f" % t.disp_ind
                     out_filename_png = out_filename + "+%06.2fs.png" % t_offset
+<<<<<<< HEAD
                     out_filename_DMT = out_filename + "_DM-T_ "+ "+%06.2fs.npy" % t_offset             
                     out_filename_FT  = out_filename + "_Freq-T_" + "+%06.2fs.npy" % t_offset
  
@@ -272,7 +277,13 @@ class FileSearch(object):
                                     out_filename += "+n=%02.f" % t.disp_ind
                     out_filename += "+%06.2fs.png" % t_offset
                     plt.savefig(out_filename, bbox_inches='tight')
+=======
+                    out_filename_txt = out_filename + "+%06.2fs.txt" % t_offset
+                    plt.savefig(out_filename_png, bbox_inches='tight')
+>>>>>>> e93e419f646e3c5246b43fefb63ac1ccfcd446ee
                     plt.close(f)
+                    dm_data_cut = t.dm_data_cut()
+                    np.savetxt(out_filename_txt, dm_data_cut, fmt='%1.3f')
             return action_fun
         else:
             msg = "Unrecognized trigger action: " + action
@@ -302,10 +313,11 @@ class FileSearch(object):
             #do simulation
             data += self._sim_source.generate_events(block_ind)[:,0:data.shape[1]]
 
-        preprocess.remove_outliers(data, 5, 128)
+        remove_outliers(data, 5, 128)
+
         data = preprocess.highpass_filter(data, HPF_WIDTH / parameters['delta_t'])
 
-        preprocess.remove_outliers(data, 5)
+        remove_outliers(data, 5)
         preprocess.remove_noisy_freq(data, 3)
         preprocess.remove_bad_times(data, 2)
         preprocess.remove_continuum_v2(data)
@@ -334,7 +346,9 @@ class FileSearch(object):
                      #   g = self._dedispersed_out_group.create_group("%d-%d"
                       #          % (start_record, end_record))
                        # data.to_hdf5(g)
+
                     dm_data = self._Transformer(this_dat)
+
                     del this_dat
                     dm_data.start_record = start_record
                     these_triggers = self._search(dm_data,spec_ind=alpha,disp_ind=self._disp_ind)

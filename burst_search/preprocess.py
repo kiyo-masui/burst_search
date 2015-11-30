@@ -100,14 +100,16 @@ def remove_outliers(data, sigma_threshold, block=None):
     ntime = block
     nfreq = nfreq0 * (ntime0 // block)
 
+    print data.shape
     data.shape = (nfreq, ntime)
+    print data.shape
     
 
     # To optimize cache usage, process one frequency at a time.
     for ii in range(nfreq):
         this_freq_data = data[ii,:]
-        mean = np.mean(this_freq_data)
-        std = np.std(this_freq_data)
+        mean = np.mean(this_freq_data, dtype=np.float32)
+        std = np.std(this_freq_data, dtype=np.float32)
         outliers = abs(this_freq_data - mean) > sigma_threshold * std
         this_freq_data[outliers] = mean
 
