@@ -93,7 +93,7 @@ if __name__ == "__main__":
     
     files = args.files
     if len(files) == 1:
-    files = glob.glob(files[0])
+        files = glob.glob(files[0])
 
     if mpi_size > 1:
         files = sorted(files)
@@ -116,7 +116,7 @@ if __name__ == "__main__":
                 Searcher = guppi.FileSearch(filename,sim=args.sim)
 
         except IOError as e:
-        print "Rank %d, file can't be opened %s." % (mpi_rank, filename)
+            print "Rank %d, file can't be opened %s." % (mpi_rank, filename)
             continue
         if not cal_spec is None:
             Searcher.set_cal_spectrum(cal_spec)
