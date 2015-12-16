@@ -42,7 +42,7 @@ MAX_DM = 2000
 #OVERLAP = 15.
 OVERLAP = 8.
 
-DO_SPEC_SEARCH = True
+DO_SPEC_SEARCH = False
 SPEC_INDEX_MIN = -10
 SPEC_INDEX_MAX = 10
 SPEC_INDEX_SAMPLES = 11
@@ -52,7 +52,7 @@ THRESH_SNR = 8.0
 DEV_PLOTS = False
 
 #Event simulation params, speculative/contrived
-SIMULATE = False
+SIMULATE = True
 alpha = -5.0
 sim_rate = 50*1.0/6000.0
 f_m = 800
