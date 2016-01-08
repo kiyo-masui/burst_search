@@ -273,7 +273,7 @@ class Trigger(object):
                 rebin_factor_time,
                 )
         spec_data_rebin = np.mean(np.mean(spec_data_delay, 3), 1)
-        print spec_data_rebin
+        return spec_data_rebin
 
 
 def basic(data, snr_threshold=5., min_dm=50.,spec_ind=None,disp_ind=2.0):
