@@ -39,7 +39,7 @@ class Trigger(object):
     def centre(self):
         return (self._dm_ind, self._time_ind)
 
-    @property
+    @property 
     def spec_ind(self):
         return self._spec_ind
 
@@ -274,6 +274,7 @@ class Trigger(object):
                 )
         spec_data_rebin = np.mean(np.mean(spec_data_delay, 3), 1)
         return spec_data_rebin
+
 
 def basic(data, snr_threshold=5., min_dm=50.,spec_ind=None,disp_ind=2.0):
     """Simple event search of DM data.

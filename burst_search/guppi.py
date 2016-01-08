@@ -17,12 +17,17 @@ import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 
+import cProfile, pstats, StringIO
+
 from . import preprocess
 from . import dedisperse
+from . import datasource
 from . import search
 from . import simulate
 from simulate import *
 from catalog import Catalog, convert_deg
+from _preprocess import remove_outliers
+from datasource import ScrunchFileSource, FileSource
 
 
 # XXX Eventually a parameter, seconds.
@@ -42,7 +47,7 @@ MAX_DM = 2000
 #OVERLAP = 15.
 OVERLAP = 8.
 
-DO_SPEC_SEARCH = False
+DO_SPEC_SEARCH = True
 SPEC_INDEX_MIN = -10
 SPEC_INDEX_MAX = 10
 SPEC_INDEX_SAMPLES = 11
@@ -52,7 +57,7 @@ THRESH_SNR = 8.0
 DEV_PLOTS = False
 
 #Event simulation params, speculative/contrived
-SIMULATE = True
+SIMULATE = False
 alpha = -5.0
 sim_rate = 50*1.0/6000.0
 f_m = 800
@@ -84,18 +89,24 @@ HPF_WIDTH = 0.2    # s
 class FileSearch(object):
 
     def __init__(self, filename, disp_ind=DISP_IND, disp_max = DISP_MAX, disp_ind_samples = DISP_IND_SAMPLES, 
-        max_dm = MAX_DM, sim = SIMULATE):
+        max_dm = MAX_DM, sim = SIMULATE, datasource=None, scrunch=1,**kwargs):
         self._disp_ind = disp_ind
         self._disp_max = disp_max
         self._disp_ind_samples = disp_ind_samples
         SIMULATE = sim
         MAX_DM = max_dm
         
-
         self._filename = filename
+
+        if datasource == None:
+            datasource = FileSource(self._filename)
+        self._datasource = datasource
+
+        self._scrunch = scrunch
+
         hdulist = pyfits.open(filename, 'readonly')
 
-        parameters = parameters_from_header(hdulist)
+        parameters = self.parameters_from_header(hdulist)
         #print parameters
         self._parameters = parameters
 
@@ -247,12 +258,14 @@ class FileSearch(object):
                     out_filename += path.splitext(path.basename(self._filename))[0]
                     if not t.spec_ind is None:
                                     out_filename += "+a=%02.f" % t.spec_ind
+                    #out_filename += "+%06.2fs.png" % t_offset
                     if not t.disp_ind is None:
                                     out_filename += "+n=%02.f" % t.disp_ind
                     out_filename_png = out_filename + "+%06.2fs.png" % t_offset
+
                     out_filename_DMT = out_filename + "_DM-T_ "+ "+%06.2fs.npy" % t_offset             
                     out_filename_FT  = out_filename + "_Freq-T_" + "+%06.2fs.npy" % t_offset
-                    
+ 
                     plt.savefig(out_filename_png, bbox_inches='tight')
                     plt.close(f)
                     dm_data_cut = t.dm_data_cut()
@@ -271,7 +284,7 @@ class FileSearch(object):
 
     #simple method to replace nested structure
     def search_records(self, start_record, end_record):
-        data = self.get_records(start_record, end_record)
+        data = self._datasource.get_records(start_record, end_record, self._scrunch)
         parameters = self._parameters
 
         preprocess.sys_temperature_bandpass(data)
@@ -288,10 +301,11 @@ class FileSearch(object):
             #do simulation
             data += self._sim_source.generate_events(block_ind)[:,0:data.shape[1]]
 
-        preprocess.remove_outliers(data, 5, 128)
+        remove_outliers(data, 5, 128)
+
         data = preprocess.highpass_filter(data, HPF_WIDTH / parameters['delta_t'])
 
-        preprocess.remove_outliers(data, 5)
+        remove_outliers(data, 5)
         preprocess.remove_noisy_freq(data, 3)
         preprocess.remove_bad_times(data, 2)
         preprocess.remove_continuum_v2(data)
@@ -320,7 +334,9 @@ class FileSearch(object):
                      #   g = self._dedispersed_out_group.create_group("%d-%d"
                       #          % (start_record, end_record))
                        # data.to_hdf5(g)
+
                     dm_data = self._Transformer(this_dat)
+
                     del this_dat
                     dm_data.start_record = start_record
                     these_triggers = self._search(dm_data,spec_ind=alpha,disp_ind=self._disp_ind)
@@ -490,7 +506,54 @@ class FileSearch(object):
         # Precess any leftovers that don't fill out a whole block.
         self.search_records(current_start_record, 
                             current_start_record + nrecords_block) 
- 
+
+    def parameters_from_header(self, hdulist):
+        """Get data acqusition parameters for psrfits file header.
+
+        Returns
+        -------
+        parameters : dict
+
+        """
+
+        parameters = {}
+
+        #print repr(hdulist[0].header)
+        #print
+        #print repr(hdulist[1].header)
+        mheader = hdulist[0].header
+        dheader = hdulist[1].header
+
+        if mheader['CAL_FREQ']:
+            cal_period = 1. / mheader['CAL_FREQ']
+            parameters['cal_period_samples'] = int(round(cal_period / dheader['TBIN']))
+        else:
+            parameters['cal_period_samples'] = 0
+        parameters['delta_t'] = dheader['TBIN']*self._scrunch
+        parameters['nfreq'] = dheader['NCHAN']
+        parameters['freq0'] = mheader['OBSFREQ'] - mheader['OBSBW'] / 2.
+
+        parameters['delta_f'] = dheader['CHAN_BW']
+        parameters['mjd_start'] = mheader['STT_IMJD'] + (mheader['STT_SMJD'] + mheader['STT_OFFS'])/86400.0
+        parameters['unix_start'] = (parameters['mjd_start'] - 40587.0)*86400.0
+
+        parameters['track_mode'] = mheader['TRK_MODE']
+        parameters['loc_0'] = (convert_deg(mheader['STT_CRD1']),convert_deg(mheader['STT_CRD2']))
+        parameters['loc_1'] = (convert_deg(mheader['STP_CRD1']),convert_deg(mheader['STP_CRD2']))
+
+        record0 = hdulist[1].data[0]
+        #print record0
+        #data0 = record0["DATA"]
+        #freq = record0["DAT_FREQ"]
+        ntime_record, npol, nfreq, one = eval(dheader["TDIM17"])[::-1]
+        parameters['npol'] = npol
+
+        #is this correct?
+        parameters['ntime_record'] = ntime_record/self._scrunch
+        parameters['dtype'] = np.uint8
+
+        return parameters
+
 def parameters_from_header(hdulist):
     """Get data acqusition parameters for psrfits file header.
 
@@ -532,32 +595,11 @@ def parameters_from_header(hdulist):
     ntime_record, npol, nfreq, one = eval(dheader["TDIM17"])[::-1]
     parameters['npol'] = npol
 
+    #is this correct?
     parameters['ntime_record'] = ntime_record
     parameters['dtype'] = np.uint8
 
     return parameters
-
-def read_records(hdulist, start_record=0, end_record=None):
-    """Read and format records from GUPPI PSRFITS file."""
-
-    nrecords = len(hdulist[1].data)
-    if end_record is None or end_record > nrecords:
-        end_record = nrecords
-    nrecords_read = end_record - start_record
-    ntime_record, npol, nfreq, one = hdulist[1].data[0]["DATA"].shape
-
-    out_data = np.empty((nfreq, nrecords_read, ntime_record), dtype=np.float32)
-    for ii in xrange(nrecords_read):
-        # Read the record.
-        record = hdulist[1].data[start_record + ii]["DATA"]
-        # Interpret as unsigned int (for Stokes I only).
-        record = record.view(dtype=np.uint8)
-        # Select stokes I and copy.
-        out_data[:,ii,:] = np.transpose(record[:,0,:,0])
-    out_data.shape = (nfreq, nrecords_read * ntime_record)
-
-    return out_data
-
 
 def get_nrecords(filename):
     hdulist = pyfits.open(filename, 'readonly')
