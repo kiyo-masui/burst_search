@@ -3,6 +3,7 @@
 """
 
 import math
+import os
 from os import path
 import time
 
@@ -16,11 +17,17 @@ import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 
+import cProfile, pstats, StringIO
+
 from . import preprocess
 from . import dedisperse
+from . import datasource
 from . import search
 from . import simulate
 from simulate import *
+from catalog import Catalog, convert_deg
+from _preprocess import remove_outliers
+from datasource import ScrunchFileSource, FileSource
 
 
 # XXX Eventually a parameter, seconds.
@@ -32,8 +39,8 @@ MIN_SEARCH_DM = 5
 #TIME_BLOCK = 30.0
 TIME_BLOCK = 5.0
 
-MAX_DM = 200
-#MAX_DM = 2000
+#Must scale with disp_ind
+MAX_DM = 2000
 # For DM=4000, 13s delay across the band, so overlap searches by ~15s.
 
 # Overlap needs to account for the total delay across the band at max DM as
@@ -67,28 +74,84 @@ s_sd = 0.1
 dm_m = 600
 dm_sd = 0
 
+CATALOG = True
+
+#Use to test different dispersions
+#of the form l^DISP_IND
+#where l is wavelength
+#Be sure to alter 'MAX_DM' accordingly.
+#Large DISP_IND decreases depth
+#DISP_IND is now set via a command line argument
+DISP_IND = 2.0
+DISP_MAX = None
+DISP_IND_SAMPLES = None
+dump_snrs = True
+
+HPF_WIDTH = 0.2    # s
 
 class FileSearch(object):
 
-    def __init__(self, filename):
+    def __init__(self, filename, disp_ind=DISP_IND, disp_max = DISP_MAX, disp_ind_samples = DISP_IND_SAMPLES, 
+        max_dm = MAX_DM, sim = SIMULATE, datasource=None, scrunch=1,**kwargs):
+        self._disp_ind = disp_ind
+        self._disp_max = disp_max
+        self._disp_ind_samples = disp_ind_samples
+        SIMULATE = sim
+        MAX_DM = max_dm
 
         self._filename = filename
+
+        if datasource == None:
+            datasource = FileSource(self._filename)
+        self._datasource = datasource
+
+        self._scrunch = scrunch
+
         hdulist = pyfits.open(filename, 'readonly')
 
-        parameters = parameters_from_header(hdulist)
+        parameters = self.parameters_from_header(hdulist)
         #print parameters
         self._parameters = parameters
 
-        self._Transformer = dedisperse.DMTransform(
-                parameters['delta_t'],
-                parameters['nfreq'],
-                parameters['freq0'],
-                parameters['delta_f'],
-                MAX_DM,
-                jon=USE_JON_DD,
-                )
+        if self._disp_max == None:
+            #compute the invariant DM:
+            MAX_DM *= (math.pow(1.0/700.0,2.0) - math.pow(1.0/900.0,2.0))
+            MAX_DM /= (math.pow(1.0/700.0,self._disp_ind) - math.pow(1.0/900.0,self._disp_ind))
 
-        self._df = parameters['delta_f']
+            self._Transformer = dedisperse.DMTransform(
+                    parameters['delta_t'],
+                    parameters['nfreq'],
+                    parameters['freq0'],
+                    parameters['delta_f'],
+                    MAX_DM,
+                    self._disp_ind,
+                    jon=USE_JON_DD,
+                    )
+        else:
+            self._Transformer = {}
+            for ind in np.linspace(self._disp_ind,self._disp_max,self._disp_ind_samples):
+                this_dm = MAX_DM*(math.pow(1.0/700.0,2.0) - math.pow(1.0/900.0,2.0))
+                this_dm /= (math.pow(1.0/700.0,ind) - math.pow(1.0/900.0,ind))
+                self._Transformer[ind] = dedisperse.DMTransform(
+                    parameters['delta_t'],
+                    parameters['nfreq'],
+                    parameters['freq0'],
+                    parameters['delta_f'],
+                    this_dm,
+                    ind,
+                    jon=USE_JON_DD,
+                    )
+            if not 2.0 in np.linspace(self._disp_ind,self._disp_max,self._disp_ind_samples):
+                self._Transformer[2.0] = dedisperse.DMTransform(
+                    parameters['delta_t'],
+                    parameters['nfreq'],
+                    parameters['freq0'],
+                    parameters['delta_f'],
+                    MAX_DM,
+                    2.0,
+                    jon=USE_JON_DD,
+                    )
+        self._df =  parameters['delta_f']
         self._nfreq = parameters['nfreq']
         self._f0 = parameters['freq0']
         self._record_length = (parameters['ntime_record'] * parameters['delta_t'])
@@ -103,6 +166,11 @@ class FileSearch(object):
             self._sim_source = simulate.RandSource(alpha=alpha, f_m=f_m,f_sd=f_sd,bw_m=bw_m,bw_sd=bw_sd,t_m=t_m,
                 t_sd=t_sd,s_m=s_m,s_sd=s_sd,dm_m=dm_m,dm_sd=dm_sd,
                 event_rate=sim_rate,file_params=self._parameters,t_overlap=OVERLAP,nrecords_block=self._nrecords_block)
+
+        if CATALOG:
+            reduced_name = '.'.join(self._filename.split(os.sep)[-1].split('.')[:-1])
+            self._catalog = Catalog(parent_name=reduced_name, parameters=parameters)
+
 
         self._cal_spec = 1.
         self._dedispersed_out_group = None
@@ -139,6 +207,7 @@ class FileSearch(object):
                     MIN_SEARCH_DM,
                     int(0.100/self._parameters['delta_t']),
                     spec_ind=spec_ind,
+                    disp_ind=disp_ind
                     )
         else:
             msg = "Unrecognized search method."
@@ -201,9 +270,20 @@ class FileSearch(object):
                     out_filename += path.splitext(path.basename(self._filename))[0]
                     if not t.spec_ind is None:
                                     out_filename += "+a=%02.f" % t.spec_ind
-                    out_filename += "+%06.2fs.png" % t_offset
-                    plt.savefig(out_filename, bbox_inches='tight')
+                    #out_filename += "+%06.2fs.png" % t_offset
+                    if not t.disp_ind is None:
+                                    out_filename += "+n=%02.f" % t.disp_ind
+                    out_filename_png = out_filename + "+%06.2fs.png" % t_offset
+
+                    out_filename_DMT = out_filename + "_DM-T_ "+ "+%06.2fs.npy" % t_offset             
+                    out_filename_FT  = out_filename + "_Freq-T_" + "+%06.2fs.npy" % t_offset
+ 
+                    plt.savefig(out_filename_png, bbox_inches='tight')
                     plt.close(f)
+                    dm_data_cut = t.dm_data_cut()
+                    np.save(out_filename_DMT, dm_data_cut)
+                    spec_data_rebin = t.spec_data_rebin()
+                    np.save(out_filename_FT, spec_data_rebin)
             return action_fun
         else:
             msg = "Unrecognized trigger action: " + action
@@ -216,7 +296,7 @@ class FileSearch(object):
 
     #simple method to replace nested structure
     def search_records(self, start_record, end_record):
-        data = self.get_records(start_record, end_record)
+        data = self._datasource.get_records(start_record, end_record, self._scrunch)
         parameters = self._parameters
 
         preprocess.sys_temperature_bandpass(data)
@@ -233,10 +313,14 @@ class FileSearch(object):
             #do simulation
             data += self._sim_source.generate_events(block_ind)[:,0:data.shape[1]]
 
-        preprocess.remove_outliers(data, 5, 512)
-        data = preprocess.highpass_filter(data, 0.200 / parameters['delta_t'])
+        remove_outliers(data, 5, 128)
 
-        preprocess.remove_outliers(data, 5)
+        data = preprocess.highpass_filter(data, HPF_WIDTH / parameters['delta_t'])
+
+        remove_outliers(data, 5)
+        preprocess.remove_noisy_freq(data, 3)
+        preprocess.remove_bad_times(data, 2)
+        preprocess.remove_continuum_v2(data)
         preprocess.remove_noisy_freq(data, 3)
 
         #from here we weight channels by spectral index
@@ -244,50 +328,84 @@ class FileSearch(object):
         fmin = self._f0 + self._df*self._nfreq
         fmax = self._f0
 
-        if DO_SPEC_SEARCH:
-            print "----------------------"
-            spec_trigger = None
+        if self._disp_max == None:
+            if DO_SPEC_SEARCH:
+                print "----------------------"
+                spec_trigger = None
 
-            complete = 1
-            for alpha in np.linspace(SPEC_INDEX_MIN,SPEC_INDEX_MAX,SPEC_INDEX_SAMPLES):
-                #for i in xrange(0,3):
-                weights = array([math.pow(f/center_f, alpha) for f in np.linspace(fmax,fmin,self._nfreq)])
+                complete = 1
+                for alpha in np.linspace(SPEC_INDEX_MIN,SPEC_INDEX_MAX,SPEC_INDEX_SAMPLES):
+                    #for i in xrange(0,3):
+                    weights = array([math.pow(f/center_f, alpha) for f in np.linspace(fmax,fmin,self._nfreq)])
 
-                
-                f = lambda x: weights*x
-                this_dat = np.matrix(np.apply_along_axis(f, axis=0, arr=data),dtype=np.float32)
+                    
+                    f = lambda x: weights*x
+                    this_dat = np.matrix(np.apply_along_axis(f, axis=0, arr=data),dtype=np.float32)
 
-                #if self._dedispersed_out_group:
-                 #   g = self._dedispersed_out_group.create_group("%d-%d"
-                  #          % (start_record, end_record))
-                   # data.to_hdf5(g)
-                dm_data = self._Transformer(this_dat)
-                del this_dat
+                    #if self._dedispersed_out_group:
+                     #   g = self._dedispersed_out_group.create_group("%d-%d"
+                      #          % (start_record, end_record))
+                       # data.to_hdf5(g)
+
+                    dm_data = self._Transformer(this_dat)
+
+                    del this_dat
+                    dm_data.start_record = start_record
+                    these_triggers = self._search(dm_data,spec_ind=alpha,disp_ind=self._disp_ind)
+                    del dm_data
+                    print 'complete spectral indices: {0} of {1} ({2})'.format(complete,SPEC_INDEX_SAMPLES,alpha)
+                    if len(these_triggers)  > 0:
+                        print 'max snr: {0}'.format(these_triggers[0].snr)
+                        if spec_trigger == None or these_triggers[0].snr > spec_trigger.snr:
+                            spec_trigger = these_triggers[0]
+                    del these_triggers
+                    complete += 1
+
+                #spec_triggers = [t[0] for t in spec_triggers if len(t) > 0]
+                #spec_triggers = sorted(spec_triggers, key= lambda x: -x.snr)
+                #if len(spec_triggers) > 0:
+                    #spec_triggers = [spec_triggers[0],]
+                    #self._action(spec_triggers, dm_data)
+                if spec_trigger != None:
+                    triggers = (spec_trigger,)
+                else: triggers = []
+                    #self._action((spec_trigger,))
+            else:
+                dm_data = self._Transformer(data)
                 dm_data.start_record = start_record
-                these_triggers = self._search(dm_data,spec_ind=alpha)
-                del dm_data
-                print 'complete indices: {0} of {1} ({2})'.format(complete,SPEC_INDEX_SAMPLES,alpha)
-                if len(these_triggers)  > 0:
-                    print 'max snr: {0}'.format(these_triggers[0].snr)
-                    if spec_trigger == None or these_triggers[0].snr > spec_trigger.snr:
-                        spec_trigger = these_triggers[0]
-                del these_triggers
+
+                triggers = self._search(dm_data,disp_ind=self._disp_ind)
+
+        #Do dispersion index search
+        else:
+            disp_trigger = None
+            complete = 1
+            snrs = []
+            for ind in sorted(self._Transformer.keys()):
+                dm_data = self._Transformer[ind](data)
+                dm_data.start_record = start_record
+                these_triggers = self._search(dm_data,disp_ind=ind)
+                if len(these_triggers) > 0:
+                    print "this snr: {0}".format(these_triggers[0].snr)
+                    snrs.append([ind,these_triggers[0].snr])
+                    if disp_trigger == None or these_triggers[0].snr > disp_trigger.snr:
+                        disp_trigger = these_triggers[0]
+                    del these_triggers
+                print 'complete dispersion indices: {0} of {1} ({2})'.format(complete,self._disp_ind_samples,ind)
                 complete += 1
 
-            #spec_triggers = [t[0] for t in spec_triggers if len(t) > 0]
-            #spec_triggers = sorted(spec_triggers, key= lambda x: -x.snr)
-            #if len(spec_triggers) > 0:
-                #spec_triggers = [spec_triggers[0],]
-                #self._action(spec_triggers, dm_data)
-            if spec_trigger != None:
-                self._action((spec_trigger,))
-        else:
-            dm_data = self._Transformer(data)
-            dm_data.start_record = start_record
-
-            triggers = self._search(dm_data)
-            self._action(triggers)
-            del triggers
+                if disp_trigger != None:
+                    triggers = (disp_trigger,)
+                else: triggers = []
+                
+            if dump_snrs:
+                print snrs
+            del snrs
+        
+        self._action(triggers)
+        if CATALOG:
+            self._catalog.simple_write(triggers,disp_ind = DISP_IND)
+        del triggers
 
 
     def get_records(self, start_record, end_record):
@@ -340,7 +458,54 @@ class FileSearch(object):
         # Precess any leftovers that don't fill out a whole block.
         self.search_records(current_start_record, 
                             current_start_record + nrecords_block) 
- 
+
+    def parameters_from_header(self, hdulist):
+        """Get data acqusition parameters for psrfits file header.
+
+        Returns
+        -------
+        parameters : dict
+
+        """
+
+        parameters = {}
+
+        #print repr(hdulist[0].header)
+        #print
+        #print repr(hdulist[1].header)
+        mheader = hdulist[0].header
+        dheader = hdulist[1].header
+
+        if mheader['CAL_FREQ']:
+            cal_period = 1. / mheader['CAL_FREQ']
+            parameters['cal_period_samples'] = int(round(cal_period / dheader['TBIN']))
+        else:
+            parameters['cal_period_samples'] = 0
+        parameters['delta_t'] = dheader['TBIN']*self._scrunch
+        parameters['nfreq'] = dheader['NCHAN']
+        parameters['freq0'] = mheader['OBSFREQ'] - mheader['OBSBW'] / 2.
+
+        parameters['delta_f'] = dheader['CHAN_BW']
+        parameters['mjd_start'] = mheader['STT_IMJD'] + (mheader['STT_SMJD'] + mheader['STT_OFFS'])/86400.0
+        parameters['unix_start'] = (parameters['mjd_start'] - 40587.0)*86400.0
+
+        parameters['track_mode'] = mheader['TRK_MODE']
+        parameters['loc_0'] = (convert_deg(mheader['STT_CRD1']),convert_deg(mheader['STT_CRD2']))
+        parameters['loc_1'] = (convert_deg(mheader['STP_CRD1']),convert_deg(mheader['STP_CRD2']))
+
+        record0 = hdulist[1].data[0]
+        #print record0
+        #data0 = record0["DATA"]
+        #freq = record0["DAT_FREQ"]
+        ntime_record, npol, nfreq, one = eval(dheader["TDIM17"])[::-1]
+        parameters['npol'] = npol
+
+        #is this correct?
+        parameters['ntime_record'] = ntime_record/self._scrunch
+        parameters['dtype'] = np.uint8
+
+        return parameters
+
 def parameters_from_header(hdulist):
     """Get data acqusition parameters for psrfits file header.
 
@@ -368,6 +533,12 @@ def parameters_from_header(hdulist):
     parameters['freq0'] = mheader['OBSFREQ'] - mheader['OBSBW'] / 2.
 
     parameters['delta_f'] = dheader['CHAN_BW']
+    parameters['mjd_start'] = mheader['STT_IMJD'] + (mheader['STT_SMJD'] + mheader['STT_OFFS'])/86400.0
+    parameters['unix_start'] = (parameters['mjd_start'] - 40587.0)*86400.0
+
+    parameters['track_mode'] = mheader['TRK_MODE']
+    parameters['loc_0'] = (convert_deg(mheader['STT_CRD1']),convert_deg(mheader['STT_CRD2']))
+    parameters['loc_1'] = (convert_deg(mheader['STP_CRD1']),convert_deg(mheader['STP_CRD2']))
 
     record0 = hdulist[1].data[0]
     #print record0
@@ -376,32 +547,11 @@ def parameters_from_header(hdulist):
     ntime_record, npol, nfreq, one = eval(dheader["TDIM17"])[::-1]
     parameters['npol'] = npol
 
+    #is this correct?
     parameters['ntime_record'] = ntime_record
     parameters['dtype'] = np.uint8
 
     return parameters
-
-def read_records(hdulist, start_record=0, end_record=None):
-    """Read and format records from GUPPI PSRFITS file."""
-
-    nrecords = len(hdulist[1].data)
-    if end_record is None or end_record > nrecords:
-        end_record = nrecords
-    nrecords_read = end_record - start_record
-    ntime_record, npol, nfreq, one = hdulist[1].data[0]["DATA"].shape
-
-    out_data = np.empty((nfreq, nrecords_read, ntime_record), dtype=np.float32)
-    for ii in xrange(nrecords_read):
-        # Read the record.
-        record = hdulist[1].data[start_record + ii]["DATA"]
-        # Interpret as unsigned int (for Stokes I only).
-        record = record.view(dtype=np.uint8)
-        # Select stokes I and copy.
-        out_data[:,ii,:] = np.transpose(record[:,0,:,0])
-    out_data.shape = (nfreq, nrecords_read * ntime_record)
-
-    return out_data
-
 
 def get_nrecords(filename):
     hdulist = pyfits.open(filename, 'readonly')

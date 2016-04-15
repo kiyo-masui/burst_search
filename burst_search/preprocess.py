@@ -1,7 +1,5 @@
 """Preprocessing data for fast radio burst searches.
-
 This module contains, bandpass calibration, RFI flagging, etc.
-
 """
 
 import numpy as np
@@ -12,13 +10,11 @@ from _preprocess import remove_continuum_v2
 
 def remove_periodic(data, period):
     """Remove periodic time compenent from data.
-
     Parameters
     ----------
     data : array with shape ``(nfreq, ntime)``.
     period : integer
         Must be greater than or equal to *ntime*.
-
     Returns
     -------
     profile : array with shape ``(nfreq, period)``.
@@ -50,10 +46,8 @@ def remove_periodic(data, period):
 
 def noisecal_bandpass(data, cal_spectrum, cal_period):
     """Remove noise-cal and use to bandpass calibrate.
-
     Do not use this function. The estimate of the cal amplitude is very noisy.
     Need an algorithm to find the square wave.
-
     Parameters
     ----------
     data : array with shape ``(nfreq, ntime)``
@@ -62,7 +56,6 @@ def noisecal_bandpass(data, cal_spectrum, cal_period):
         Calibrated spectrum of the noise cal.
     cal_period : int
         Noise cal switching period, Must be an integer number of samples.
-
     """
 
     cal_profile = remove_periodic(data, cal_period)
@@ -79,7 +72,6 @@ def noisecal_bandpass(data, cal_spectrum, cal_period):
 
 def sys_temperature_bandpass(data):
     """Bandpass calibrate based on system temperature.
-
     The lowest noise way to flatten the bandpass. Very good if T_sys is
     relatively constant accross the band.
     """
@@ -90,34 +82,34 @@ def sys_temperature_bandpass(data):
     data /= T_sys[:,None]
     data[bad_chans,:] = 0
 
-def remove_outliers(data, sigma_threshold, block=None):
+def remove_outliers(data, sigma_threshold, block=None, ddof = 1.0):
     """Flag outliers within frequency channels.
-
     Replace outliers with that frequency's mean.
-
     """
 
     nfreq0 = data.shape[0]
     ntime0 = data.shape[1]
 
     if block is None:
-	block = ntime0
+        block = ntime0
 
     if ntime0 % block:
-	raise ValueError("Time axis must be divisible by block."
-			 " (ntime, block) = (%d, %d)." % (ntime0, block))
+        raise ValueError("Time axis must be divisible by block."
+                         " (ntime, block) = (%d, %d)." % (ntime0, block))
 
     ntime = block
     nfreq = nfreq0 * (ntime0 // block)
 
+    print data.shape
     data.shape = (nfreq, ntime)
+    print data.shape
     
 
     # To optimize cache usage, process one frequency at a time.
     for ii in range(nfreq):
         this_freq_data = data[ii,:]
-        mean = np.mean(this_freq_data)
-        std = np.std(this_freq_data)
+        mean = np.mean(this_freq_data, dtype=np.float32, ddof=ddof)
+        std = np.std(this_freq_data, dtype=np.float32,ddof=ddof)
         outliers = abs(this_freq_data - mean) > sigma_threshold * std
         this_freq_data[outliers] = mean
 
@@ -126,9 +118,7 @@ def remove_outliers(data, sigma_threshold, block=None):
 
 def remove_noisy_freq(data, sigma_threshold):
     """Flag frequency channels with high variance.
-
     To be effective, data should be bandpass calibrated in some way.
-
     """
 
     nfreq = data.shape[0]
@@ -137,28 +127,47 @@ def remove_noisy_freq(data, sigma_threshold):
     # Calculate variances without making full data copy (as numpy does).
     var = np.empty(nfreq, dtype=np.float64)
     skew = np.empty(nfreq, dtype=np.float64)
+    kurt = np.empty(nfreq, dtype=np.float64)
     for ii in range(nfreq):
         var[ii] = np.var(data[ii,:])
         skew[ii] = np.mean((data[ii,:] - np.mean(data[ii,:])**3))
-    # Find the bad channels.
-    
-    bad_chans = var > sigma_threshold * np.std(var) + np.mean(var)
-    bad_chans_skew = skew > sigma_threshold * np.std(skew) + np.mean(skew)
-    # Iterate twice, lest bad channels contaminate the mean.
-    var[bad_chans] = np.mean(var)
-    skew[bad_chans_skew] = np.mean(skew)
-    bad_chans_2 = var > sigma_threshold * np.std(var) + np.mean(var)
-    bad_chans_2_skew = skew > sigma_threshold * np.std(skew) + np.mean(skew)
-    bad_chans = np.logical_or(np.logical_or(bad_chans, bad_chans_2), np.logical_or(bad_chans_skew, bad_chans_2_skew))
+        kurt[ii] = np.mean((data[ii,:] - np.mean(data[ii,:])**4))
 
+    # Find the bad channels.
+    bad_chans = False
+    for ii in range(3):
+        bad_chans_var = abs(var - np.mean(var)) > sigma_threshold * np.std(var)
+        bad_chans_skew = abs(skew - np.mean(skew)) > sigma_threshold * np.std(skew)
+        bad_chans_kurt = abs(kurt - np.mean(kurt)) > sigma_threshold * np.std(kurt)
+        bad_chans = np.logical_or(bad_chans, bad_chans_var)
+        bad_chans = np.logical_or(bad_chans, bad_chans_skew)
+        bad_chans = np.logical_or(bad_chans, bad_chans_kurt)
+        var[bad_chans] = np.mean(var)
+        skew[bad_chans] = np.mean(skew)
+        kurt[bad_chans] = np.mean(kurt)
     data[bad_chans,:] = 0
+
+
+def remove_bad_times(data, sigma_threshold):
+
+    nfreq = data.shape[0]
+    ntime = data.shape[1]
+
+    # Calculate time means and frequency means with no copies.
+    mean = np.empty(nfreq, dtype=np.float64)
+    freq_sum = 0.
+    for ii in range(nfreq):
+        mean[ii] = np.mean(data[ii])
+        freq_sum += data[ii]
+
+    bad_times = (abs(freq_sum - np.mean(freq_sum))
+                 > sigma_threshold * np.std(freq_sum))
+    data[:,bad_times] = mean[:,None]
 
 
 def remove_continuum(data):
     """Calculates a contiuum template and removes it from the data.
-
     Also removes the time mean from each channel.
-
     """
 
     nfreq = data.shape[0]
@@ -183,9 +192,7 @@ def remove_continuum(data):
 
 def highpass_filter(data, width):
     """Highpass filter on *width* scales using blackman window.
-
     Finite impulse response filter *that discards invalid data* at the ends.
-
     """
 
     ntime = data.shape[-1]
@@ -214,5 +221,3 @@ def highpass_filter(data, width):
         out[ii] = d_lpf[-ntime_out:].real
 
     return out
-
-
