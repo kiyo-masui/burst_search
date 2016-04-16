@@ -338,7 +338,6 @@ class FileSearch(object):
                     #for i in xrange(0,3):
                     weights = array([math.pow(f/center_f, alpha) for f in np.linspace(fmax,fmin,self._nfreq)])
 
-                    
                     f = lambda x: weights*x
                     this_dat = np.matrix(np.apply_along_axis(f, axis=0, arr=data),dtype=np.float32)
 
@@ -406,13 +405,6 @@ class FileSearch(object):
         if CATALOG:
             self._catalog.simple_write(triggers,disp_ind = DISP_IND)
         del triggers
-
-
-    def get_records(self, start_record, end_record):
-        hdulist = pyfits.open(self._filename, 'readonly')
-        data = read_records(hdulist, start_record, end_record)
-        hdulist.close()
-        return data
 
 
     def search_all_records(self, time_block=TIME_BLOCK, overlap=OVERLAP):
@@ -506,52 +498,6 @@ class FileSearch(object):
 
         return parameters
 
-def parameters_from_header(hdulist):
-    """Get data acqusition parameters for psrfits file header.
-
-    Returns
-    -------
-    parameters : dict
-
-    """
-
-    parameters = {}
-
-    #print repr(hdulist[0].header)
-    #print
-    #print repr(hdulist[1].header)
-    mheader = hdulist[0].header
-    dheader = hdulist[1].header
-
-    if mheader['CAL_FREQ']:
-        cal_period = 1. / mheader['CAL_FREQ']
-        parameters['cal_period_samples'] = int(round(cal_period / dheader['TBIN']))
-    else:
-        parameters['cal_period_samples'] = 0
-    parameters['delta_t'] = dheader['TBIN']
-    parameters['nfreq'] = dheader['NCHAN']
-    parameters['freq0'] = mheader['OBSFREQ'] - mheader['OBSBW'] / 2.
-
-    parameters['delta_f'] = dheader['CHAN_BW']
-    parameters['mjd_start'] = mheader['STT_IMJD'] + (mheader['STT_SMJD'] + mheader['STT_OFFS'])/86400.0
-    parameters['unix_start'] = (parameters['mjd_start'] - 40587.0)*86400.0
-
-    parameters['track_mode'] = mheader['TRK_MODE']
-    parameters['loc_0'] = (convert_deg(mheader['STT_CRD1']),convert_deg(mheader['STT_CRD2']))
-    parameters['loc_1'] = (convert_deg(mheader['STP_CRD1']),convert_deg(mheader['STP_CRD2']))
-
-    record0 = hdulist[1].data[0]
-    #print record0
-    #data0 = record0["DATA"]
-    #freq = record0["DAT_FREQ"]
-    ntime_record, npol, nfreq, one = eval(dheader["TDIM17"])[::-1]
-    parameters['npol'] = npol
-
-    #is this correct?
-    parameters['ntime_record'] = ntime_record
-    parameters['dtype'] = np.uint8
-
-    return parameters
 
 def get_nrecords(filename):
     hdulist = pyfits.open(filename, 'readonly')
