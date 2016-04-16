@@ -36,8 +36,8 @@ from datasource import ScrunchFileSource, FileSource
 #Additions:
 MIN_SEARCH_DM = 5
 
-#TIME_BLOCK = 30.0
-TIME_BLOCK = 5.0
+TIME_BLOCK = 30.0
+#TIME_BLOCK = 5.0
 
 #Must scale with disp_ind
 MAX_DM = 2000
@@ -46,14 +46,14 @@ MAX_DM = 2000
 # Overlap needs to account for the total delay across the band at max DM as
 # well as any data invalidated by FIR filtering of the data.
 #OVERLAP = 15.
-OVERLAP = 1.
-#OVERLAP = 8.
+#OVERLAP = 1.
+OVERLAP = 8.
 
 DO_SPEC_SEARCH = True
 USE_JON_DD = False
-SPEC_INDEX_MIN = -10
-SPEC_INDEX_MAX = 10
-SPEC_INDEX_SAMPLES = 11
+SPEC_INDEX_MIN = -8
+SPEC_INDEX_MAX = 8
+SPEC_INDEX_SAMPLES = 5
 
 THRESH_SNR = 8.0
 
@@ -201,7 +201,7 @@ class FileSearch(object):
 
     def set_search_method(self, method='basic', **kwargs):
         if method == 'basic':
-            self._search = lambda dm_data,spec_ind=None : search.basic(
+            self._search = lambda dm_data,spec_ind=None,disp_ind=2. : search.basic(
                     dm_data,
                     THRESH_SNR,
                     MIN_SEARCH_DM,
