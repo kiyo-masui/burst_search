@@ -6,22 +6,18 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
 import _search
+from dedisperse import disp_delay
 
-def disp_delay(f,dm,disp_ind):
-    """Compute the dispersion delay (s) as a function of frequency (MHz) and DM"""
-    return 4.148808*dm*(10.0**3)/(f**disp_ind)
 
 class Trigger(object):
 
-    def __init__(self, data, centre, snr=0., duration=1 ,spec_ind=None, disp_ind = 2.0):
+    def __init__(self, data, centre, snr=0., duration=1):
 
         self._data = data
         self._dm_ind = centre[0]
         self._time_ind = centre[1]
         self._snr = snr
         self._duration = duration
-        self._spec_ind = spec_ind
-        self._disp_ind = disp_ind
 
     @property 
     def disp_ind(self):
@@ -39,15 +35,11 @@ class Trigger(object):
     def centre(self):
         return (self._dm_ind, self._time_ind)
 
-    @property 
-    def spec_ind(self):
-        return self._spec_ind
-
     def __str__(self):
-        return str((self._snr, self._spec_ind, self._disp_ind, self.centre))
+        return str((self._snr, self.data.spec_ind, self._disp_ind, self.centre))
 
     def __repr__(self):
-        return str((self._snr, self._spec_ind, self._disp_ind, self.centre))
+        return str((self._snr, self.data.spec_ind, self._disp_ind, self.centre))
 
     def plot_dm(self):
         di, ti = self.centre
@@ -70,7 +62,7 @@ class Trigger(object):
         duration_value = ",width ="
         duration_value += str(round(duration*delta_t, 3))
         duration_value += " (s)"
-        spec_ind = self._spec_ind
+        spec_ind = self.data.spec_ind
         spec_ind_value = ",spec_ind ="
         spec_ind_value += str(spec_ind)
         disp_ind = self.disp_ind
@@ -288,7 +280,7 @@ class Trigger(object):
         return spec_data_rebin
 
 
-def basic(data, snr_threshold=5., min_dm=50., length_limit=0, spec_ind=None,disp_ind=2.0):
+def basic(data, snr_threshold=5., min_dm=50., length_limit=0):
     """Simple event search of DM data.
 
     Returns
@@ -310,5 +302,5 @@ def basic(data, snr_threshold=5., min_dm=50., length_limit=0, spec_ind=None,disp
                 length_limit)
 
         if snr > snr_threshold:
-            triggers.append(Trigger(data, sample, snr,spec_ind=spec_ind,duration=duration,disp_ind=disp_ind))
+            triggers.append(Trigger(data, sample, snr, duration=duration))
     return triggers

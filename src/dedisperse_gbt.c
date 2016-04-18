@@ -16,7 +16,7 @@
   #define min( a, b ) ( ((a) < (b)) ? (a) : (b) )
 #endif
 
-#define DM0 4148.8
+#define DM0 4148.808
 //OLD DM0 4000.0
 #define NOISE_PERIOD 64
 #define SIG_THRESH 30.0

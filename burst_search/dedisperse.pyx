@@ -29,6 +29,14 @@ cdef extern void burst_setup_channel_mapping(CM_DTYPE_t *chan_map, size_t nfreq,
         float freq0, float delta_f, int depth, float disp_ind)
 
 
+DM_CONST = 4148.808
+
+
+def disp_delay(freq, dm, disp_ind=2.):
+    """Compute the dispersion delay (s) as a function of frequency (MHz) and DM"""
+    return DM_CONST * dm / (freq ** disp_ind)
+
+
 def dm_transform(
         np.ndarray[ndim=2, dtype=DTYPE_t] data1 not None,
         np.ndarray[ndim=2, dtype=DTYPE_t] data2,
@@ -76,7 +84,6 @@ def dm_transform(
             freq0,
             delta_f,
             depth,
-            #2.0,
             jon,
             )
 
@@ -119,6 +126,18 @@ class DMData(object):
         return self._delta_dm
 
     @property
+    def disp_ind(self):
+        return self._disp_ind
+
+    @property
+    def t0(self):
+        return self._t0
+
+    @property
+    def spec_ind(self):
+        return self._spec_ind
+
+    @property
     def nfreq(self):
         return self.spec_data.shape[0]
 
@@ -134,7 +153,8 @@ class DMData(object):
     def dm(self):
         return self.dm0 + self.delta_dm * np.arange(self.ndm, dtype=float)
 
-    def __init__(self, spec_data, dm_data, delta_t, freq0, delta_f, dm0, delta_dm):
+    def __init__(self, spec_data, dm_data, delta_t, freq0, delta_f, dm0,
+            delta_dm, disp_ind=2., t0=0., spec_ind=0.):
         self._spec_data = spec_data
         self._dm_data = dm_data
         self._delta_t = delta_t
@@ -142,6 +162,9 @@ class DMData(object):
         self._delta_f = delta_f
         self._dm0 = dm0
         self._delta_dm = delta_dm
+        self._disp_ind = disp_ind
+        self._spec_ind = spec_ind
+        self._t0 = t0
 
     @classmethod
     def from_hdf5(cls, group):
@@ -196,7 +219,11 @@ class DMTransform(object):
     def depth(self):
         return self._depth
 
-    def __init__(self, delta_t, nfreq, freq0, delta_f, max_dm, disp_ind, jon=False):
+    @property
+    def disp_ind(self):
+        return self._disp_ind
+
+    def __init__(self, delta_t, nfreq, freq0, delta_f, max_dm, disp_ind=2., jon=False):
 
         cdef float cdelta_t = delta_t
         cdef int cnfreq = nfreq
@@ -276,18 +303,17 @@ class DMTransform(object):
                 freq0,
                 delta_f,
                 depth,
-                #disp_ind, # XXX Not ins call signature
                 jon,
                 )
         dm_data = np.ascontiguousarray(out[:,:ntime_out])
         spec_data = np.ascontiguousarray(data1[:, :ntime_out])
 
         dm0 = 0
-        delta_dm = (delta_t / 4150.
-                    / abs(1. / freq0**2 - 1. / (freq0 + nfreq * delta_f)**2))
+        delta_dm = (delta_t / DM_CONST / 
+                abs(1. / freq0**disp_ind - 1. / (freq0 + nfreq * delta_f)**disp_ind))
 
         out_cont = DMData(spec_data, dm_data, delta_t, freq0, delta_f, dm0,
-                          delta_dm)
+                          delta_dm, disp_ind=disp_ind)
 
         return out_cont
 

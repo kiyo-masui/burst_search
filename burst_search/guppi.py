@@ -87,115 +87,117 @@ DISP_MAX = None
 DISP_IND_SAMPLES = None
 dump_snrs = True
 
-HPF_WIDTH = 0.2    # s
+HPF_WIDTH = 0.1    # s
+
+
+DEFAULT_PARAMETERS = {
+        # filename must also be supplied.
+        'time_block' : 30,    # Seconds.
+        'overlap' : 8.,
+        'scrunch' : 1,
+        'max_dm' : 2000.,
+        'min_search_dm' : 5.
+        'threshold_snr' : 8.,
+        'trigger_action' : 'print',
+        'spec_ind_search' : True,
+        'spec_ind_min' : -8.,
+        'spec_ind_mac' : 8.,
+        'spec_ind_samples' : 5.,
+        'disp_ind_search' : False,
+        'disp_ind_min' : 1.,
+        'disp_ind_max' : 5.,
+        'disp_ind_samples' : 9,
+        'simulate' : False,
+        'simulate_rate' : 0,
+        }
+
+
+
+
 
 class FileSearch(object):
 
-    def __init__(self, filename, disp_ind=DISP_IND, disp_max = DISP_MAX, disp_ind_samples = DISP_IND_SAMPLES, 
-        max_dm = MAX_DM, sim = SIMULATE, datasource=None, scrunch=1,**kwargs):
-        self._disp_ind = disp_ind
-        self._disp_max = disp_max
-        self._disp_ind_samples = disp_ind_samples
-        SIMULATE = sim
-        MAX_DM = max_dm
+    def __init__(self, filename, **kwargs):
+        parameters = dict(DEFAULT_PARAMETERS)
+        parameters.update(kwargs)
 
-        self._filename = filename
+        self._datasource = FileSource(
+                filename,
+                time_block=parameters['time_block'],
+                overlap=parameters['overlap'],
+                scrunch=parameters['scrunch'],
+                )
 
-        if datasource == None:
-            datasource = FileSource(self._filename)
-        self._datasource = datasource
-
-        self._scrunch = scrunch
-
-        hdulist = pyfits.open(filename, 'readonly')
-
-        parameters = self.parameters_from_header(hdulist)
-        #print parameters
-        self._parameters = parameters
-
-        if self._disp_max == None:
-            #compute the invariant DM:
-            MAX_DM *= (math.pow(1.0/700.0,2.0) - math.pow(1.0/900.0,2.0))
-            MAX_DM /= (math.pow(1.0/700.0,self._disp_ind) - math.pow(1.0/900.0,self._disp_ind))
-
-            self._Transformer = dedisperse.DMTransform(
-                    parameters['delta_t'],
-                    parameters['nfreq'],
-                    parameters['freq0'],
-                    parameters['delta_f'],
-                    MAX_DM,
-                    self._disp_ind,
-                    jon=USE_JON_DD,
+        # Spectral index search.
+        if parameters['spec_ind_search']:
+            self._spectral_inds = np.linspace(
+                    parameters['spec_ind_min'],
+                    parameters['spec_ind_max'],
+                    parameters['spec_ind_samples'],
+                    endpoint=True,
                     )
         else:
-            self._Transformer = {}
-            for ind in np.linspace(self._disp_ind,self._disp_max,self._disp_ind_samples):
-                this_max_dm = MAX_DM*(math.pow(1.0/700.0,2.0) - math.pow(1.0/900.0,2.0))
-                this_max_dm /= (math.pow(1.0/700.0,ind) - math.pow(1.0/900.0,ind))
-                self._Transformer[ind] = dedisperse.DMTransform(
-                    parameters['delta_t'],
-                    parameters['nfreq'],
-                    parameters['freq0'],
-                    parameters['delta_f'],
-                    this_max_dm,
-                    ind,
-                    jon=USE_JON_DD,
-                    )
-            if not 2.0 in np.linspace(self._disp_ind,self._disp_max,self._disp_ind_samples):
-                self._Transformer[2.0] = dedisperse.DMTransform(
-                    parameters['delta_t'],
-                    parameters['nfreq'],
-                    parameters['freq0'],
-                    parameters['delta_f'],
-                    MAX_DM,
-                    2.0,
-                    jon=USE_JON_DD,
-                    )
-        self._df =  parameters['delta_f']
-        self._nfreq = parameters['nfreq']
-        self._f0 = parameters['freq0']
-        self._record_length = (parameters['ntime_record'] * parameters['delta_t'])
-        self._nrecords_block = int(math.ceil(TIME_BLOCK / self._record_length))
-        self._nrecords_overlap = int(math.ceil(OVERLAP / self._record_length))
-        self._nrecords = len(hdulist[1].data)
-        #also insert to parameters dict to keep things concise (sim code wants this)
-        self._parameters['nrecords'] = self._nrecords
-
-        #initialize sim object, if there are to be simulated events
-        if SIMULATE:
-            self._sim_source = simulate.RandSource(alpha=alpha, f_m=f_m,f_sd=f_sd,bw_m=bw_m,bw_sd=bw_sd,t_m=t_m,
-                t_sd=t_sd,s_m=s_m,s_sd=s_sd,dm_m=dm_m,dm_sd=dm_sd,
-                event_rate=sim_rate,file_params=self._parameters,t_overlap=OVERLAP,nrecords_block=self._nrecords_block)
-
-        if CATALOG:
-            reduced_name = '.'.join(self._filename.split(os.sep)[-1].split('.')[:-1])
-            self._catalog = Catalog(parent_name=reduced_name, parameters=parameters)
-
-        self.set_search_method()
-        self.set_trigger_action()
-
-        hdulist.close()
+            self._spectral_inds = [0.]
 
 
-    def set_search_method(self, method='basic', **kwargs):
-        if method == 'basic':
-            self._search = lambda dm_data,spec_ind=None,disp_ind=2. : search.basic(
-                    dm_data,
-                    THRESH_SNR,
-                    MIN_SEARCH_DM,
-                    int(0.100/self._parameters['delta_t']),
-                    spec_ind=spec_ind,
-                    disp_ind=disp_ind
+        # Dispersion index search.
+        if parameters['disp_ind_search']:
+            dispersion_inds = np.linspace(
+                    parameters['disp_ind_min'],
+                    parameters['disp_ind_max'],
+                    parameters['disp_ind_samples'],
+                    endpoint=True,
                     )
         else:
-            msg = "Unrecognized search method."
-            raise ValueError(msg)
+            dispersion_inds = [2.]
+
+        # Initailize DM transforms.
+        self._dm_transformers = []
+        freq = self.datasource.freq
+        max_freq = np.max(freq)
+        min_freq = np.min(freq)
+        for disp_ind in dispersion_inds:
+            # Rescale max dm to same total delay as disp_ind=2.
+            max_dm = parameters['max_dm']
+            max_dm *= (1.0 / min_freq ** 2.0) - (1.0 / max_freq ** 2.0)
+            max_dm /= (1.0 / min_freq ** disp_ind) - (1.0 / max_freq ** disp_ind)
+            transform = dedisperse.DMTransform(
+                    self.datasource.delta_t,
+                    self.datasource.nfreq,
+                    self.datasource.freq0,
+                    self.datasource.delta_f,
+                    max_dm,
+                    disp_ind,
+                    jon=USE_JON_DD,
+                    )
+            self._dm_transformers.append(transform)
+
+        # Deal with these later.
+        if False:
+            #initialize sim object, if there are to be simulated events
+            if SIMULATE:
+                self._sim_source = simulate.RandSource(alpha=alpha, f_m=f_m,f_sd=f_sd,bw_m=bw_m,bw_sd=bw_sd,t_m=t_m,
+                    t_sd=t_sd,s_m=s_m,s_sd=s_sd,dm_m=dm_m,dm_sd=dm_sd,
+                    event_rate=sim_rate,file_params=self._parameters,t_overlap=OVERLAP,nrecords_block=self._nrecords_block)
+
+            if CATALOG:
+                reduced_name = '.'.join(self._filename.split(os.sep)[-1].split('.')[:-1])
+                self._catalog = Catalog(parent_name=reduced_name, parameters=parameters)
+
+        # Initialize trigger actions.
+        self.set_trigger_action(parameters['trigger_action'])
+
+
+    @property
+    def datasource(self):
+        return self._datasource
+
 
     def set_trigger_action(self, action='print', **kwargs):
         actions = [self._get_trigger_action(s.strip()) for s in action.split(',')]
         def action_fun(triggers):
             for a in actions:
-                a(triggers) 
+                a(triggers)
         self._action = action_fun
 
     def _get_trigger_action(self,action):
@@ -221,10 +223,7 @@ class FileSearch(object):
         elif action == 'save_plot_dm':
             def action_fun(triggers):
                 for t in triggers:
-                    parameters = self._parameters
-                    t_offset = (parameters['ntime_record'] * t.data.start_record)
-                    t_offset += t.centre[1]
-                    t_offset *= parameters['delta_t']
+                    t_offset = t.data.t0 * t.centre[1] * t.data.delta_t
                     f = plt.figure(1)
                     t.plot_summary()
 
@@ -240,8 +239,8 @@ class FileSearch(object):
                     else:
                         out_filename = "DM300-2000_" 
                     out_filename += path.splitext(path.basename(self._filename))[0]
-                    if not t.spec_ind is None:
-                                    out_filename += "+a=%02.f" % t.spec_ind
+                    if not t.data.spec_ind is None:
+                                    out_filename += "+a=%02.f" % t.data.spec_ind
                     #out_filename += "+%06.2fs.png" % t_offset
                     if not t.disp_ind is None:
                                     out_filename += "+n=%02.f" % t.disp_ind
@@ -261,9 +260,12 @@ class FileSearch(object):
             msg = "Unrecognized trigger action: " + action
             raise ValueError(msg)
 
-
     def preprocess(self, t0, data):
-        """Preprocessing includes simulation."""
+        """Preprocess the data.
+
+        Preprocessing includes simulation.
+
+        """
 
         preprocess.sys_temperature_bandpass(data)
         cal_period = self.datasource.cal_period_samples
@@ -294,9 +296,16 @@ class FileSearch(object):
 
         return t0, data
 
+    def search(self, dm_data):
+        """Search the data."""
+        search.basic(
+                dm_data,
+                THRESH_SNR,
+                MIN_SEARCH_DM,
+                int(HPF_WIDTH/self.datasource.delta_t),
+                )
 
-    #simple method to replace nested structure
-    def search_next_block(self):
+    def process_next_block(self):
         t0, data = self.datasource.get_next_block()
         t0, data = self.preprocess(t0, data)
 
@@ -322,8 +331,9 @@ class FileSearch(object):
                     dm_data = self._Transformer(this_dat)
 
                     del this_dat
-                    dm_data.t0 = t0
-                    these_triggers = self._search(dm_data,spec_ind=alpha,disp_ind=self._disp_ind)
+                    dm_data._t0 = t0
+                    dm_data._spec_ind = alpha
+                    these_triggers = self.search(dm_data)
                     del dm_data
                     print 'complete spectral indices: {0} of {1} ({2})'.format(complete,SPEC_INDEX_SAMPLES,alpha)
                     if len(these_triggers)  > 0:
@@ -346,7 +356,7 @@ class FileSearch(object):
                 dm_data = self._Transformer(data)
                 dm_data.t0 = t0
 
-                triggers = self._search(dm_data,disp_ind=self._disp_ind)
+                triggers = self.search(dm_data)
 
         #Do dispersion index search
         else:
@@ -356,7 +366,7 @@ class FileSearch(object):
             for ind in sorted(self._Transformer.keys()):
                 dm_data = self._Transformer[ind](data)
                 dm_data.t0 = t0
-                these_triggers = self._search(dm_data,disp_ind=ind)
+                these_triggers = self.search(dm_data)
                 if len(these_triggers) > 0:
                     print "this snr: {0}".format(these_triggers[0].snr)
                     snrs.append([ind,these_triggers[0].snr])
@@ -379,8 +389,7 @@ class FileSearch(object):
             self._catalog.simple_write(triggers,disp_ind = DISP_IND)
         del triggers
 
-
-    def search_all(self):
+    def process_all(self):
         while True:
             try:
                 print "Processing block %d." % self.datasource.nblocks_fetched
@@ -388,8 +397,7 @@ class FileSearch(object):
             except StopIteration:
                 break
 
-
-    def search_real_time(self):
+    def process_real_time(self):
         wait_time = float(self.time_block - self.overlap) / 5
         max_wait_iterations = 10
 
