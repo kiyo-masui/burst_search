@@ -1,62 +1,123 @@
 import pyfits
 import numpy as np
-from multiprocessing import Queue
 
-def read_records(hdulist, start_record=0, end_record=None):
-	"""Read and format records from GUPPI PSRFITS file."""
 
-	nrecords = len(hdulist[1].data)
-	if end_record is None or end_record > nrecords:
-		end_record = nrecords
-	nrecords_read = end_record - start_record
-	ntime_record, npol, nfreq, one = hdulist[1].data[0]["DATA"].shape
+class DataSource(object):
+    """Abstract base class for data sources."""
 
-	out_data = np.empty((nfreq, nrecords_read, ntime_record), dtype=np.float32)
-	for ii in xrange(nrecords_read):
-		# Read the record.
-		record = hdulist[1].data[start_record + ii]["DATA"]
-		# Interpret as unsigned int (for Stokes I only).
-		record = record.view(dtype=np.uint8)
-		# Select stokes I and copy.
-		out_data[:,ii,:] = np.transpose(record[:,0,:,0])
-	out_data.shape = (nfreq, nrecords_read * ntime_record)
+    # The Subclasses must implement the following.
 
-	return out_data
+    def __init__(self, source=None, block=None, overlap=None, scrunch=1):
+        """
+        Parameters
+        ----------
+        source :
+            To be used by subclasses
+        block : float
+            Target time block, approximate but lower limit.
+        overlap : float
+            Target overlapping of blocks, approximate but lower limit.
 
-class FileSource(object):
-	def __init__(self, fitsfile):
-		self._filename = fitsfile
-	
-	def get_records(self,start,end,scrunch=1):
-		hdulist = pyfits.open(self._filename, 'readonly')
-		data = read_records(hdulist, start, end)
-		hdulist.close()
-		return data
+        """
 
-class ScrunchFileSource(object):
-	def __init__(self, fitsfile, nscrunch):
-		self._filename = fitsfile
-		self._nscrunch = nscrunch
-		self._dq = [Queue() for i in xrange(0,nscrunch - 1)]
-	
-	def get_records(self,start,end,scrunch):
-		if scrunch == 1:
-			hdulist = pyfits.open(self._filename, 'readonly')
-			data = read_records(hdulist, start, end)
-			last = data
+        self._source = source
+        self._block = block
+        self._overlap = overlap
+        self._scrunch = scrunch
 
-			self._current_recs = [start,end]
-			for i in xrange(1,self._nscrunch):
-				thisdat = last[0::2] + last[1::2]
-				thisq = self._dq[i - 1]
-				while not thisq.empty():
-					dat = thisq.get(timeout=0.1)
-					del dat
-				thisq.put(thisdat)
-				last = thisdat
-			hdulist.close()
-			return data
-		else:
-			if start < self._current_recs[0]:
-				raise Exception("Data no longer available")
-			return self._dq[i - 2].get()
+    def get_next_block_native(self):
+        """Get the next block of data to process without applying time scrunch.
+
+        Returns
+        -------
+        t0 : float
+            Time of first sample, in seconds `self.start_time`.
+        data : 2D array
+            Data with axes representing frequency, time.
+
+        Raises
+        ------
+        StopIteration:
+            If not data left to process.
+
+        """
+        pass
+
+    @property
+    def nblocks_left(self):
+        """Number of blocks remaining.
+
+        This might not be static if the data source is growing.
+
+        """
+        pass
+
+    @property
+    def nblocks_fetched(self):
+        """Number of blocks yielded so far."""
+        pass
+
+    # Initialization must provide data for these parameters.
+
+    @property
+    def delta_t(self):
+        return self._delta_t_native * self._scrunch
+
+    @property
+    def delta_f(self):
+        return self._delta_f
+
+    @property
+    def freq0(self):
+        return self._freq0
+
+    @property
+    def nfreq(self):
+        return self._nfreq
+
+    @property
+    def mjd(self):
+        """Modified Julian date of the data, as integer."""
+        return self._mjd
+
+    @property
+    def start_time(self):
+        """Start time of the data, in seconds since UTC midnight of `self.mjd`.
+        """
+        return self._start_time
+
+
+    # Abstract methods.
+
+    @property
+    def freq(self):
+        return np.arange(self.nfreq, dtype=float) * self.delta_f + self.freq0
+
+    def get_next_block(self):
+        """Get the next block of data to process.
+
+        Returns
+        -------
+        t0 : float
+            Time of first sample, in seconds since `self.start_time`.
+        data : 2D array
+            Data with axes representing frequency, time.
+
+        Raises
+        ------
+        StopIteration:
+            If not data left to process.
+
+        """
+
+        scrunch = self._scrunch
+        t0, data_native = self.get_next_block_native()
+        ntime_native = data_native.shape[1]
+        if ntime_native % self._scrunch:
+            msg = "Scrunch factor (%d) must divide native time block size (%d)"
+            raise NotImplementedError(msg % (scrunch, ntime_native))
+        shape = data_native.shape[:1] + (ntime_native // scrunch, scrunch)
+        data_native.shape = shape
+        t0 += self.delta_t * (1 - 1./scrunch) / 2
+        return t0, np.mean(data_native, -1).astype(data_native.dtype)
+

@@ -152,7 +152,7 @@ class Trigger(object):
             start = ti + delay_ind - duration + 1
             stop = start + duration
             spectrum[ii] = np.mean(self.data.spec_data[ii,start:stop])
-        
+
         self.fluence = sum(spectrum)
 
         colors = ['blue','red','darkgreen','orange']
@@ -167,6 +167,18 @@ class Trigger(object):
                 )
         plt.ylabel("Fluence")
         plt.xlabel("Frequency (MHz)")
+
+    def plot_summary(self):
+        plt.subplot(411)
+        t.plot_dm()
+        plt.subplot(412)
+        t.plot_freq()
+        plt.subplot(413)
+        t.plot_time()
+        plt.subplot(414)
+        t.plot_spec()
+
+
 
     def plot_freq(self):
         di, ti = self.centre

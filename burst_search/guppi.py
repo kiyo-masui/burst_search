@@ -21,7 +21,7 @@ import cProfile, pstats, StringIO
 
 from . import preprocess
 from . import dedisperse
-from . import datasource
+from .datasource import DataSource
 from . import search
 from . import simulate
 from simulate import *
@@ -130,14 +130,14 @@ class FileSearch(object):
         else:
             self._Transformer = {}
             for ind in np.linspace(self._disp_ind,self._disp_max,self._disp_ind_samples):
-                this_dm = MAX_DM*(math.pow(1.0/700.0,2.0) - math.pow(1.0/900.0,2.0))
-                this_dm /= (math.pow(1.0/700.0,ind) - math.pow(1.0/900.0,ind))
+                this_max_dm = MAX_DM*(math.pow(1.0/700.0,2.0) - math.pow(1.0/900.0,2.0))
+                this_max_dm /= (math.pow(1.0/700.0,ind) - math.pow(1.0/900.0,ind))
                 self._Transformer[ind] = dedisperse.DMTransform(
                     parameters['delta_t'],
                     parameters['nfreq'],
                     parameters['freq0'],
                     parameters['delta_f'],
-                    this_dm,
+                    this_max_dm,
                     ind,
                     jon=USE_JON_DD,
                     )
@@ -171,33 +171,11 @@ class FileSearch(object):
             reduced_name = '.'.join(self._filename.split(os.sep)[-1].split('.')[:-1])
             self._catalog = Catalog(parent_name=reduced_name, parameters=parameters)
 
-
-        self._cal_spec = 1.
-        self._dedispersed_out_group = None
-
         self.set_search_method()
         self.set_trigger_action()
 
         hdulist.close()
 
-    def set_cal_spectrum(self, cal_spec):
-        """Set spectrum of the noise-cal for band-pass calibration.
-
-        Parameters
-        ----------
-        cal_spec : 1D record array with records 'freq' and 'cal_T'.
-
-        """
-
-        nfreq = self._parameters['nfreq']
-        # TODO Should really check that the frequency axes match exactly, or
-        # interpolate/extrapolate.
-        if len(cal_spec) != nfreq:
-            msg = "Noise cal spectrum frequncy axis does not match the data."
-            raise ValueError(msg)
-        spec = cal_spec["cal_T"]
-        spec[np.logical_not(np.isfinite(spec))] = 0
-        self._cal_spec = spec
 
     def set_search_method(self, method='basic', **kwargs):
         if method == 'basic':
@@ -248,14 +226,8 @@ class FileSearch(object):
                     t_offset += t.centre[1]
                     t_offset *= parameters['delta_t']
                     f = plt.figure(1)
-                    plt.subplot(411)
-                    t.plot_dm()
-                    plt.subplot(412)
-                    t.plot_freq()
-                    plt.subplot(413)
-                    t.plot_time()
-                    plt.subplot(414)
-                    t.plot_spec()
+                    t.plot_summary()
+
                     t_dm_value = t.centre[0] * t.data.delta_dm
                     if t_dm_value < 5:
                         out_filename = "DM0-5_"
@@ -289,22 +261,16 @@ class FileSearch(object):
             msg = "Unrecognized trigger action: " + action
             raise ValueError(msg)
 
-    def set_dedispersed_h5(self, group=None):
-        """Set h5py group to which to write dedispersed data."""
 
-        self._dedispersed_out_group = group
-
-    #simple method to replace nested structure
-    def search_records(self, start_record, end_record):
-        data = self._datasource.get_records(start_record, end_record, self._scrunch)
-        parameters = self._parameters
+    def preprocess(self, t0, data):
+        """Preprocessing includes simulation."""
 
         preprocess.sys_temperature_bandpass(data)
-        if self._parameters['cal_period_samples']:
-            preprocess.remove_periodic(data,
-                               self._parameters['cal_period_samples'])
+        cal_period = self.datasource.cal_period_samples
+        if cal_period:
+            preprocess.remove_periodic(data, cal_period)
 
-        block_ind = start_record/self._nrecords_block
+        block_ind = self.datasource.nblocks_fetched
 
         # Preprocess.
         #preprocess.sys_temperature_bandpass(data)
@@ -315,13 +281,24 @@ class FileSearch(object):
 
         remove_outliers(data, 5, 128)
 
-        data = preprocess.highpass_filter(data, HPF_WIDTH / parameters['delta_t'])
+        ntime_pre_filter = data.shape[1]
+        data = preprocess.highpass_filter(data, HPF_WIDTH / self.datasource.delta_t)
+        # This changes t0 by half a window width.
+        t0 -= (ntime_pre_filter - data.shape[1]) / 2 * self.datasource.delta_t
 
         remove_outliers(data, 5)
         preprocess.remove_noisy_freq(data, 3)
         preprocess.remove_bad_times(data, 2)
         preprocess.remove_continuum_v2(data)
         preprocess.remove_noisy_freq(data, 3)
+
+        return t0, data
+
+
+    #simple method to replace nested structure
+    def search_next_block(self):
+        t0, data = self.datasource.get_next_block()
+        t0, data = self.preprocess(t0, data)
 
         #from here we weight channels by spectral index
         center_f = self._f0 + (self._df*self._nfreq/2.0)
@@ -341,15 +318,11 @@ class FileSearch(object):
                     f = lambda x: weights*x
                     this_dat = np.matrix(np.apply_along_axis(f, axis=0, arr=data),dtype=np.float32)
 
-                    #if self._dedispersed_out_group:
-                     #   g = self._dedispersed_out_group.create_group("%d-%d"
-                      #          % (start_record, end_record))
-                       # data.to_hdf5(g)
 
                     dm_data = self._Transformer(this_dat)
 
                     del this_dat
-                    dm_data.start_record = start_record
+                    dm_data.t0 = t0
                     these_triggers = self._search(dm_data,spec_ind=alpha,disp_ind=self._disp_ind)
                     del dm_data
                     print 'complete spectral indices: {0} of {1} ({2})'.format(complete,SPEC_INDEX_SAMPLES,alpha)
@@ -371,7 +344,7 @@ class FileSearch(object):
                     #self._action((spec_trigger,))
             else:
                 dm_data = self._Transformer(data)
-                dm_data.start_record = start_record
+                dm_data.t0 = t0
 
                 triggers = self._search(dm_data,disp_ind=self._disp_ind)
 
@@ -382,7 +355,7 @@ class FileSearch(object):
             snrs = []
             for ind in sorted(self._Transformer.keys()):
                 dm_data = self._Transformer[ind](data)
-                dm_data.start_record = start_record
+                dm_data.t0 = t0
                 these_triggers = self._search(dm_data,disp_ind=ind)
                 if len(these_triggers) > 0:
                     print "this snr: {0}".format(these_triggers[0].snr)
@@ -396,107 +369,141 @@ class FileSearch(object):
                 if disp_trigger != None:
                     triggers = (disp_trigger,)
                 else: triggers = []
-                
+
             if dump_snrs:
                 print snrs
             del snrs
-        
+
         self._action(triggers)
         if CATALOG:
             self._catalog.simple_write(triggers,disp_ind = DISP_IND)
         del triggers
 
 
-    def search_all_records(self, time_block=TIME_BLOCK, overlap=OVERLAP):
+    def search_all(self):
+        while True:
+            try:
+                print "Processing block %d." % self.datasource.nblocks_fetched
+                self.search_next_block()
+            except StopIteration:
+                break
 
-        parameters = self._parameters
 
-        record_length = (parameters['ntime_record'] * parameters['delta_t'])
-        nrecords_block = int(math.ceil(time_block / record_length))
-        nrecords_overlap = int(math.ceil(overlap / record_length))
-        nrecords = self._nrecords
-
-        for ii in xrange(0, nrecords, nrecords_block - nrecords_overlap):
-            # XXX
-            print "Block starting with record: {0} of {1}".format(ii,nrecords)
-            #print "Progress: {0}".format(float(ii)/float(nrecords))
-            self.search_records(ii, ii + nrecords_block)
-
-    def search_real_time(self, time_block=TIME_BLOCK, overlap=OVERLAP):
-        parameters = self._parameters
-
-        record_length = (parameters['ntime_record'] * parameters['delta_t'])
-        nrecords_block = int(math.ceil(time_block / record_length))
-        nrecords_overlap = int(math.ceil(overlap / record_length))
-
-        wait_time = float(time_block - overlap) / 5
+    def search_real_time(self):
+        wait_time = float(self.time_block - self.overlap) / 5
         max_wait_iterations = 10
 
         # Enter holding loop, processing records in blocks as they become
         # available.
-        current_start_record = 0
         wait_iterations = 0
         while wait_iterations < max_wait_iterations:
-            nrecords = get_nrecords(self._filename)
-            if nrecords - current_start_record >= nrecords_block:
-                print "Block starting with record: %d" % current_start_record
-                self.search_records(current_start_record,
-                                    current_start_record + nrecords_block)
-                current_start_record += nrecords_block - nrecords_overlap
+            # If there is only 1 block left, it probably is not be complete.
+            if self.datasource.nblocks_left >= 2:
+                print "Processing block %d." % self.datasource.nblocks_fetched
+                self.search_next_block()
                 wait_iterations = 0
             else:
                 time.sleep(wait_time)
                 wait_iterations += 1
         # Precess any leftovers that don't fill out a whole block.
-        self.search_records(current_start_record, 
-                            current_start_record + nrecords_block) 
+        self.search_all()
 
-    def parameters_from_header(self, hdulist):
-        """Get data acqusition parameters for psrfits file header.
 
-        Returns
-        -------
-        parameters : dict
+# GUPPI IO
+# --------
 
-        """
+def FileSource(DataSource):
 
-        parameters = {}
+    def __init__(filename, block=block, overlap=overlap, **kwargs):
+        super(FileSource, self).__init__(
+                source=filename,
+                block=block,
+                overlap=overlap,
+                **kwargs,
+                )
 
-        #print repr(hdulist[0].header)
-        #print
-        #print repr(hdulist[1].header)
+        # Read the headers
+        hdulist = pyfits.open(filename)
         mheader = hdulist[0].header
         dheader = hdulist[1].header
 
         if mheader['CAL_FREQ']:
             cal_period = 1. / mheader['CAL_FREQ']
-            parameters['cal_period_samples'] = int(round(cal_period / dheader['TBIN']))
+            self._cal_period_samples = int(round(cal_period / dheader['TBIN']))
         else:
-            parameters['cal_period_samples'] = 0
-        parameters['delta_t'] = dheader['TBIN']*self._scrunch
-        parameters['nfreq'] = dheader['NCHAN']
-        parameters['freq0'] = mheader['OBSFREQ'] - mheader['OBSBW'] / 2.
-
-        parameters['delta_f'] = dheader['CHAN_BW']
-        parameters['mjd_start'] = mheader['STT_IMJD'] + (mheader['STT_SMJD'] + mheader['STT_OFFS'])/86400.0
-        parameters['unix_start'] = (parameters['mjd_start'] - 40587.0)*86400.0
-
-        parameters['track_mode'] = mheader['TRK_MODE']
-        parameters['loc_0'] = (convert_deg(mheader['STT_CRD1']),convert_deg(mheader['STT_CRD2']))
-        parameters['loc_1'] = (convert_deg(mheader['STP_CRD1']),convert_deg(mheader['STP_CRD2']))
-
-        record0 = hdulist[1].data[0]
-        #print record0
-        #data0 = record0["DATA"]
-        #freq = record0["DAT_FREQ"]
+            self._cal_period_samples = 0
+        self._delta_t_native = dheader['TBIN']
+        self._nfreq = dheader['NCHAN']
+        self._freq0 = mheader['OBSFREQ'] - mheader['OBSBW'] / 2.
+        self._delta_f = dheader['CHAN_BW']
+        self._mjd = mheader['STT_IMJD']
+        self._start_time = (mheader['STT_SMJD'] + mheader['STT_OFFS'])
         ntime_record, npol, nfreq, one = eval(dheader["TDIM17"])[::-1]
-        parameters['npol'] = npol
+        self._ntime_record = ntime_record
+        hdulist.close()
 
-        #is this correct?
-        parameters['ntime_record'] = ntime_record/self._scrunch
-        parameters['dtype'] = np.uint8
+        # Initialize blocking parameters.
+        record_len = self._ntime_record * self._delta_t_native
+        self._nrecords_block = int(np.ceil(block / record_len))
+        self._nrecords_overlap = int(np.ceil(overlap / record_len))
+        self._next_start_record = 0
 
-        return parameters
+    @property
+    def nblocks_left(self):
+        nrecords_left = get_nrecords(self._source) - self._next_start_record
+        return int(np.ceil(float(nrecords_left) / 
+                           (self._nrecords_block - self._nrecords_overlap)))
+
+    @property
+    def nblocks_fetched(self):
+        return (self._next_start_record //
+                (self._nrecords_block - self._nrecords_overlap))
+
+    def get_next_block_native(self):
+        start_record = self._next_start_record
+        if start_record >= self.nblocks_left:
+            raise StopIteration()
+
+        t0 = start_record * self._ntime_record * self._delta_t_native
+        t0 += self._delta_t_native / 2
+
+        hdulist = pyfits.open(self._source)
+        data = read_records(
+                hdulist,
+                self._next_start_record,
+                self._next_start_record + self._nrecords_block,
+                )
+
+        self._next_start_record += (self._nrecords_block
+                                    - self._nrecords_overlap)
+
+        return t0, data
+
+    @property
+    def cal_period_samples(self):
+        return self._cal_period_samples
+
+
+def read_records(hdulist, start_record=0, end_record=None):
+    """Read and format records from GUPPI PSRFITS file."""
+
+    nrecords = len(hdulist[1].data)
+    if end_record is None or end_record > nrecords:
+        end_record = nrecords
+    nrecords_read = end_record - start_record
+    ntime_record, npol, nfreq, one = hdulist[1].data[0]["DATA"].shape
+
+    out_data = np.empty((nfreq, nrecords_read, ntime_record), dtype=np.float32)
+    for ii in xrange(nrecords_read):
+        # Read the record.
+        record = hdulist[1].data[start_record + ii]["DATA"]
+        # Interpret as unsigned int (for Stokes I only).
+        record = record.view(dtype=np.uint8)
+        # Select stokes I and copy.
+        out_data[:,ii,:] = np.transpose(record[:,0,:,0])
+    out_data.shape = (nfreq, nrecords_read * ntime_record)
+
+    return out_data
 
 
 def get_nrecords(filename):
