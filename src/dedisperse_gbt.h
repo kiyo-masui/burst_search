@@ -12,7 +12,6 @@ typedef struct {
   float **raw_data; //remap to float so we can do things like clean up data without worrying about overflow
   float **data;
   size_t *chan_map;
-
   //int icur;  //useful if we want to collapse the data after dedispersing
 } Data;
 
@@ -33,7 +32,7 @@ typedef struct {
 
 
 int get_nchan_from_depth(int depth);
-float get_diagonal_dm_simple(float nu1, float nu2, float dt, int depth);
+float get_diagonal_dm_simple(float nu1, float nu2, float dt, int depth, float disp_ind);
 int *ivector(int n);
 size_t get_burst_nextra(size_t ndata2, int depth);
 Data *put_data_into_burst_struct(float *indata1, float *indata2, size_t ntime1, size_t ntime2, size_t nfreq, size_t *chan_map, int depth);

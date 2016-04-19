@@ -1,6 +1,5 @@
 #! /usr/bin/python
 """Search guppi files for fast radio bursts.
-
 """
 
 import time
@@ -9,10 +8,14 @@ from os import path
 import logging
 import glob
 
+
 import numpy as np
 import h5py
 
 from burst_search import guppi
+
+
+import cProfile, pstats, StringIO
 
 
 logger = logging.getLogger(__name__)
@@ -42,57 +45,120 @@ parser.add_argument(
         help="GUPPI PSRFITS files to search.",
         )
 parser.add_argument(
-        '-c', '--cal-spec-file',
-        help=('.npy file containing the noise-cal spectrum for bandpass'
-              ' calibration.'),
-        )
-parser.add_argument(
         '-p', '--show_plot',
         type=bool,
         default=False
         )
-
+parser.add_argument(
+        '--disp_ind_search',
+        type=float,
+        default=None,
+        nargs=3,
+        metavar=('min', 'max', 'ntrail'),
+        help="Dispersion index search parameters (eg. '1. 5. 4')"
+        )
+parser.add_argument(
+        '--spec_ind_search',
+        type=float,
+        default=None,
+        nargs=3,
+        metavar=('min', 'max', 'ntrail'),
+        help="Spectral index search parameters (eg. '-5. 5. 3')"
+        )
+parser.add_argument(
+        '--max_dm',
+        type=float,
+        default=2000.0
+        )
+parser.add_argument(
+        '--sim',
+        action='store_true',
+        default=False,
+        )
+parser.add_argument(
+        '--scrunch',
+        action='store_true',
+        default=False,
+        help="Use scrunching to achieve max DM."
+        )
+parser.add_argument(
+        '--profile',
+        action='store_true',
+        default=False,
+        )
 
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    
-    if args.cal_spec_file:
-        cal_spec = np.load(args.cal_spec_file)
-    else:
-        cal_spec = None
-	
+    prof = args.profile
+
+    if not args.show_plot:
+        # Configure matplotlib to not need X.
+        import matplotlib as mpl
+        mpl.use('Agg')
+
     files = args.files
     if len(files) == 1:
-	files = glob.glob(files[0])
+        files = glob.glob(files[0])
 
     if mpi_size > 1:
         files = sorted(files)
     else:
         files = files
 
+    search_pars = {}
+    if args.disp_ind_search is not None:
+        search_pars['disp_ind_search'] = True
+        search_pars['disp_ind_min'] =  args.disp_ind_search[0]
+        search_pars['disp_ind_max'] =  args.disp_ind_search[1]
+        search_pars['disp_ind_samples'] = int(args.disp_ind_search[2])
+    if args.spec_ind_search is not None:
+        search_pars['spec_ind_search'] = True
+        search_pars['spec_ind_min'] =  args.spec_ind_search[0]
+        search_pars['spec_ind_max'] =  args.spec_ind_search[1]
+        search_pars['spec_ind_samples'] = int(args.spec_ind_search[2])
+    search_pars["simulate"] = args.sim
+    if args.scrunch:
+        search_pars["max_dm"] = -1.9
+        search_pars["scrunch"] = 1
+    else:
+        search_pars["max_dm"] = args.max_dm
+
+
+
     for filename in files[mpi_rank::mpi_size]:
         print "Rank %d, file %s." % (mpi_rank, filename)
-        try:
-	    Searcher = guppi.FileSearch(filename)
-        except IOError:
-	    print "Rank %d, file can't be opened %s." % (mpi_rank, filename)
-            continue
-        if not cal_spec is None:
-            Searcher.set_cal_spectrum(cal_spec)
+        while True:
+            try:
+                Searcher = guppi.Manager(filename, **dict(search_pars))
+            except IOError as e:
+                print "Rank %d, file can't be opened %s." % (mpi_rank, filename)
+                continue
 
-        act_str = 'save_plot_dm,print'
-        if args.show_plot:
-            act_str = act_str + ', show_plot_dm'
-        print 'doing actions \n' + act_str
-        Searcher.set_trigger_action(act_str)
-        #Searcher.set_trigger_action('print')
+            act_str = 'save_plot_dm,print'
+            if args.show_plot:
+                act_str = act_str + ', show_plot_dm'
+            print 'doing actions \n' + act_str
+            Searcher.set_trigger_action(act_str)
 
-        # To write dedispered data to disk.
-        #out_filename = path.splitext(path.basename(filename))[0] + ".h5"
-        #out_file = h5py.File(out_filename)
-        #Searcher.set_dedispersed_h5(out_file)
+            if prof:
+                pr = cProfile.Profile()
+                pr.enable()
 
-        Searcher.search_all_records()
-        #out_file.close()
+            Searcher.process_all()
+
+            if prof:
+                pr.disable()
+                s = StringIO.StringIO()
+                sortby = 'cumulative'
+                ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+                ps.print_stats()
+                print '\n'.join(s.getvalue().split('\n')[:200])
+                #out_file.close()
+
+            if Searcher.max_dm >= args.max_dm:
+                break
+            else:
+                search_pars["min_search_dm"] = Searcher.max_dm
+                search_pars["scrunch"] *= 2
 

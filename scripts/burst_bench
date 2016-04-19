@@ -137,13 +137,6 @@ parser.add_argument(
         type=int,
         help="Number of samples per parameter",
         )
-parser.add_argument(
-        '-j', '--jon',
-        metavar="verify",
-        default=0,
-        type=int,
-        help="Verify and visually compare sievers/roman dedisperse",
-        )
 
 def make_transient(nchan, fmin, bandwidth, time_window, ntime,dm=100.0):
 	dt = time_window/float(ntime)
@@ -226,10 +219,7 @@ if __name__ == "__main__":
 
 			print 'effective channels: {0}'.format(2**trans.depth)
 			t0 = time.time()
-			if args.jon:
-				trans(dat,jon=1)
-			else:
-				trans(dat,jon=0)
+			trans(dat)
 			times.append([time.time() - t0,time_window,max_dm,nchan,this_dt])
 			print 'complete; t = {0}'.format(times[-1][0])
 

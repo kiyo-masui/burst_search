@@ -28,13 +28,14 @@ size_t burst_get_num_dispersions(size_t nfreq, float freq0,
 
 // Return minimum *depth* parameter required to achieve given maximum DM.
 int burst_depth_for_max_dm(float max_dm, float delta_t, size_t nfreq, float freq0,
-        float delta_f) {
+        float delta_f,float disp_ind) {
   int depth=2;
   int imax=20;
   int i=0;
-  while ((get_diagonal_dm_simple(freq0,freq0+nfreq*delta_f,delta_t,depth)<max_dm)&&(i<imax)) {
+  while ((get_diagonal_dm_simple(freq0,freq0+nfreq*delta_f,delta_t,depth,disp_ind)<max_dm)&&(i<imax)) {
   //while ((alex_diag_dm(freq0, freq0+delta_f, delta_t)<max_dm)&&(i<imax)) {
     //fprintf(stderr,"max DM: %d \n",alex_diag_dm(freq0,freq0+delta_f,delta_t));
+    //printf("%i\n",get_diagonal_dm_simple(freq0,freq0+nfreq*delta_f,delta_t,depth,disp_ind));
     depth++;
     i++;
   }
@@ -43,6 +44,7 @@ int burst_depth_for_max_dm(float max_dm, float delta_t, size_t nfreq, float freq
     return 0;
   }
   
+  //printf("max depth: %i,%i\n",depth,1<<depth);
   return depth;
 }
 
@@ -54,15 +56,15 @@ int burst_depth_for_max_dm(float max_dm, float delta_t, size_t nfreq, float freq
 
 // If chan_map is an array of indeces, should it not be typed `size_t *`? -KM
 void burst_setup_channel_mapping(CM_DTYPE *chan_map, size_t nfreq, float freq0,
-        float delta_f, int depth)
+        float delta_f, int depth, float disp_ind)
 {
   int nchan=get_nchan_from_depth(depth);
   int i,j;
 
   float l0=1.0/(freq0+0.5*delta_f);
-  l0=l0*l0;
+  l0= pow(l0,disp_ind);
   float l1=1.0/(freq0+(nfreq-0.5)*delta_f);
-  l1=l1*l1;
+  l1= pow(l1,disp_ind);
   if (l0>l1) {
     float tmp=l0;
     l0=l1;
@@ -76,7 +78,7 @@ void burst_setup_channel_mapping(CM_DTYPE *chan_map, size_t nfreq, float freq0,
   
   for (i=0;i<nfreq;i++) {
     float myl=1.0/(freq0+(0.5+i)*delta_f);
-    myl=myl*myl;
+    myl=pow(myl,disp_ind);
     int jmin=-1;
     float minerr=1e30;
     for (j=0;j<nchan;j++) {
