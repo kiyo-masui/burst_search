@@ -105,16 +105,16 @@ if __name__ == "__main__":
         print "Rank %d, file %s." % (mpi_rank, filename)
         try:
             if args.disp_search == None and not args.disp_ind == None:
-                Searcher = guppi.FileSearch(filename,disp_ind=args.disp_ind,
+                Searcher = guppi.Manager(filename,disp_ind=args.disp_ind,
                 max_dm=args.max_dm,sim=args.sim)
             elif args.disp_search != None:
                 print args.disp_search
                 disp_min, disp_max, disp_num = args.disp_search
-                Searcher = guppi.FileSearch(filename,disp_ind=disp_min,
+                Searcher = guppi.Manager(filename,disp_ind=disp_min,
                     disp_max = disp_max, disp_ind_samples=int(disp_num),
                     max_dm=args.max_dm,sim=args.sim)
             else:
-                Searcher = guppi.FileSearch(filename,sim=args.sim)
+                Searcher = guppi.Manager(filename,sim=args.sim)
 
         except IOError as e:
             print "Rank %d, file can't be opened %s." % (mpi_rank, filename)

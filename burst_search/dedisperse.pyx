@@ -30,6 +30,8 @@ cdef extern void burst_setup_channel_mapping(CM_DTYPE_t *chan_map, size_t nfreq,
 
 
 DM_CONST = 4148.808
+USE_JON_DD = False
+
 
 
 def disp_delay(freq, dm, disp_ind=2.):
@@ -46,7 +48,7 @@ def dm_transform(
         float delta_f,
         ):
 
-    cdef int jon = 0
+    cdef int jon = USE_JON_DD
     cdef int nfreq = data1.shape[0]
 
     if data2 is None:
@@ -223,7 +225,7 @@ class DMTransform(object):
     def disp_ind(self):
         return self._disp_ind
 
-    def __init__(self, delta_t, nfreq, freq0, delta_f, max_dm, disp_ind=2., jon=False):
+    def __init__(self, delta_t, nfreq, freq0, delta_f, max_dm, disp_ind=2.):
 
         cdef float cdelta_t = delta_t
         cdef int cnfreq = nfreq
@@ -256,7 +258,6 @@ class DMTransform(object):
         self._max_dm = max_dm
         self._ndm = cndm
         self._depth = depth
-        self._jon = jon
         self._disp_ind = disp_ind
 
 
@@ -283,7 +284,7 @@ class DMTransform(object):
         cdef float delta_f = self.delta_f
         cdef int ndm = self.ndm
         cdef int depth = self.depth
-        cdef int jon = self._jon
+        cdef int jon = USE_JON_DD
 
         cdef np.ndarray[ndim=1, dtype=CM_DTYPE_t] chan_map
         chan_map = self._chan_map
