@@ -3,9 +3,6 @@
 """
 
 import numpy as np
-# Should be moved to scripts.
-import matplotlib as mpl
-mpl.use('Agg')
 import matplotlib.pyplot as plt
 try:
     import astropy.io.fits as pyfits
