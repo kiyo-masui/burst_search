@@ -309,14 +309,49 @@ class FileSearch(object):
         t0, data = self.datasource.get_next_block()
         t0, data = self.preprocess(t0, data)
 
-        #from here we weight channels by spectral index
-        center_f = self._f0 + (self._df*self._nfreq/2.0)
-        fmin = self._f0 + self._df*self._nfreq
-        fmax = self._f0
+        freq = self.datasource.freq
+        freq_norm = freq / np.mean(freq)
+
+        trigger = None
+
+        for transform in self._dm_transformers:
+            print "Dispersion index %3.1f." % transform.disp_ind
+            for spec_ind in self._spectral_inds:
+                print "Spectral index %3.1f." % spec_ind
+                weights = freq_norm ** spec_ind
+                this_data = data * weights[:,None]
+                # DM transform.
+                dm_data = transform(this_data)
+                # Metadata required for the search but not the transform.
+                dm_data._t0 = t0
+                dm_data._spec_ind = spec_ind
+                # Search the data.
+                this_triggers = self.search(dm_data)
+                # Free up memory if there where no triggers.
+                del this_data, dm_data
+                if len(this_triggers) > 0:
+                    # In principle a search routine could return more than one
+                    # trigger. For now just choose the strongest.
+                    this_best_trigger = this_triggers[0]
+                    for t in this_triggers[1:]:
+                        if t.snr > this_best_trigger.snr:
+                            this_best_trigger = t
+                        print "Trigger with SNR 4.1%f." % this_best_trigger.snr
+                        if trigger is None or this_best_trigger.snr > trigger.snr:
+                            trigger = this_best_trigger
+                        # Recover memory for next iteration.
+                        del this_triggers, this_best_trigger
+        # Process any triggers.
+        self._action([trigger])
+        if False:
+            self._catalog.simple_write([trigger])
+
+
+
+
 
         if self._disp_max == None:
             if DO_SPEC_SEARCH:
-                print "----------------------"
                 spec_trigger = None
 
                 complete = 1
