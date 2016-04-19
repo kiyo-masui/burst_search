@@ -8,54 +8,24 @@ from os import path
 import time
 
 import numpy as np
-from numpy import array, dot
+# Should be moved to scripts.
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
 try:
     import astropy.io.fits as pyfits
 except ImportError:
     import pyfits
-import matplotlib as mpl
-mpl.use('Agg')
-import matplotlib.pyplot as plt
-
-import cProfile, pstats, StringIO
 
 from . import preprocess
 from . import dedisperse
-from .datasource import DataSource
+from . import datasource
 from . import search
 from . import simulate
-from simulate import *
-from catalog import Catalog, convert_deg
-from _preprocess import remove_outliers
+from . import catalog
 
 
-# XXX Eventually a parameter, seconds.
-#TIME_BLOCK = 30.
-
-#Additions:
-MIN_SEARCH_DM = 5
-
-TIME_BLOCK = 30.0
-#TIME_BLOCK = 5.0
-
-#Must scale with disp_ind
-MAX_DM = 2000
-# For DM=4000, 13s delay across the band, so overlap searches by ~15s.
-
-# Overlap needs to account for the total delay across the band at max DM as
-# well as any data invalidated by FIR filtering of the data.
-#OVERLAP = 15.
-#OVERLAP = 1.
-OVERLAP = 8.
-
-DO_SPEC_SEARCH = True
 USE_JON_DD = False
-SPEC_INDEX_MIN = -8
-SPEC_INDEX_MAX = 8
-SPEC_INDEX_SAMPLES = 5
-
-THRESH_SNR = 8.0
-
 DEV_PLOTS = False
 
 #Event simulation params, speculative/contrived
@@ -75,23 +45,13 @@ dm_sd = 0
 
 CATALOG = True
 
-#Use to test different dispersions
-#of the form l^DISP_IND
-#where l is wavelength
-#Be sure to alter 'MAX_DM' accordingly.
-#Large DISP_IND decreases depth
-#DISP_IND is now set via a command line argument
-DISP_IND = 2.0
-DISP_MAX = None
-DISP_IND_SAMPLES = None
-dump_snrs = True
 
 HPF_WIDTH = 0.1    # s
 
 
 DEFAULT_PARAMETERS = {
         # filename must also be supplied.
-        'time_block' : 38,    # Seconds.
+        'time_block' : 40,    # Seconds.
         'overlap' : 8.,
         'scrunch' : 1,
         'max_dm' : 2000.,
@@ -111,9 +71,6 @@ DEFAULT_PARAMETERS = {
         }
 
 
-
-
-
 class FileSearch(object):
 
     def __init__(self, filename, **kwargs):
@@ -126,6 +83,10 @@ class FileSearch(object):
                 overlap=parameters['overlap'],
                 scrunch=parameters['scrunch'],
                 )
+
+        # Store search parameters.
+        self._min_search_dm = parameters['min_search_dm']
+        self._threshold_snr = parameters['threshold_snr']
 
         # Spectral index search.
         if parameters['spec_ind_search']:
@@ -248,7 +209,6 @@ class FileSearch(object):
                     out_filename_DMT = out_filename + "_DM-T_ "+ "+%06.2fs.npy" % t_offset
                     out_filename_FT  = out_filename + "_Freq-T_" + "+%06.2fs.npy" % t_offset
 
-                    print out_filename_png
  
                     plt.savefig(out_filename_png, bbox_inches='tight')
                     plt.close(f)
@@ -282,14 +242,14 @@ class FileSearch(object):
             #do simulation
             data += self._sim_source.generate_events(block_ind)[:,0:data.shape[1]]
 
-        remove_outliers(data, 5, 128)
+        preprocess.remove_outliers(data, 5, 128)
 
         ntime_pre_filter = data.shape[1]
         data = preprocess.highpass_filter(data, HPF_WIDTH / self.datasource.delta_t)
         # This changes t0 by half a window width.
         t0 -= (ntime_pre_filter - data.shape[1]) / 2 * self.datasource.delta_t
 
-        remove_outliers(data, 5)
+        preprocess.remove_outliers(data, 5)
         preprocess.remove_noisy_freq(data, 3)
         preprocess.remove_bad_times(data, 2)
         preprocess.remove_continuum_v2(data)
@@ -301,8 +261,8 @@ class FileSearch(object):
         """Search the data."""
         return search.basic(
                 dm_data,
-                THRESH_SNR,
-                MIN_SEARCH_DM,
+                self._threshold_snr,
+                self._min_search_dm,
                 int(HPF_WIDTH/self.datasource.delta_t),
                 )
 
@@ -379,7 +339,7 @@ class FileSearch(object):
 # GUPPI IO
 # --------
 
-class FileSource(DataSource):
+class FileSource(datasource.DataSource):
 
     def __init__(self, filename, block=30., overlap=8., **kwargs):
         super(FileSource, self).__init__(

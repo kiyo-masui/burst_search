@@ -5,7 +5,7 @@ This module contains, bandpass calibration, RFI flagging, etc.
 import numpy as np
 from scipy import signal, fftpack
 
-from _preprocess import remove_continuum_v2
+from _preprocess import remove_continuum_v2, remove_outliers
 
 
 def remove_periodic(data, period):
@@ -81,39 +81,6 @@ def sys_temperature_bandpass(data):
     T_sys[bad_chans] = 1
     data /= T_sys[:,None]
     data[bad_chans,:] = 0
-
-def remove_outliers(data, sigma_threshold, block=None, ddof = 1.0):
-    """Flag outliers within frequency channels.
-    Replace outliers with that frequency's mean.
-    """
-
-    nfreq0 = data.shape[0]
-    ntime0 = data.shape[1]
-
-    if block is None:
-        block = ntime0
-
-    if ntime0 % block:
-        raise ValueError("Time axis must be divisible by block."
-                         " (ntime, block) = (%d, %d)." % (ntime0, block))
-
-    ntime = block
-    nfreq = nfreq0 * (ntime0 // block)
-
-    print data.shape
-    data.shape = (nfreq, ntime)
-    print data.shape
-    
-
-    # To optimize cache usage, process one frequency at a time.
-    for ii in range(nfreq):
-        this_freq_data = data[ii,:]
-        mean = np.mean(this_freq_data, dtype=np.float32, ddof=ddof)
-        std = np.std(this_freq_data, dtype=np.float32,ddof=ddof)
-        outliers = abs(this_freq_data - mean) > sigma_threshold * std
-        this_freq_data[outliers] = mean
-
-    data.shape = (nfreq0, ntime0)
 
 
 def remove_noisy_freq(data, sigma_threshold):
