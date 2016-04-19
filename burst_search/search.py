@@ -20,10 +20,6 @@ class Trigger(object):
         self._duration = duration
 
     @property 
-    def disp_ind(self):
-        return self._disp_ind
-
-    @property 
     def snr(self):
         return self._snr
 
@@ -36,10 +32,10 @@ class Trigger(object):
         return (self._dm_ind, self._time_ind)
 
     def __str__(self):
-        return str((self._snr, self.data.spec_ind, self._disp_ind, self.centre))
+        return str((self._snr, self.data.spec_ind, self.centre))
 
     def __repr__(self):
-        return str((self._snr, self.data.spec_ind, self._disp_ind, self.centre))
+        return str((self._snr, self.data.spec_ind, self.centre))
 
     def plot_dm(self):
         di, ti = self.centre
@@ -65,7 +61,7 @@ class Trigger(object):
         spec_ind = self.data.spec_ind
         spec_ind_value = ",spec_ind ="
         spec_ind_value += str(spec_ind)
-        disp_ind = self.disp_ind
+        disp_ind = self.data.disp_ind
         disp_ind_value = ",disp_ind ="
         disp_ind_value += str(disp_ind)
         text = dm_value + snr_value + duration_value + spec_ind_value + disp_ind_value
@@ -134,7 +130,7 @@ class Trigger(object):
 
         spectrum = np.zeros(nfreq, dtype=float)
 
-        disp_ind = self._disp_ind
+        disp_ind = self.data.disp_ind
 
         for ii in range(nfreq):
             f = freq[ii]
@@ -162,13 +158,13 @@ class Trigger(object):
 
     def plot_summary(self):
         plt.subplot(411)
-        t.plot_dm()
+        self.plot_dm()
         plt.subplot(412)
-        t.plot_freq()
+        self.plot_freq()
         plt.subplot(413)
-        t.plot_time()
+        self.plot_time()
         plt.subplot(414)
-        t.plot_spec()
+        self.plot_spec()
 
 
 
@@ -186,7 +182,7 @@ class Trigger(object):
 
         the_dm = self.data.dm[di]
 
-        disp_ind = self._disp_ind
+        disp_ind = self.data.disp_ind
 
         spec_data_delay = np.zeros((nfreq, tside), dtype=float)
         for ii in range(nfreq):
@@ -249,7 +245,7 @@ class Trigger(object):
 
         the_dm = self.data.dm[di]
 
-        disp_ind = self._disp_ind
+        disp_ind = self.data.disp_ind
 
         spec_data_delay = np.zeros((nfreq, tside), dtype=float)
         for ii in range(nfreq):

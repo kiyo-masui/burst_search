@@ -27,7 +27,6 @@ from . import simulate
 from simulate import *
 from catalog import Catalog, convert_deg
 from _preprocess import remove_outliers
-from datasource import ScrunchFileSource, FileSource
 
 
 # XXX Eventually a parameter, seconds.
@@ -92,17 +91,17 @@ HPF_WIDTH = 0.1    # s
 
 DEFAULT_PARAMETERS = {
         # filename must also be supplied.
-        'time_block' : 30,    # Seconds.
+        'time_block' : 38,    # Seconds.
         'overlap' : 8.,
         'scrunch' : 1,
         'max_dm' : 2000.,
-        'min_search_dm' : 5.
+        'min_search_dm' : 5.,
         'threshold_snr' : 8.,
         'trigger_action' : 'print',
         'spec_ind_search' : True,
-        'spec_ind_min' : -8.,
-        'spec_ind_mac' : 8.,
-        'spec_ind_samples' : 5.,
+        'spec_ind_min' : -5.,
+        'spec_ind_max' : 5.,
+        'spec_ind_samples' : 3.,
         'disp_ind_search' : False,
         'disp_ind_min' : 1.,
         'disp_ind_max' : 5.,
@@ -123,7 +122,7 @@ class FileSearch(object):
 
         self._datasource = FileSource(
                 filename,
-                time_block=parameters['time_block'],
+                block=parameters['time_block'],
                 overlap=parameters['overlap'],
                 scrunch=parameters['scrunch'],
                 )
@@ -235,19 +234,21 @@ class FileSearch(object):
                     elif 20 <= t_dm_value < 100:
                         out_filename = "DM20-100_"
                     elif 100 <= t_dm_value <300:
-                        out_filename = "DM100-300_"                    
+                        out_filename = "DM100-300_"
                     else:
                         out_filename = "DM300-2000_" 
-                    out_filename += path.splitext(path.basename(self._filename))[0]
+                    out_filename += path.splitext(path.basename(self.datasource._source))[0]
                     if not t.data.spec_ind is None:
                                     out_filename += "+a=%02.f" % t.data.spec_ind
                     #out_filename += "+%06.2fs.png" % t_offset
-                    if not t.disp_ind is None:
-                                    out_filename += "+n=%02.f" % t.disp_ind
+                    if not t.data.disp_ind is None:
+                                    out_filename += "+n=%02.f" % t.data.disp_ind
                     out_filename_png = out_filename + "+%06.2fs.png" % t_offset
 
-                    out_filename_DMT = out_filename + "_DM-T_ "+ "+%06.2fs.npy" % t_offset             
+                    out_filename_DMT = out_filename + "_DM-T_ "+ "+%06.2fs.npy" % t_offset
                     out_filename_FT  = out_filename + "_Freq-T_" + "+%06.2fs.npy" % t_offset
+
+                    print out_filename_png
  
                     plt.savefig(out_filename_png, bbox_inches='tight')
                     plt.close(f)
@@ -298,7 +299,7 @@ class FileSearch(object):
 
     def search(self, dm_data):
         """Search the data."""
-        search.basic(
+        return search.basic(
                 dm_data,
                 THRESH_SNR,
                 MIN_SEARCH_DM,
@@ -306,6 +307,7 @@ class FileSearch(object):
                 )
 
     def process_next_block(self):
+        print "Processing block %d." % self.datasource.nblocks_fetched
         t0, data = self.datasource.get_next_block()
         t0, data = self.preprocess(t0, data)
 
@@ -315,11 +317,11 @@ class FileSearch(object):
         trigger = None
 
         for transform in self._dm_transformers:
-            print "Dispersion index %3.1f." % transform.disp_ind
             for spec_ind in self._spectral_inds:
-                print "Spectral index %3.1f." % spec_ind
+                msg = "Dispersion index %3.1f, spectral index %3.1f."
+                print msg % (transform.disp_ind, spec_ind)
                 weights = freq_norm ** spec_ind
-                this_data = data * weights[:,None]
+                this_data = (data * weights[:,None]).astype(data.dtype)
                 # DM transform.
                 dm_data = transform(this_data)
                 # Metadata required for the search but not the transform.
@@ -336,99 +338,21 @@ class FileSearch(object):
                     for t in this_triggers[1:]:
                         if t.snr > this_best_trigger.snr:
                             this_best_trigger = t
-                        print "Trigger with SNR 4.1%f." % this_best_trigger.snr
-                        if trigger is None or this_best_trigger.snr > trigger.snr:
-                            trigger = this_best_trigger
-                        # Recover memory for next iteration.
-                        del this_triggers, this_best_trigger
+                    print "Trigger with SNR %4.1f." % this_best_trigger.snr
+                    if trigger is None or this_best_trigger.snr > trigger.snr:
+                        trigger = this_best_trigger
+                    # Recover memory for next iteration.
+                    del this_triggers, this_best_trigger
         # Process any triggers.
-        self._action([trigger])
-        if False:
-            self._catalog.simple_write([trigger])
-
-
-
-
-
-        if self._disp_max == None:
-            if DO_SPEC_SEARCH:
-                spec_trigger = None
-
-                complete = 1
-                for alpha in np.linspace(SPEC_INDEX_MIN,SPEC_INDEX_MAX,SPEC_INDEX_SAMPLES):
-                    #for i in xrange(0,3):
-                    weights = array([math.pow(f/center_f, alpha) for f in np.linspace(fmax,fmin,self._nfreq)])
-
-                    f = lambda x: weights*x
-                    this_dat = np.matrix(np.apply_along_axis(f, axis=0, arr=data),dtype=np.float32)
-
-
-                    dm_data = self._Transformer(this_dat)
-
-                    del this_dat
-                    dm_data._t0 = t0
-                    dm_data._spec_ind = alpha
-                    these_triggers = self.search(dm_data)
-                    del dm_data
-                    print 'complete spectral indices: {0} of {1} ({2})'.format(complete,SPEC_INDEX_SAMPLES,alpha)
-                    if len(these_triggers)  > 0:
-                        print 'max snr: {0}'.format(these_triggers[0].snr)
-                        if spec_trigger == None or these_triggers[0].snr > spec_trigger.snr:
-                            spec_trigger = these_triggers[0]
-                    del these_triggers
-                    complete += 1
-
-                #spec_triggers = [t[0] for t in spec_triggers if len(t) > 0]
-                #spec_triggers = sorted(spec_triggers, key= lambda x: -x.snr)
-                #if len(spec_triggers) > 0:
-                    #spec_triggers = [spec_triggers[0],]
-                    #self._action(spec_triggers, dm_data)
-                if spec_trigger != None:
-                    triggers = (spec_trigger,)
-                else: triggers = []
-                    #self._action((spec_trigger,))
-            else:
-                dm_data = self._Transformer(data)
-                dm_data.t0 = t0
-
-                triggers = self.search(dm_data)
-
-        #Do dispersion index search
-        else:
-            disp_trigger = None
-            complete = 1
-            snrs = []
-            for ind in sorted(self._Transformer.keys()):
-                dm_data = self._Transformer[ind](data)
-                dm_data.t0 = t0
-                these_triggers = self.search(dm_data)
-                if len(these_triggers) > 0:
-                    print "this snr: {0}".format(these_triggers[0].snr)
-                    snrs.append([ind,these_triggers[0].snr])
-                    if disp_trigger == None or these_triggers[0].snr > disp_trigger.snr:
-                        disp_trigger = these_triggers[0]
-                    del these_triggers
-                print 'complete dispersion indices: {0} of {1} ({2})'.format(complete,self._disp_ind_samples,ind)
-                complete += 1
-
-                if disp_trigger != None:
-                    triggers = (disp_trigger,)
-                else: triggers = []
-
-            if dump_snrs:
-                print snrs
-            del snrs
-
-        self._action(triggers)
-        if CATALOG:
-            self._catalog.simple_write(triggers,disp_ind = DISP_IND)
-        del triggers
+        if trigger is not None:
+            self._action([trigger])
+            if False:
+                self._catalog.simple_write([trigger])
 
     def process_all(self):
         while True:
             try:
-                print "Processing block %d." % self.datasource.nblocks_fetched
-                self.search_next_block()
+                self.process_next_block()
             except StopIteration:
                 break
 
@@ -443,26 +367,26 @@ class FileSearch(object):
             # If there is only 1 block left, it probably is not be complete.
             if self.datasource.nblocks_left >= 2:
                 print "Processing block %d." % self.datasource.nblocks_fetched
-                self.search_next_block()
+                self.process_next_block()
                 wait_iterations = 0
             else:
                 time.sleep(wait_time)
                 wait_iterations += 1
         # Precess any leftovers that don't fill out a whole block.
-        self.search_all()
+        self.process_all()
 
 
 # GUPPI IO
 # --------
 
-def FileSource(DataSource):
+class FileSource(DataSource):
 
-    def __init__(filename, block=block, overlap=overlap, **kwargs):
+    def __init__(self, filename, block=30., overlap=8., **kwargs):
         super(FileSource, self).__init__(
                 source=filename,
                 block=block,
                 overlap=overlap,
-                **kwargs,
+                **kwargs
                 )
 
         # Read the headers
@@ -504,7 +428,7 @@ def FileSource(DataSource):
 
     def get_next_block_native(self):
         start_record = self._next_start_record
-        if start_record >= self.nblocks_left:
+        if self.nblocks_left == 0:
             raise StopIteration()
 
         t0 = start_record * self._ntime_record * self._delta_t_native

@@ -6,6 +6,7 @@ import time
 import argparse
 from os import path
 import logging
+import glob
 
 
 import numpy as np
@@ -118,8 +119,6 @@ if __name__ == "__main__":
         except IOError as e:
             print "Rank %d, file can't be opened %s." % (mpi_rank, filename)
             continue
-        if not cal_spec is None:
-            Searcher.set_cal_spectrum(cal_spec)
 
         act_str = 'save_plot_dm,print'
         if args.show_plot:
@@ -136,7 +135,7 @@ if __name__ == "__main__":
             pr = cProfile.Profile()
             pr.enable()
 
-        Searcher.search_all_records()
+        Searcher.process_all()
 
         if prof:
             pr.disable()

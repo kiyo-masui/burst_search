@@ -112,6 +112,8 @@ class DataSource(object):
 
         scrunch = self._scrunch
         t0, data_native = self.get_next_block_native()
+        if scrunch == 1:
+            return t0, data_native
         ntime_native = data_native.shape[1]
         if ntime_native % self._scrunch:
             msg = "Scrunch factor (%d) must divide native time block size (%d)"
