@@ -50,7 +50,7 @@ DEFAULT_PARAMETERS = {
         'min_search_dm' : 5.,
         'threshold_snr' : 8.,
         'trigger_action' : 'print',
-        'spec_ind_search' : True,
+        'spec_ind_search' : False,
         'spec_ind_min' : -5.,
         'spec_ind_max' : 5.,
         'spec_ind_samples' : 3.,
@@ -111,13 +111,26 @@ class Manager(object):
             dispersion_inds = [2.]
 
         # Initailize DM transforms.
+        if parameters['max_dm'] < 0:
+            # Go to N times the diagonal DM.'
+            freq = self.datasource.freq
+            diagonal_dm = dedisperse.calc_delta_dm(
+                    self.datasource.delta_t,
+                    freq[0],
+                    freq[-1],
+                    )
+            diagonal_dm *= len(freq)
+            max_dm = -parameters['max_dm'] * diagonal_dm
+        else:
+            max_dm = parameters['max_dm']
+        self._max_dm = max_dm
         self._dm_transformers = []
         freq = self.datasource.freq
         max_freq = np.max(freq)
         min_freq = np.min(freq)
         for disp_ind in dispersion_inds:
             # Rescale max dm to same total delay as disp_ind=2.
-            max_dm = parameters['max_dm']
+            max_dm = max_dm
             max_dm *= (1.0 / min_freq ** 2.0) - (1.0 / max_freq ** 2.0)
             max_dm /= (1.0 / min_freq ** disp_ind) - (1.0 / max_freq ** disp_ind)
             transform = dedisperse.DMTransform(
@@ -149,6 +162,10 @@ class Manager(object):
     @property
     def datasource(self):
         return self._datasource
+
+    @property
+    def max_dm(self):
+        return self._max_dm
 
 
     def set_trigger_action(self, action='print', **kwargs):

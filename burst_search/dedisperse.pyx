@@ -310,13 +310,17 @@ class DMTransform(object):
         spec_data = np.ascontiguousarray(data1[:, :ntime_out])
 
         dm0 = 0
-        delta_dm = (delta_t / DM_CONST / 
-                abs(1. / freq0**disp_ind - 1. / (freq0 + nfreq * delta_f)**disp_ind))
+        delta_dm = calc_delta_dm(delta_t, freq0, freq0 + nfreq * delta_f,
+                                 disp_ind)
 
         out_cont = DMData(spec_data, dm_data, delta_t, freq0, delta_f, dm0,
                           delta_dm, disp_ind=disp_ind)
 
         return out_cont
+
+
+def calc_delta_dm(delta_t, f1, f2, disp_ind=2):
+    return (delta_t / DM_CONST / abs(1. / f1**disp_ind - 1. / f2**disp_ind))
 
 
 
