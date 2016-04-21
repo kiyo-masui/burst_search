@@ -285,6 +285,7 @@ class DMTransform(object):
         cdef int ndm = self.ndm
         cdef int depth = self.depth
         cdef int jon = USE_JON_DD
+        cdef int ntime_out
 
         cdef np.ndarray[ndim=1, dtype=CM_DTYPE_t] chan_map
         chan_map = self._chan_map
@@ -292,20 +293,21 @@ class DMTransform(object):
         cdef np.ndarray[ndim=2, dtype=DTYPE_t] out
         out = np.empty(shape=(ndm, ntime1), dtype=DTYPE)
 
-        cdef int ntime_out = burst_dm_transform(
-                <DTYPE_t *> data1.data,
-                <DTYPE_t *> data2.data,
-                <CM_DTYPE_t *> chan_map.data,
-                <DTYPE_t *> out.data,
-                ntime1,
-                ntime2,
-                delta_t,
-                nfreq,
-                freq0,
-                delta_f,
-                depth,
-                jon,
-                )
+        with nogil:
+            ntime_out = burst_dm_transform(
+                    <DTYPE_t *> &data1[0,0],
+                    <DTYPE_t *> &data2[0,0],
+                    <CM_DTYPE_t *> &chan_map[0],
+                    <DTYPE_t *> &out[0,0],
+                    ntime1,
+                    ntime2,
+                    delta_t,
+                    nfreq,
+                    freq0,
+                    delta_f,
+                    depth,
+                    jon,
+                    )
         dm_data = np.ascontiguousarray(out[:,:ntime_out])
         spec_data = np.ascontiguousarray(data1[:, :ntime_out])
 

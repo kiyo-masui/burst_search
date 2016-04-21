@@ -1,4 +1,3 @@
-import pyfits
 import numpy as np
 
 
@@ -58,6 +57,14 @@ class DataSource(object):
         pass
 
     # Initialization must provide data for these parameters.
+
+    @property
+    def time_block(self):
+        return self._block
+
+    @property
+    def overlap(self):
+        return self._overlap
 
     @property
     def delta_t(self):

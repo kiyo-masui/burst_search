@@ -29,20 +29,22 @@ def sievers_find_peak(data, low_dm_exclude=1, length_limit=0):
     cdef int peak_time
     cdef int peak_duration
     cdef int len_lim = length_limit
+    cdef size_t ret
 
     dm_data = data.dm_data[low_dm_exclude:,:]
     ndm -= low_dm_exclude
 
-    cdef size_t ret = find_peak_wrapper(
-            <DTYPE_t *> dm_data.data,
-            ndm,
-            ntime,
-            len_lim,
-            &peak_snr,
-            &peak_dm,
-            &peak_time,
-            &peak_duration,
-            )
+    with nogil:
+        ret = find_peak_wrapper(
+                <DTYPE_t *> dm_data.data,
+                ndm,
+                ntime,
+                len_lim,
+                &peak_snr,
+                &peak_dm,
+                &peak_time,
+                &peak_duration,
+                )
 
     peak_dm += low_dm_exclude
 
