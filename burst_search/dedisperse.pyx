@@ -21,9 +21,10 @@ cdef extern int burst_get_num_dispersions(size_t nfreq, float freq0,
 cdef extern int burst_depth_for_max_dm(float max_dm, float delta_t,
         size_t nfreq, float freq0, float delta_f, float disp_ind)
 
-cdef extern int  burst_dm_transform(DTYPE_t *indata1, DTYPE_t *indata2,
+cdef extern int burst_dm_transform(DTYPE_t *indata1, DTYPE_t *indata2,
         CM_DTYPE_t *chan_map, DTYPE_t *outdata, size_t ntime1, int ntime2,
-        float delta_t, size_t nfreq, float freq0, float delta_f, int depth, int jon)
+        float delta_t, size_t nfreq, float freq0, float delta_f, int depth,
+        int jon) nogil
 
 cdef extern void burst_setup_channel_mapping(CM_DTYPE_t *chan_map, size_t nfreq,
         float freq0, float delta_f, int depth, float disp_ind)

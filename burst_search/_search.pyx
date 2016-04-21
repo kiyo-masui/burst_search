@@ -15,7 +15,7 @@ ctypedef np.float32_t DTYPE_t
 # C prototypes.
 cdef extern size_t find_peak_wrapper(float *data, int nchan, int ndata,
         int len_lim, float *peak_snr, int *peak_channel, int *peak_sample,
-        int *peak_duration)
+        int *peak_duration) nogil
 
 
 def sievers_find_peak(data, low_dm_exclude=1, length_limit=0):
