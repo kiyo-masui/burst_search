@@ -21,9 +21,10 @@ cdef extern int burst_get_num_dispersions(size_t nfreq, float freq0,
 cdef extern int burst_depth_for_max_dm(float max_dm, float delta_t,
         size_t nfreq, float freq0, float delta_f, float disp_ind)
 
-cdef extern int  burst_dm_transform(DTYPE_t *indata1, DTYPE_t *indata2,
+cdef extern int burst_dm_transform(DTYPE_t *indata1, DTYPE_t *indata2,
         CM_DTYPE_t *chan_map, DTYPE_t *outdata, size_t ntime1, int ntime2,
-        float delta_t, size_t nfreq, float freq0, float delta_f, int depth, int jon)
+        float delta_t, size_t nfreq, float freq0, float delta_f, int depth,
+        int jon) nogil
 
 cdef extern void burst_setup_channel_mapping(CM_DTYPE_t *chan_map, size_t nfreq,
         float freq0, float delta_f, int depth, float disp_ind)
@@ -285,6 +286,7 @@ class DMTransform(object):
         cdef int ndm = self.ndm
         cdef int depth = self.depth
         cdef int jon = USE_JON_DD
+        cdef int ntime_out
 
         cdef np.ndarray[ndim=1, dtype=CM_DTYPE_t] chan_map
         chan_map = self._chan_map
@@ -292,20 +294,21 @@ class DMTransform(object):
         cdef np.ndarray[ndim=2, dtype=DTYPE_t] out
         out = np.empty(shape=(ndm, ntime1), dtype=DTYPE)
 
-        cdef int ntime_out = burst_dm_transform(
-                <DTYPE_t *> data1.data,
-                <DTYPE_t *> data2.data,
-                <CM_DTYPE_t *> chan_map.data,
-                <DTYPE_t *> out.data,
-                ntime1,
-                ntime2,
-                delta_t,
-                nfreq,
-                freq0,
-                delta_f,
-                depth,
-                jon,
-                )
+        with nogil:
+            ntime_out = burst_dm_transform(
+                    <DTYPE_t *> &data1[0,0],
+                    <DTYPE_t *> &data2[0,0],
+                    <CM_DTYPE_t *> &chan_map[0],
+                    <DTYPE_t *> &out[0,0],
+                    ntime1,
+                    ntime2,
+                    delta_t,
+                    nfreq,
+                    freq0,
+                    delta_f,
+                    depth,
+                    jon,
+                    )
         dm_data = np.ascontiguousarray(out[:,:ntime_out])
         spec_data = np.ascontiguousarray(data1[:, :ntime_out])
 

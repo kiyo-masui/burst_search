@@ -3,7 +3,6 @@ import time
 import os
 from os import listdir, makedirs
 from os.path import isfile, join, exists
-import pyfits
 import numpy as np
 
 ind_t = np.int16

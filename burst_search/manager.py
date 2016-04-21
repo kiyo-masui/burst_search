@@ -7,10 +7,6 @@ import time
 
 import numpy as np
 import matplotlib.pyplot as plt
-try:
-    import astropy.io.fits as pyfits
-except ImportError:
-    import pyfits
 
 from . import dedisperse
 from . import datasource
@@ -326,7 +322,7 @@ class Manager(object):
                 break
 
     def process_real_time(self):
-        wait_time = float(self.time_block - self.overlap) / 5
+        wait_time = float(self.datasource.time_block - self.datasource.overlap) / 5
         max_wait_iterations = 10
 
         # Enter holding loop, processing records in blocks as they become
