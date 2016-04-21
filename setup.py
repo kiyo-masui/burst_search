@@ -74,7 +74,7 @@ setup(
     ext_modules = EXTENSIONS,
     scripts = SCRIPTS,
     cmdclass = {'build_ext': build_ext},
-    install_requires = ['numpy', 'pyfits', 'Cython', 'h5py'],
+    install_requires = ['numpy', 'astropy', 'Cython', 'h5py', 'matplotlib'],
 
     # metadata for upload to PyPI
     author = "Kiyoshi Wesley Masui, Jonathan Sievers",
