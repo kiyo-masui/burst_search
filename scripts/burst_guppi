@@ -12,7 +12,6 @@ import glob
 import numpy as np
 import h5py
 
-from burst_search import guppi
 
 
 import cProfile, pstats, StringIO
@@ -96,6 +95,9 @@ if __name__ == "__main__":
         # Configure matplotlib to not need X.
         import matplotlib as mpl
         #mpl.use('Agg')
+
+    # Must be imported after choosing mpl backend.
+    from burst_search import guppi
 
     files = args.files
     if len(files) == 1:
