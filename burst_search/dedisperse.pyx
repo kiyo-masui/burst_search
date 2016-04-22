@@ -294,10 +294,13 @@ class DMTransform(object):
         cdef np.ndarray[ndim=2, dtype=DTYPE_t] out
         out = np.empty(shape=(ndm, ntime1), dtype=DTYPE)
 
+        cdef DTYPE_t *d1ptr = <DTYPE_t *> data1.data
+        cdef DTYPE_t *d2ptr = <DTYPE_t *> data2.data
+
         with nogil:
             ntime_out = burst_dm_transform(
-                    <DTYPE_t *> &data1[0,0],
-                    <DTYPE_t *> &data2[0,0],
+                    d1ptr,
+                    d2ptr,
                     <CM_DTYPE_t *> &chan_map[0],
                     <DTYPE_t *> &out[0,0],
                     ntime1,
