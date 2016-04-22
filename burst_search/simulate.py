@@ -1,11 +1,15 @@
 import random
 import math
 import uuid
+import logging
 
 import numpy as np
 import numpy.random as nprand
 
 from dedisperse import disp_delay
+
+
+logger = logging.getLogger(__name__)
 
 
 class Event(object):
@@ -135,7 +139,8 @@ class EventSimulator(object):
                 msg = ("Injecting simulated event at time = %5.2f, DM = %6.1f,"
                        " fluence = %f, width = %f, spec_ind = %3.1f, disp_ind"
                        " = %3.1f.")
-                print msg % (time[ind], dm, fluence, width, spec_ind, disp_ind)
+                logger.info(msg
+                        % (time[ind], dm, fluence, width, spec_ind, disp_ind))
                 t = disp_delay(f_min, dm, disp_ind)
                 t = t - disp_delay(f_mean, dm, disp_ind)
                 t = t + time[ind]

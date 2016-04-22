@@ -4,6 +4,7 @@
 
 from os import path
 import time
+import logging
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,6 +15,8 @@ from . import search
 from . import simulate
 from . import catalog
 
+
+logger = logging.getLogger(__name__)
 
 DEV_PLOTS = False
 
@@ -155,11 +158,6 @@ class Manager(object):
         # Deal with these later.
         if False:
             #initialize sim object, if there are to be simulated events
-            if SIMULATE:
-                self._sim_source = simulate.RandSource(alpha=alpha, f_m=f_m,f_sd=f_sd,bw_m=bw_m,bw_sd=bw_sd,t_m=t_m,
-                    t_sd=t_sd,s_m=s_m,s_sd=s_sd,dm_m=dm_m,dm_sd=dm_sd,
-                    event_rate=sim_rate,file_params=self._parameters,t_overlap=OVERLAP,nrecords_block=self._nrecords_block)
-
             if CATALOG:
                 reduced_name = '.'.join(self._filename.split(os.sep)[-1].split('.')[:-1])
                 self._catalog = Catalog(parent_name=reduced_name, parameters=parameters)
@@ -292,7 +290,7 @@ class Manager(object):
                 )
 
     def process_next_block(self):
-        print "Processing block %d." % self.datasource.nblocks_fetched
+        logger.info("Processing block %d." % self.datasource.nblocks_fetched)
         t0, data = self.datasource.get_next_block()
         t0, data = self.preprocess(t0, data)
 
@@ -304,7 +302,7 @@ class Manager(object):
         for transform in self._dm_transformers:
             for spec_ind in self._spectral_inds:
                 msg = "Dispersion index %3.1f, spectral index %3.1f."
-                print msg % (transform.disp_ind, spec_ind)
+                logger.info(msg % (transform.disp_ind, spec_ind))
                 weights = freq_norm ** spec_ind
                 this_data = (data * weights[:,None]).astype(data.dtype)
                 # DM transform.
@@ -323,7 +321,8 @@ class Manager(object):
                     for t in this_triggers[1:]:
                         if t.snr > this_best_trigger.snr:
                             this_best_trigger = t
-                    print "Trigger with SNR %4.1f." % this_best_trigger.snr
+                    logger.info("Trigger with SNR %4.1f."
+                            % this_best_trigger.snr)
                     if trigger is None or this_best_trigger.snr > trigger.snr:
                         trigger = this_best_trigger
                     # Recover memory for next iteration.
@@ -351,7 +350,8 @@ class Manager(object):
         while wait_iterations < max_wait_iterations:
             # If there is only 1 block left, it probably is not be complete.
             if self.datasource.nblocks_left >= 2:
-                print "Processing block %d." % self.datasource.nblocks_fetched
+                logger.info("Processing block %d." %
+                        self.datasource.nblocks_fetched)
                 self.process_next_block()
                 wait_iterations = 0
             else:
