@@ -95,7 +95,7 @@ if __name__ == "__main__":
     if not args.show_plot:
         # Configure matplotlib to not need X.
         import matplotlib as mpl
-        mpl.use('Agg')
+        #mpl.use('Agg')
 
     files = args.files
     if len(files) == 1:

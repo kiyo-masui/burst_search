@@ -104,6 +104,8 @@ class Manager(manager.Manager):
         """
 
         preprocess.sys_temperature_bandpass(data)
+        self.simulate(t0, data)
+
         cal_period = self.datasource.cal_period_samples
         if cal_period:
             preprocess.remove_periodic(data, cal_period)
