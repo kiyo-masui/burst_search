@@ -1,10 +1,14 @@
 import numpy as np
+import logging
 
 cimport numpy as np
 cimport cython
 
 
 np.import_array()
+
+
+logger = logging.getLogger(__name__)
 
 
 # These must match prototypes in src/dedisperse.h
@@ -242,7 +246,9 @@ class DMTransform(object):
             raise ValueError("""Choose higher max_dm and/or lower disp_ind; 
             Effective channels {0} must be greater than {1}""".format(2**depth, nfreq))
         else:
-            print "using {0} effective channels with a memory footprint of {1} MB/s".format(2**depth,(4.0e-6)*(2**depth)/delta_t)
+            msg = "Using {0} effective channels with a memory footprint of {1} MB/s"
+            msg = msg.format(2**depth,(4.0e-6)*(2**depth)/delta_t)
+            logger.info(msg)
         cdef int cndm =  burst_get_num_dispersions(cnfreq, cfreq0, cdelta_f, depth)
 
         cdef np.ndarray[ndim=1, dtype=CM_DTYPE_t] chan_map
@@ -294,10 +300,13 @@ class DMTransform(object):
         cdef np.ndarray[ndim=2, dtype=DTYPE_t] out
         out = np.empty(shape=(ndm, ntime1), dtype=DTYPE)
 
+        cdef DTYPE_t *d1ptr = <DTYPE_t *> data1.data
+        cdef DTYPE_t *d2ptr = <DTYPE_t *> data2.data
+
         with nogil:
             ntime_out = burst_dm_transform(
-                    <DTYPE_t *> &data1[0,0],
-                    <DTYPE_t *> &data2[0,0],
+                    d1ptr,
+                    d2ptr,
                     <CM_DTYPE_t *> &chan_map[0],
                     <DTYPE_t *> &out[0,0],
                     ntime1,

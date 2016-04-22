@@ -4,6 +4,7 @@
 
 from os import path
 import time
+import logging
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,6 +15,8 @@ from . import search
 from . import simulate
 from . import catalog
 
+
+logger = logging.getLogger(__name__)
 
 DEV_PLOTS = False
 
@@ -54,15 +57,18 @@ DEFAULT_PARAMETERS = {
         'disp_ind_min' : 1.,
         'disp_ind_max' : 5.,
         'disp_ind_samples' : 9,
-        'simulate' : False,
-        'simulate_rate' : 0,
+        'simulate' : True,
+        'simulate_rate' : 0.01,
+        'simulate_fluence' : 0.0002,
         }
 
 
 class Manager(object):
     """Abstract base class for search manager.
-    
-    Subclasses must implement IO, adding a datasource_class attribute.
+
+    Subclasses must implement IO, adding a datasource_class attribute. It can
+    optionally have custom preprocessing but reimplementing the preprocessing
+    method.
 
     """
 
@@ -139,14 +145,19 @@ class Manager(object):
                     )
             self._dm_transformers.append(transform)
 
+        if parameters['simulate']:
+            self._simulator = simulate.EventSimulator(
+                    self._datasource,
+                    rate=parameters['simulate_rate'],
+                    fluence=(0, parameters['simulate_fluence']),
+                    )
+        else:
+            self._simulator = None
+
+
         # Deal with these later.
         if False:
             #initialize sim object, if there are to be simulated events
-            if SIMULATE:
-                self._sim_source = simulate.RandSource(alpha=alpha, f_m=f_m,f_sd=f_sd,bw_m=bw_m,bw_sd=bw_sd,t_m=t_m,
-                    t_sd=t_sd,s_m=s_m,s_sd=s_sd,dm_m=dm_m,dm_sd=dm_sd,
-                    event_rate=sim_rate,file_params=self._parameters,t_overlap=OVERLAP,nrecords_block=self._nrecords_block)
-
             if CATALOG:
                 reduced_name = '.'.join(self._filename.split(os.sep)[-1].split('.')[:-1])
                 self._catalog = Catalog(parent_name=reduced_name, parameters=parameters)
@@ -232,6 +243,17 @@ class Manager(object):
             msg = "Unrecognized trigger action: " + action
             raise ValueError(msg)
 
+    def simulate(self, t0, data):
+        if self._simulator is not None:
+            self._simulator.inject_events(t0, data)
+
+
+        #for ii in range(0,data.shape[1],2000):
+        #    plt.imshow(data[:,ii:ii+2000].copy())
+        #    plt.show()
+        return t0, data
+
+
     def preprocess(self, t0, data):
         """Preprocess the data.
 
@@ -240,12 +262,8 @@ class Manager(object):
         """
 
         preprocess.sys_temperature_bandpass(data)
- 
 
-        if SIMULATE and block_ind in self._sim_source.coarse_event_schedule():
-            block_ind = self.datasource.nblocks_fetched
-            #do simulation
-            data += self._sim_source.generate_events(block_ind)[:,0:data.shape[1]]
+        self.simulate(t0, data)
 
         preprocess.remove_outliers(data, 5, 128)
 
@@ -272,7 +290,7 @@ class Manager(object):
                 )
 
     def process_next_block(self):
-        print "Processing block %d." % self.datasource.nblocks_fetched
+        logger.info("Processing block %d." % self.datasource.nblocks_fetched)
         t0, data = self.datasource.get_next_block()
         t0, data = self.preprocess(t0, data)
 
@@ -284,7 +302,7 @@ class Manager(object):
         for transform in self._dm_transformers:
             for spec_ind in self._spectral_inds:
                 msg = "Dispersion index %3.1f, spectral index %3.1f."
-                print msg % (transform.disp_ind, spec_ind)
+                logger.info(msg % (transform.disp_ind, spec_ind))
                 weights = freq_norm ** spec_ind
                 this_data = (data * weights[:,None]).astype(data.dtype)
                 # DM transform.
@@ -303,7 +321,8 @@ class Manager(object):
                     for t in this_triggers[1:]:
                         if t.snr > this_best_trigger.snr:
                             this_best_trigger = t
-                    print "Trigger with SNR %4.1f." % this_best_trigger.snr
+                    logger.info("Trigger with SNR %4.1f."
+                            % this_best_trigger.snr)
                     if trigger is None or this_best_trigger.snr > trigger.snr:
                         trigger = this_best_trigger
                     # Recover memory for next iteration.
@@ -331,7 +350,8 @@ class Manager(object):
         while wait_iterations < max_wait_iterations:
             # If there is only 1 block left, it probably is not be complete.
             if self.datasource.nblocks_left >= 2:
-                print "Processing block %d." % self.datasource.nblocks_fetched
+                logger.info("Processing block %d." %
+                        self.datasource.nblocks_fetched)
                 self.process_next_block()
                 wait_iterations = 0
             else:

@@ -7,20 +7,16 @@ import argparse
 from os import path
 import logging
 import glob
-
+import cProfile, pstats, StringIO
 
 import numpy as np
 import h5py
 
-
-
-import cProfile, pstats, StringIO
-
-
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-logger.addHandler(logging.StreamHandler())
+#logger.setLevel(logging.INFO)
+#logger.addHandler(logging.StreamHandler())
 
+logging.basicConfig(level=logging.INFO)
 
 try:
     from mpi4py import MPI
@@ -70,9 +66,14 @@ parser.add_argument(
         default=2000.0
         )
 parser.add_argument(
-        '--sim',
-        action='store_true',
-        default=False,
+        '--simulate',
+        type=float,
+        default=None,
+        nargs=2,
+        metavar=('rate', 'max_fluence'),
+        help="Simulation parameters. Specify both an average rate "
+        "(per second) and max fluence (in units T_sys seconds). "
+        " Eg. '0.01 0.0001'."
         )
 parser.add_argument(
         '--scrunch',
@@ -119,28 +120,30 @@ if __name__ == "__main__":
         search_pars['spec_ind_min'] =  args.spec_ind_search[0]
         search_pars['spec_ind_max'] =  args.spec_ind_search[1]
         search_pars['spec_ind_samples'] = int(args.spec_ind_search[2])
-    search_pars["simulate"] = args.sim
+    if args.simulate is not None:
+        search_pars["simulate"] = True
+        search_pars["simulate_rate"] = args.simulate[0]
+        search_pars["simulate_fluence"] = args.simulate[1]
     if args.scrunch:
         search_pars["max_dm"] = -1.9
         search_pars["scrunch"] = 1
     else:
         search_pars["max_dm"] = args.max_dm
 
-
-
     for filename in files[mpi_rank::mpi_size]:
-        print "Rank %d, file %s." % (mpi_rank, filename)
+        logger.info("Rank %d, file %s." % (mpi_rank, filename))
         while True:
             try:
                 Searcher = guppi.Manager(filename, **dict(search_pars))
             except IOError as e:
-                print "Rank %d, file can't be opened %s." % (mpi_rank, filename)
+                logging.error("Rank %d, file can't be opened %s."
+                        % (mpi_rank, filename))
                 continue
 
             act_str = 'save_plot_dm,print'
             if args.show_plot:
-                act_str = act_str + ', show_plot_dm'
-            print 'doing actions \n' + act_str
+                act_str = act_str + ',show_plot_dm'
+            logger.info('Doing actions: %s' % act_str)
             Searcher.set_trigger_action(act_str)
 
             if prof:
