@@ -57,7 +57,7 @@ DEFAULT_PARAMETERS = {
         'disp_ind_min' : 1.,
         'disp_ind_max' : 5.,
         'disp_ind_samples' : 9,
-        'simulate' : True,
+        'simulate' : False,
         'simulate_rate' : 0.01,
         'simulate_fluence' : 0.0002,
         }
