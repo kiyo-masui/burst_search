@@ -147,18 +147,28 @@ def read_records(hdulist, start_record=0, end_record=None):
     nrecords_read = end_record - start_record
     ntime_record, npol, nfreq, one = hdulist[1].data[0]["DATA"].shape
 
+    # Hack: to simulate thermal noise triggers, just fill with random data.
     out_data = np.empty((nfreq, nrecords_read, ntime_record), dtype=np.float32)
-    for ii in xrange(nrecords_read):
-        # Read the record.
-        record = hdulist[1].data[start_record + ii]["DATA"]
-        # Interpret as unsigned int (for Stokes I only).
-        record = record.view(dtype=np.uint8)
-        # Select stokes I and copy.
-        out_data[:,ii,:] = np.transpose(record[:,0,:,0])
+    #for ii in xrange(nrecords_read):
+    #   # Read the record.
+    #   record = hdulist[1].data[start_record + ii]["DATA"]
+    #   # Interpret as unsigned int (for Stokes I only).
+    #   record = record.view(dtype=np.uint8)
+    #   # Select stokes I and copy.
+    #   out_data[:,ii,:] = np.transpose(record[:,0,:,0])
+
+
+
     out_data.shape = (nfreq, nrecords_read * ntime_record)
+    out_data[:] = 100.
+    from numpy import random
+    random.seed()
+    out_data[:] += random.randn(*out_data.shape)
+    cal_period = 64
+    for ii in range(0, out_data.shape[1], cal_period):
+        out_data[:,ii:ii+cal_period//2] += 5.
 
     return out_data
-
 
 def get_nrecords(filename):
     hdulist = pyfits.open(filename, 'readonly')
