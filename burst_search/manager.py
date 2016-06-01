@@ -205,11 +205,15 @@ class Manager(object):
         elif action == 'save_plot_dm':
             def action_fun(triggers):
                 for t in triggers:
-                    t_offset = t.data.t0 * t.centre[1] * t.data.delta_t
+                    t_unix = time.time()
+                    t_offset = t.data.t0 + t.centre[1] * t.data.delta_t
+                   
                     f = plt.figure(1)
                     t.plot_summary()
 
                     t_dm_value = t.centre[0] * t.data.delta_dm
+                    
+                    print "DM of %02.f pc cm**-3 %06.2fs into file" % (t_dm_value, t_offset)
                     if t_dm_value < 5:
                         out_filename = "DM0-5_"
                     elif 5 <= t_dm_value < 20:
@@ -220,17 +224,19 @@ class Manager(object):
                         out_filename = "DM100-300_"
                     else:
                         out_filename = "DM300-2000_" 
+                        
+                    out_filename = out_filename + "+%06.2fs.png" % t_offset
                     out_filename += path.splitext(path.basename(self.datasource._source))[0]
                     if not t.data.spec_ind is None:
                                     out_filename += "+a=%02.f" % t.data.spec_ind
                     #out_filename += "+%06.2fs.png" % t_offset
                     if not t.data.disp_ind is None:
                                     out_filename += "+n=%02.f" % t.data.disp_ind
-                    out_filename_png = out_filename + "+%06.2fs.png" % t_offset
-
-                    out_filename_DMT = out_filename + "_DM-T_ "+ "+%06.2fs.npy" % t_offset
-                    out_filename_FT  = out_filename + "_Freq-T_" + "+%06.2fs.npy" % t_offset
-
+                    out_filename = "DM" + np.str(np.round(t_dm_value)) + "_"
+                    
+                    out_filename_png = out_filename + "+%06.2f+%06.2fs.png" % (t_offset, t_unix)
+                    out_filename_DMT = out_filename + "_DM-T_ "+ "+%06.2f+%06.2fs.npy" % (t_offset, t_unix)
+                    out_filename_FT  = out_filename + "_Freq-T_" + "+%06.2f+%06.2fs.npy" % (t_offset, t_unix)
  
                     plt.savefig(out_filename_png, bbox_inches='tight')
                     plt.close(f)
