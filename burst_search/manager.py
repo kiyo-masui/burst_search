@@ -1,7 +1,5 @@
-"""Base search manager.
+"""Base search manager
 """
-
-
 from os import path
 import time
 import logging
@@ -14,7 +12,6 @@ from . import datasource
 from . import search
 from . import simulate
 from . import catalog
-
 
 logger = logging.getLogger(__name__)
 
@@ -204,45 +201,50 @@ class Manager(object):
             return action_fun
         elif action == 'save_plot_dm':
             def action_fun(triggers):
+                import glob
+
                 for t in triggers:
-                    t_unix = time.time()
                     t_offset = t.data.t0 + t.centre[1] * t.data.delta_t
-                   
+
                     f = plt.figure(1)
                     t.plot_summary()
-
-                    t_dm_value = t.centre[0] * t.data.delta_dm
                     
+                    t_dm_value = t.centre[0] * t.data.delta_dm
+                    print t.data.t0, t.centre[1], t.data.delta_t
                     print "DM of %02.f pc cm**-3 %06.2fs into file" % (t_dm_value, t_offset)
-                    if t_dm_value < 5:
-                        out_filename = "DM0-5_"
-                    elif 5 <= t_dm_value < 20:
-                        out_filename = "DM5-20_"
-                    elif 20 <= t_dm_value < 100:
-                        out_filename = "DM20-100_"
-                    elif 100 <= t_dm_value <300:
-                        out_filename = "DM100-300_"
+
+                    out_filename = "DM" + np.str(int(t_dm_value)) + "_"
+
+                    # Check if this trigger has already been plotted/saved
+                    out_fn_list = glob.glob(out_filename + '*png')
+
+                    if len(out_fn_list) == 0:
+                        n_copy = 0
                     else:
-                        out_filename = "DM300-2000_" 
+                        n_copy = len(out_fn_list) + 1
                         
-                    out_filename = out_filename + "+%06.2fs.png" % t_offset
                     out_filename += path.splitext(path.basename(self.datasource._source))[0]
                     if not t.data.spec_ind is None:
                                     out_filename += "+a=%02.f" % t.data.spec_ind
                     #out_filename += "+%06.2fs.png" % t_offset
                     if not t.data.disp_ind is None:
                                     out_filename += "+n=%02.f" % t.data.disp_ind
-                    out_filename = "DM" + np.str(np.round(t_dm_value)) + "_"
-                    
-                    out_filename_png = out_filename + "+%06.2f+%06.2fs.png" % (t_offset, t_unix)
-                    out_filename_DMT = out_filename + "_DM-T_ "+ "+%06.2f+%06.2fs.npy" % (t_offset, t_unix)
-                    out_filename_FT  = out_filename + "_Freq-T_" + "+%06.2f+%06.2fs.npy" % (t_offset, t_unix)
+#                    out_filename_png = out_filename + "+%06.2f+%06.2fs.png" % (t_offset, t_unix)
+                    out_filename_png = out_filename + "+%06.2f+%02d.png" % (t_offset, n_copy)
+                   
+                    #out_filename_DMT = out_filename + "_DM-T_ "+ "+%06.2f+%06.2fs.npy" % (t_offset, t_unix)
+                    out_filename_DMT = out_filename + "_DM-T_ "+ "+%06.2f+%02d.npy" % (t_offset, n_copy)
+                    #out_filename_FT  = out_filename + "_Freq-T_" + "+%06.2f+%06.2fs.npy" % (t_offset, t_unix)
+                    out_filename_FT  = out_filename + "_Freq-T_" + "+%06.2f+%02d.npy" % (t_offset, n_copy)
+
  
                     plt.savefig(out_filename_png, bbox_inches='tight')
                     plt.close(f)
                     dm_data_cut = t.dm_data_cut()
+
                     np.save(out_filename_DMT, dm_data_cut)
                     spec_data_rebin = t.spec_data_rebin()
+
                     np.save(out_filename_FT, spec_data_rebin)
             return action_fun
         else:
@@ -296,8 +298,8 @@ class Manager(object):
                 )
 
     def process_next_block(self):
-        t0, data = self.datasource.get_next_block()
         logger.info("Processing block %d." % self.datasource.nblocks_fetched)
+        t0, data = self.datasource.get_next_block()
         t0, data = self.preprocess(t0, data)
 
         freq = self.datasource.freq
@@ -347,22 +349,22 @@ class Manager(object):
                 break
 
     def process_real_time(self):
-        wait_time = float(self.datasource.time_block - self.datasource.overlap) / 10
-        max_wait_iterations = 30
+        wait_time = float(self.datasource.time_block - self.datasource.overlap) / 5
+        max_wait_iterations = 10
 
         # Enter holding loop, processing records in blocks as they become
         # available.
-        wait_iterations = -10  # Wait a bit of extra time for first block.
-        logger.info("Entering real-time processing holding loop.")
+        wait_iterations = 0
         while wait_iterations < max_wait_iterations:
-            # If there is only 1 block left, it may not be complete.
+            # If there is only 1 block left, it probably is not be complete.
             if self.datasource.nblocks_left >= 2:
+                logger.info("Processing block %d." %
+                        self.datasource.nblocks_fetched)
                 self.process_next_block()
                 wait_iterations = 0
             else:
                 time.sleep(wait_time)
                 wait_iterations += 1
-        logger.info("Exiting holding look and processing leftovers.")
         # Precess any leftovers that don't fill out a whole block.
         self.process_all()
 
