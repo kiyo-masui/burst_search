@@ -226,17 +226,13 @@ class Manager(object):
                     out_filename += path.splitext(path.basename(self.datasource._source))[0]
                     if not t.data.spec_ind is None:
                                     out_filename += "+a=%02.f" % t.data.spec_ind
-                    #out_filename += "+%06.2fs.png" % t_offset
+
                     if not t.data.disp_ind is None:
                                     out_filename += "+n=%02.f" % t.data.disp_ind
-#                    out_filename_png = out_filename + "+%06.2f+%06.2fs.png" % (t_offset, t_unix)
-                    out_filename_png = out_filename + "+%06.2f+%02d.png" % (t_offset, n_copy)
-                   
-                    #out_filename_DMT = out_filename + "_DM-T_ "+ "+%06.2f+%06.2fs.npy" % (t_offset, t_unix)
-                    out_filename_DMT = out_filename + "_DM-T_ "+ "+%06.2f+%02d.npy" % (t_offset, n_copy)
-                    #out_filename_FT  = out_filename + "_Freq-T_" + "+%06.2f+%06.2fs.npy" % (t_offset, t_unix)
-                    out_filename_FT  = out_filename + "_Freq-T_" + "+%06.2f+%02d.npy" % (t_offset, n_copy)
 
+                    out_filename_png = out_filename + "+%06.2f+%02d.png" % (t_offset, n_copy)
+                    out_filename_DMT = out_filename + "_DM-T_ "+ "+%06.2f+%02d.npy" % (t_offset, n_copy)
+                    out_filename_FT  = out_filename + "_Freq-T_" + "+%06.2f+%02d.npy" % (t_offset, n_copy)
  
                     plt.savefig(out_filename_png, bbox_inches='tight')
                     plt.close(f)
