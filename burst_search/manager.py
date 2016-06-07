@@ -239,6 +239,11 @@ class Manager(object):
                     spec_data_rebin = t.spec_data_rebin()
                     np.save(out_filename_FT, spec_data_rebin)
             return action_fun
+        elif action == 'save_dm_npy':
+            def action_fun(triggers):
+                for t in triggers:
+                    np.save(t.data.dm_data,str(t) + '.npy')
+            return action_fun
         else:
             msg = "Unrecognized trigger action: " + action
             raise ValueError(msg)
