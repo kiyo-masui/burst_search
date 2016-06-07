@@ -242,7 +242,7 @@ class Manager(object):
         elif action == 'save_dm_npy':
             def action_fun(triggers):
                 for t in triggers:
-                    np.save(t.data.dm_data,str(t) + '.npy')
+                    np.save(str(t) + '.npy',t.data.dm_data)
             return action_fun
         else:
             msg = "Unrecognized trigger action: " + action
