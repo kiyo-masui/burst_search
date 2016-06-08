@@ -344,23 +344,24 @@ class Manager(object):
             except StopIteration:
                 break
 
+
     def process_real_time(self):
-        wait_time = float(self.datasource.time_block - self.datasource.overlap) / 5
-        max_wait_iterations = 10
+        wait_time = float(self.datasource.time_block - self.datasource.overlap) / 10
+        max_wait_iterations = 30
 
         # Enter holding loop, processing records in blocks as they become
         # available.
-        wait_iterations = 0
+        wait_iterations = -10  # Wait a bit of extra time for first block.
+        logger.info("Entering real-time processing holding loop.")
         while wait_iterations < max_wait_iterations:
-            # If there is only 1 block left, it probably is not be complete.
+            # If there is only 1 block left, it may not be complete.
             if self.datasource.nblocks_left >= 2:
-                logger.info("Processing block %d." %
-                        self.datasource.nblocks_fetched)
                 self.process_next_block()
                 wait_iterations = 0
             else:
                 time.sleep(wait_time)
                 wait_iterations += 1
+        logger.info("Exiting holding look and processing leftovers.")
         # Precess any leftovers that don't fill out a whole block.
         self.process_all()
 
