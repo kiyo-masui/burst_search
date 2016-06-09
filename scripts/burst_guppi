@@ -140,7 +140,7 @@ if __name__ == "__main__":
                         % (mpi_rank, filename))
                 continue
 
-            act_str = 'save_plot_dm,print'
+            act_str = 'save_plot_dm,print,save_dm_npy' 
             if args.show_plot:
                 act_str = act_str + ',show_plot_dm'
             logger.info('Doing actions: %s' % act_str)
