@@ -1,5 +1,7 @@
-"""Base search manager
+"""Base search manager.
 """
+
+
 from os import path
 import time
 import logging
@@ -12,6 +14,7 @@ from . import datasource
 from . import search
 from . import simulate
 from . import catalog
+
 
 logger = logging.getLogger(__name__)
 
@@ -62,11 +65,9 @@ DEFAULT_PARAMETERS = {
 
 class Manager(object):
     """Abstract base class for search manager.
-
     Subclasses must implement IO, adding a datasource_class attribute. It can
     optionally have custom preprocessing but reimplementing the preprocessing
     method.
-
     """
 
     datasource_class = None
@@ -260,9 +261,7 @@ class Manager(object):
 
     def preprocess(self, t0, data):
         """Preprocess the data.
-
         Preprocessing includes simulation.
-
         """
 
         preprocess.sys_temperature_bandpass(data)
@@ -294,8 +293,8 @@ class Manager(object):
                 )
 
     def process_next_block(self):
-        logger.info("Processing block %d." % self.datasource.nblocks_fetched)
         t0, data = self.datasource.get_next_block()
+        logger.info("Processing block %d." % self.datasource.nblocks_fetched)
         t0, data = self.preprocess(t0, data)
 
         freq = self.datasource.freq
@@ -343,7 +342,6 @@ class Manager(object):
                 self.process_next_block()
             except StopIteration:
                 break
-
 
     def process_real_time(self):
         wait_time = float(self.datasource.time_block - self.datasource.overlap) / 10
