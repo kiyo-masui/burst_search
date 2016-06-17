@@ -364,4 +364,3 @@ class Manager(object):
         logger.info("Exiting holding look and processing leftovers.")
         # Precess any leftovers that don't fill out a whole block.
         self.process_all()
-
