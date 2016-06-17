@@ -65,11 +65,9 @@ DEFAULT_PARAMETERS = {
 
 class Manager(object):
     """Abstract base class for search manager.
-
     Subclasses must implement IO, adding a datasource_class attribute. It can
     optionally have custom preprocessing but reimplementing the preprocessing
     method.
-
     """
 
     datasource_class = None
@@ -204,39 +202,46 @@ class Manager(object):
             return action_fun
         elif action == 'save_plot_dm':
             def action_fun(triggers):
+                import glob
+
                 for t in triggers:
-                    t_offset = t.data.t0 * t.centre[1] * t.data.delta_t
+                    t_offset = t.data.t0 + t.centre[1] * t.data.delta_t
+
                     f = plt.figure(1)
                     t.plot_summary()
-
+                    
                     t_dm_value = t.centre[0] * t.data.delta_dm
-                    if t_dm_value < 5:
-                        out_filename = "DM0-5_"
-                    elif 5 <= t_dm_value < 20:
-                        out_filename = "DM5-20_"
-                    elif 20 <= t_dm_value < 100:
-                        out_filename = "DM20-100_"
-                    elif 100 <= t_dm_value <300:
-                        out_filename = "DM100-300_"
+                    print t.data.t0, t.centre[1], t.data.delta_t
+                    print "DM of %02.f pc cm**-3 %06.2fs into file" % (t_dm_value, t_offset)
+
+                    out_filename = "DM" + np.str(int(t_dm_value)) + "_"
+
+                    # Check if this trigger has already been plotted/saved
+                    out_fn_list = glob.glob(out_filename + '*png')
+
+                    if len(out_fn_list) == 0:
+                        n_copy = 0
                     else:
-                        out_filename = "DM300-2000_" 
+                        n_copy = len(out_fn_list) + 1
+                        
                     out_filename += path.splitext(path.basename(self.datasource._source))[0]
                     if not t.data.spec_ind is None:
                                     out_filename += "+a=%02.f" % t.data.spec_ind
-                    #out_filename += "+%06.2fs.png" % t_offset
+
                     if not t.data.disp_ind is None:
                                     out_filename += "+n=%02.f" % t.data.disp_ind
-                    out_filename_png = out_filename + "+%06.2fs.png" % t_offset
 
-                    out_filename_DMT = out_filename + "_DM-T_ "+ "+%06.2fs.npy" % t_offset
-                    out_filename_FT  = out_filename + "_Freq-T_" + "+%06.2fs.npy" % t_offset
-
+                    out_filename_png = out_filename + "+%06.2f+%02d.png" % (t_offset, n_copy)
+                    out_filename_DMT = out_filename + "_DM-T_ "+ "+%06.2f+%02d.npy" % (t_offset, n_copy)
+                    out_filename_FT  = out_filename + "_Freq-T_" + "+%06.2f+%02d.npy" % (t_offset, n_copy)
  
                     plt.savefig(out_filename_png, bbox_inches='tight')
                     plt.close(f)
                     dm_data_cut = t.dm_data_cut()
+
                     np.save(out_filename_DMT, dm_data_cut)
                     spec_data_rebin = t.spec_data_rebin()
+
                     np.save(out_filename_FT, spec_data_rebin)
             return action_fun
         else:
@@ -256,9 +261,7 @@ class Manager(object):
 
     def preprocess(self, t0, data):
         """Preprocess the data.
-
         Preprocessing includes simulation.
-
         """
 
         preprocess.sys_temperature_bandpass(data)
@@ -359,4 +362,3 @@ class Manager(object):
         logger.info("Exiting holding look and processing leftovers.")
         # Precess any leftovers that don't fill out a whole block.
         self.process_all()
-
