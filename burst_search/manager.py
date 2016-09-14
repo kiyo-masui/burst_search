@@ -14,6 +14,7 @@ from . import datasource
 from . import search
 from . import simulate
 from . import catalog
+from . import preprocess
 
 
 logger = logging.getLogger(__name__)
@@ -66,7 +67,7 @@ DEFAULT_PARAMETERS = {
 class Manager(object):
     """Abstract base class for search manager.
     Subclasses must implement IO, adding a datasource_class attribute. It can
-    optionally have custom preprocessing but reimplementing the preprocessing
+    optionally have custom preprocessing by reimplementing the preprocessing
     method.
     """
 
