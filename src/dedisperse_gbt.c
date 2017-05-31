@@ -26,6 +26,12 @@
 #include "dedisperse_gbt.h"
 
 
+// Forward declare internal functions.
+void fast_unshuffle(float **data, int* fmap, int nchan, int m);
+void generate_shift_group(int *inin, int radix, int n);
+
+
+
 /*--------------------------------------------------------------------------------*/
 float *vector(int n)
 {
@@ -1589,7 +1595,7 @@ Peak find_peak(Data *dat, int len_limit)
   Peak best;
   best.snr=0;
   if (max_depth<1)
-    return;
+    return best;
 #pragma omp parallel
   {
     Peak mybest;

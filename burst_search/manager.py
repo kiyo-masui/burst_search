@@ -344,6 +344,26 @@ class Manager(object):
             except StopIteration:
                 break
 
+    def wait_next_block(self):
+        """Waits for a data block to be available.
+
+        Returns when there is a data block ready to be processed (returns True)
+        or after 3 block times (returns False).
+
+        """
+
+        wait_time = float(self.datasource.time_block - self.datasource.overlap) / 10
+        max_wait_iterations = 30
+
+        while wait_iterations < max_wait_iterations:
+            # If there is only 1 block left, it may not be complete.
+            if self.datasource.nblocks_left >= 2:
+                return True
+            else:
+                time.sleep(wait_time)
+                wait_iterations += 1
+        return False
+
     def process_real_time(self):
         wait_time = float(self.datasource.time_block - self.datasource.overlap) / 10
         max_wait_iterations = 30
@@ -352,14 +372,11 @@ class Manager(object):
         # available.
         wait_iterations = -10  # Wait a bit of extra time for first block.
         logger.info("Entering real-time processing holding loop.")
-        while wait_iterations < max_wait_iterations:
-            # If there is only 1 block left, it may not be complete.
-            if self.datasource.nblocks_left >= 2:
-                self.process_next_block()
-                wait_iterations = 0
-            else:
-                time.sleep(wait_time)
-                wait_iterations += 1
-        logger.info("Exiting holding look and processing leftovers.")
-        # Precess any leftovers that don't fill out a whole block.
+        # The leading wait gives some extra time for the first block to arrive,
+        # if needed.
+        self.wait_next_block()
+        while self.wait_next_block():
+            self.process_next_block()
+        logger.info("Exiting holding loop and processing leftovers.")
+        # Process any leftovers that don't fill out a whole block.
         self.process_all()
