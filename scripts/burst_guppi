@@ -10,7 +10,8 @@ import glob
 import cProfile, pstats, StringIO
 
 import numpy as np
-import watchdog.observers
+#from watchdog.observers import Observer
+from watchdog.observers.polling import PollingObserver as Observer
 import watchdog.events
 
 logger = logging.getLogger(__name__)
@@ -76,8 +77,8 @@ parser.add_argument(
         nargs=2,
         metavar=('rate', 'max_fluence'),
         help="Simulation event injection parameters. Specify both"
-        " an average rate (per second) and max fluence (in units"
-        " T_sys seconds). Eg. '0.01 0.0001'."
+            " an average rate (per second) and max fluence (in units"
+            " T_sys seconds). Eg. '0.01 0.0001'.",
         )
 parser.add_argument(
         '--scrunch',
@@ -95,10 +96,10 @@ parser.add_argument(
         '--watch',
         action='store_true',
         default=False,
-        help="Only process new files appearing, in real time."
-        " Remember to wrap your 'files' argument - which specifies"
-        " a matching patern for new file - in quotes to prevent your"
-        " shell from expanding the glob.",
+        help="Only process new files appearing, in real time. 'files' argument"
+            " must be length one and specifies a matching patern for new files."
+            " Wildcards are allowed in filenames only not directories."
+            " Wrap it in quotes to prevent your shell from expanding the glob.",
         )
 
 
@@ -158,8 +159,7 @@ def setup_searchers(filename, args):
 class NewFileHandler(watchdog.events.PatternMatchingEventHandler):
 
     def __init__(self, patterns, args):
-        watchdog.events.PatternMatchingEventHandler.__init__(
-                self,
+        super(NewFileHandler, self).__init__(
                 patterns=patterns,
                 case_sensitive=True,
                 )
@@ -171,19 +171,18 @@ class NewFileHandler(watchdog.events.PatternMatchingEventHandler):
         if event.is_directory:
             return
 
-        print 'FILE'
-
         if self._nfiles_discovered % mpi_size == mpi_rank:
             filename = event.src_path
             filename = path.abspath(filename)
             logger.info("File %s." % filename)
             searchers = setup_searchers(filename, self._args)
 
-            searchers[0].wait_next_block()
-            while searchers[0].wait_next_block():
-                for s in searchers:
-                    s.wait_next_block()
-                    s.process_next_block()
+            if searchers:
+                searchers[0].wait_next_block()
+                while searchers[0].wait_next_block():
+                    for s in searchers:
+                        s.wait_next_block()
+                        s.process_next_block()
             for s in searchers:
                 s.process_all()
 
@@ -236,16 +235,22 @@ if __name__ == "__main__":
             raise ValueError("Can only supply one file pattern in watch mode")
         directory, pattern = path.split(args.files[0])
         directory = path.abspath(directory)
-        event_handler = NewFileHandler(args.files[0], args)
-        observer = watchdog.observers.Observer()
+        full_pattern = path.join(directory, pattern)
+        #full_pattern = pattern
+        event_handler = NewFileHandler([full_pattern], args)
+        observer = Observer()
         observer.schedule(event_handler, directory,
                           recursive=False)
-        logger.info("Watching %s for new files matching %s."
-                    % (directory,pattern))
+        logger.info("Files matching %s."
+                    % full_pattern)
+        observer.start()
         try:
             while True:
                 time.sleep(1)
+                if not observer.is_alive():
+                    logger.error("Observer thread crashed.")
+                    break
         except KeyboardInterrupt:
             observer.stop()
-        observer.join()
+            observer.join()
 

@@ -210,7 +210,7 @@ class Manager(object):
 
                     f = plt.figure(1)
                     t.plot_summary()
-                    
+
                     t_dm_value = t.centre[0] * t.data.delta_dm
                     print t.data.t0, t.centre[1], t.data.delta_t
                     print "DM of %02.f pc cm**-3 %06.2fs into file" % (t_dm_value, t_offset)
@@ -224,7 +224,7 @@ class Manager(object):
                         n_copy = 0
                     else:
                         n_copy = len(out_fn_list) + 1
-                        
+
                     out_filename += path.splitext(path.basename(self.datasource._source))[0]
                     if not t.data.spec_ind is None:
                                     out_filename += "+a=%02.f" % t.data.spec_ind
@@ -354,6 +354,7 @@ class Manager(object):
 
         wait_time = float(self.datasource.time_block - self.datasource.overlap) / 10
         max_wait_iterations = 30
+        wait_iterations = 0
 
         while wait_iterations < max_wait_iterations:
             # If there is only 1 block left, it may not be complete.
