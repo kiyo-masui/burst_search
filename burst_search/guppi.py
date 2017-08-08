@@ -3,7 +3,7 @@
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 try:
     import astropy.io.fits as pyfits
 except ImportError:
@@ -56,8 +56,8 @@ class FileSource(datasource.DataSource):
     @property
     def nblocks_left(self):
         nrecords_left = get_nrecords(self._source) - self._next_start_record
-        return int(np.ceil(float(nrecords_left) / 
-                           (self._nrecords_block - self._nrecords_overlap)))
+        return int(np.ceil(float(nrecords_left)
+                           / (self._nrecords_block - self._nrecords_overlap)))
 
     @property
     def nblocks_fetched(self):
@@ -113,16 +113,18 @@ class Manager(manager.Manager):
         block_ind = self.datasource.nblocks_fetched
 
         # Preprocess.
-        #preprocess.sys_temperature_bandpass(data)
+        # preprocess.sys_temperature_bandpass(data)
 
         if False and block_ind in self._sim_source.coarse_event_schedule():
-            #do simulation
-            data += self._sim_source.generate_events(block_ind)[:,0:data.shape[1]]
+            # Do simulation
+            sim_events = self._sim_source.generate_events(block_ind)
+            data += sim_events[:, 0:data.shape[1]]
 
         preprocess.remove_outliers(data, 5, 128)
 
         ntime_pre_filter = data.shape[1]
-        data = preprocess.highpass_filter(data, manager.HPF_WIDTH / self.datasource.delta_t)
+        data = preprocess.highpass_filter(data, manager.HPF_WIDTH
+                                          / self.datasource.delta_t)
         # This changes t0 by half a window width.
         t0 -= (ntime_pre_filter - data.shape[1]) / 2 * self.datasource.delta_t
 
@@ -154,7 +156,7 @@ def read_records(hdulist, start_record=0, end_record=None):
         # Interpret as unsigned int (for Stokes I only).
         record = record.view(dtype=np.uint8)
         # Select stokes I and copy.
-        out_data[:,ii,:] = np.transpose(record[:,0,:,0])
+        out_data[:, ii, :] = np.transpose(record[:, 0, :, 0])
     out_data.shape = (nfreq, nrecords_read * ntime_record)
 
     return out_data
