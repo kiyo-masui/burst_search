@@ -10,7 +10,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from . import dedisperse
-from . import datasource
 from . import search
 from . import simulate
 from . import catalog
@@ -43,24 +42,24 @@ HPF_WIDTH = 0.1    # s
 
 
 DEFAULT_PARAMETERS = {
-        'time_block' : 40,    # Seconds.
-        'overlap' : 8.,
-        'scrunch' : 1,
-        'max_dm' : 2000.,
-        'min_search_dm' : 5.,
-        'threshold_snr' : 8.,
-        'trigger_action' : 'print',
-        'spec_ind_search' : False,
-        'spec_ind_min' : -5.,
-        'spec_ind_max' : 5.,
-        'spec_ind_samples' : 3.,
-        'disp_ind_search' : False,
-        'disp_ind_min' : 1.,
-        'disp_ind_max' : 5.,
-        'disp_ind_samples' : 9,
-        'simulate' : False,
-        'simulate_rate' : 0.01,
-        'simulate_fluence' : 0.0002,
+        'time_block': 40,    # Seconds.
+        'overlap': 8.,
+        'scrunch': 1,
+        'max_dm': 2000.,
+        'min_search_dm': 5.,
+        'threshold_snr': 8.,
+        'trigger_action': 'print',
+        'spec_ind_search': False,
+        'spec_ind_min': -5.,
+        'spec_ind_max': 5.,
+        'spec_ind_samples': 3.,
+        'disp_ind_search': False,
+        'disp_ind_min': 1.,
+        'disp_ind_max': 5.,
+        'disp_ind_samples': 9,
+        'simulate': False,
+        'simulate_rate': 0.01,
+        'simulate_fluence': 0.0002,
         }
 
 
@@ -153,13 +152,12 @@ class Manager(object):
         else:
             self._simulator = None
 
-
         # Deal with these later.
         if False:
-            #initialize sim object, if there are to be simulated events
+            # initialize sim object, if there are to be simulated events
             if CATALOG:
                 reduced_name = '.'.join(self._filename.split(os.sep)[-1].split('.')[:-1])
-                self._catalog = Catalog(parent_name=reduced_name, parameters=parameters)
+                self._catalog = catalog.Catalog(parent_name=reduced_name, parameters=parameters)
 
         # Initialize trigger actions.
         self.set_trigger_action(parameters['trigger_action'])
@@ -210,7 +208,7 @@ class Manager(object):
 
                     f = plt.figure(1)
                     t.plot_summary()
-                    
+
                     t_dm_value = t.centre[0] * t.data.delta_dm
                     print t.data.t0, t.centre[1], t.data.delta_t
                     print "DM of %02.f pc cm**-3 %06.2fs into file" % (t_dm_value, t_offset)
@@ -224,7 +222,7 @@ class Manager(object):
                         n_copy = 0
                     else:
                         n_copy = len(out_fn_list) + 1
-                        
+
                     out_filename += path.splitext(path.basename(self.datasource._source))[0]
                     if not t.data.spec_ind is None:
                                     out_filename += "+a=%02.f" % t.data.spec_ind
@@ -253,12 +251,10 @@ class Manager(object):
         if self._simulator is not None:
             self._simulator.inject_events(t0, data)
 
-
-        #for ii in range(0,data.shape[1],2000):
-        #    plt.imshow(data[:,ii:ii+2000].copy())
-        #    plt.show()
+        # for ii in range(0,data.shape[1],2000):
+        #     plt.imshow(data[:,ii:ii+2000].copy())
+        #     plt.show()
         return t0, data
-
 
     def preprocess(self, t0, data):
         """Preprocess the data.
@@ -272,7 +268,8 @@ class Manager(object):
         preprocess.remove_outliers(data, 5, 128)
 
         ntime_pre_filter = data.shape[1]
-        data = preprocess.highpass_filter(data, HPF_WIDTH / self.datasource.delta_t)
+        data = preprocess.highpass_filter(data, HPF_WIDTH
+                                          / self.datasource.delta_t)
         # This changes t0 by half a window width.
         t0 -= (ntime_pre_filter - data.shape[1]) / 2 * self.datasource.delta_t
 
@@ -308,7 +305,7 @@ class Manager(object):
                 msg = "Dispersion index %3.1f, spectral index %3.1f."
                 logger.info(msg % (transform.disp_ind, spec_ind))
                 weights = freq_norm ** spec_ind
-                this_data = (data * weights[:,None]).astype(data.dtype)
+                this_data = (data * weights[:, None]).astype(data.dtype)
                 # DM transform.
                 dm_data = transform(this_data)
                 # Metadata required for the search but not the transform.
@@ -326,7 +323,7 @@ class Manager(object):
                         if t.snr > this_best_trigger.snr:
                             this_best_trigger = t
                     logger.info("Trigger with SNR %4.1f."
-                            % this_best_trigger.snr)
+                                % this_best_trigger.snr)
                     if trigger is None or this_best_trigger.snr > trigger.snr:
                         trigger = this_best_trigger
                     # Recover memory for next iteration.
@@ -344,22 +341,37 @@ class Manager(object):
             except StopIteration:
                 break
 
-    def process_real_time(self):
-        wait_time = float(self.datasource.time_block - self.datasource.overlap) / 10
-        max_wait_iterations = 30
+    def wait_next_block(self):
+        """Waits for a data block to be available.
 
-        # Enter holding loop, processing records in blocks as they become
-        # available.
-        wait_iterations = -10  # Wait a bit of extra time for first block.
-        logger.info("Entering real-time processing holding loop.")
+        Returns when there is a data block ready to be processed (returns True)
+        or after 3 block times (returns False).
+
+        """
+
+        wait_time = float(self.datasource.time_block
+                          - self.datasource.overlap) / 10
+        max_wait_iterations = 30
+        wait_iterations = 0
+
         while wait_iterations < max_wait_iterations:
             # If there is only 1 block left, it may not be complete.
             if self.datasource.nblocks_left >= 2:
-                self.process_next_block()
-                wait_iterations = 0
+                return True
             else:
                 time.sleep(wait_time)
                 wait_iterations += 1
-        logger.info("Exiting holding look and processing leftovers.")
-        # Precess any leftovers that don't fill out a whole block.
+        return False
+
+    def process_real_time(self):
+        # Enter holding loop, processing records in blocks as they become
+        # available.
+        logger.info("Entering real-time processing holding loop.")
+        # The leading wait gives some extra time for the first block to arrive,
+        # if needed.
+        self.wait_next_block()
+        while self.wait_next_block():
+            self.process_next_block()
+        logger.info("Exiting holding loop and processing leftovers.")
+        # Process any leftovers that don't fill out a whole block.
         self.process_all()
