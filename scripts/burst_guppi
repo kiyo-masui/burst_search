@@ -98,6 +98,12 @@ parser.add_argument(
         help="Use scrunching to achieve max DM."
         )
 parser.add_argument(
+        '--time-rebin',
+        type=int,
+        default=1,
+        help="Rebin time axis by this factor."
+        )
+parser.add_argument(
         '--profile',
         action='store_true',
         default=False,
@@ -134,11 +140,11 @@ def setup_searchers(filename, args):
         search_pars["simulate_fluence"] = args.simulate[1]
     if args.scrunch:
         search_pars["max_dm"] = -1.9
-        search_pars["scrunch"] = 1
     else:
         search_pars["max_dm"] = args.max_dm
     search_pars["time_block"] = args.time_block
     search_pars["overlap"] = args.overlap
+    search_pars["scrunch"] = args.time_rebin
 
     act_str = 'save_plot_dm,print'
     if args.show_plot:
