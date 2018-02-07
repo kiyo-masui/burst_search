@@ -343,10 +343,8 @@ class Manager(object):
 
     def wait_next_block(self):
         """Waits for a data block to be available.
-
         Returns when there is a data block ready to be processed (returns True)
         or after 3 block times (returns False).
-
         """
 
         wait_time = float(self.datasource.time_block
