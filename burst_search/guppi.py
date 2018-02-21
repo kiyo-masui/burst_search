@@ -78,9 +78,11 @@ class FileSource(datasource.DataSource):
                 self._next_start_record,
                 self._next_start_record + self._nrecords_block,
                 )
+        hdulist.close()
 
         self._next_start_record += (self._nrecords_block
                                     - self._nrecords_overlap)
+        
 
         return t0, data
 
