@@ -82,7 +82,6 @@ class FileSource(datasource.DataSource):
 
         self._next_start_record += (self._nrecords_block
                                     - self._nrecords_overlap)
-        
 
         return t0, data
 
@@ -154,11 +153,18 @@ def read_records(hdulist, start_record=0, end_record=None):
     out_data = np.empty((nfreq, nrecords_read, ntime_record), dtype=np.float32)
     for ii in xrange(nrecords_read):
         # Read the record.
-        record = hdulist[1].data[start_record + ii]["DATA"]
+        full_record = hdulist[1].data[start_record + ii]
+        record = full_record["DATA"]
+        scals = full_record["DAT_SCL"]
+        offs = full_record["DAT_OFFS"]
         # Interpret as unsigned int (for Stokes I only).
         record = record.view(dtype=np.uint8)
+        offs.shape = (npol, nfreq)
+        scals.shape = (npol, nfreq)
         # Select stokes I and copy.
-        out_data[:, ii, :] = np.transpose(record[:, 0, :, 0])
+        formated_data = np.transpose(record[:, 0, :, 0]) * scals[0, :, None]
+        formated_data += offs[0, :, None]
+        out_data[:, ii, :] = formated_data
     out_data.shape = (nfreq, nrecords_read * ntime_record)
 
     return out_data
