@@ -1,7 +1,7 @@
 """Base search manager.
 """
 
-
+import os
 from os import path
 import time
 import logging
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 DEV_PLOTS = False
 
-#Event simulation params, speculative/contrived
+# Event simulation params, speculative/contrived
 SIMULATE = False
 alpha = -5.0
 sim_rate = 50*1.0/6000.0
@@ -98,7 +98,6 @@ class Manager(object):
         else:
             self._spectral_inds = [0.]
 
-
         # Dispersion index search.
         if parameters['disp_ind_search']:
             dispersion_inds = np.linspace(
@@ -162,7 +161,6 @@ class Manager(object):
         # Initialize trigger actions.
         self.set_trigger_action(parameters['trigger_action'])
 
-
     @property
     def datasource(self):
         return self._datasource
@@ -171,15 +169,15 @@ class Manager(object):
     def max_dm(self):
         return self._max_dm
 
-
     def set_trigger_action(self, action='print', **kwargs):
         actions = [self._get_trigger_action(s.strip()) for s in action.split(',')]
+
         def action_fun(triggers):
             for a in actions:
                 a(triggers)
         self._action = action_fun
 
-    def _get_trigger_action(self,action):
+    def _get_trigger_action(self, action):
         if action == 'print':
             def action_fun(triggers):
                 print triggers
@@ -224,16 +222,16 @@ class Manager(object):
                         n_copy = len(out_fn_list) + 1
 
                     out_filename += path.splitext(path.basename(self.datasource._source))[0]
-                    if not t.data.spec_ind is None:
+                    if t.data.spec_ind is not None:
                                     out_filename += "+a=%02.f" % t.data.spec_ind
 
-                    if not t.data.disp_ind is None:
+                    if t.data.disp_ind is not None:
                                     out_filename += "+n=%02.f" % t.data.disp_ind
 
                     out_filename_png = out_filename + "+%06.2f+%02d.png" % (t_offset, n_copy)
-                    out_filename_DMT = out_filename + "_DM-T_ "+ "+%06.2f+%02d.npy" % (t_offset, n_copy)
-                    out_filename_FT  = out_filename + "_Freq-T_" + "+%06.2f+%02d.npy" % (t_offset, n_copy)
- 
+                    out_filename_DMT = out_filename + "_DM-T_ " + "+%06.2f+%02d.npy" % (t_offset, n_copy)
+                    out_filename_FT = out_filename + "_Freq-T_" + "+%06.2f+%02d.npy" % (t_offset, n_copy)
+
                     plt.savefig(out_filename_png, bbox_inches='tight')
                     plt.close(f)
                     dm_data_cut = t.dm_data_cut()
@@ -328,6 +326,7 @@ class Manager(object):
                         trigger = this_best_trigger
                     # Recover memory for next iteration.
                     del this_triggers, this_best_trigger
+
         # Process any triggers.
         if trigger is not None:
             self._action([trigger])

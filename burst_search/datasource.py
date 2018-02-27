@@ -93,9 +93,6 @@ class DataSource(object):
         """
         return self._start_time
 
-
-    # Abstract methods.
-
     @property
     def freq(self):
         return np.arange(self.nfreq, dtype=float) * self.delta_f + self.freq0
@@ -128,5 +125,5 @@ class DataSource(object):
         shape = data_native.shape[:1] + (ntime_native // scrunch, scrunch)
         data_native.shape = shape
         t0 += self.delta_t * (1 - 1./scrunch) / 2
-        return t0, np.mean(data_native, -1).astype(data_native.dtype)
-
+        data = np.mean(data_native, -1).astype(data_native.dtype)
+        return t0, data

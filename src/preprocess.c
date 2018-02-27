@@ -33,7 +33,7 @@ void full_algorithm(DTYPE* data, size_t nfreq, size_t ntime, int block, DTYPE si
 			DTYPE mean, std;
 			onepass_stat(data + ii + jj*ntime,block,&mean,&std);
 			for(int kk = 0; kk < block; kk++){
-				if(fabs(*(data + jj*ntime + ii + kk)) > std*sigma_cut){
+				if(fabs(*(data + jj*ntime + ii + kk) - mean) > std*sigma_cut){
 					*(data + jj*ntime + ii + kk) = mean;
 				}
 			}

@@ -196,9 +196,10 @@ class Trigger(object):
                 start_o = -start_i
                 start_i = 0
             if stop_i > ntime:
-                stop_o -= (ntime - stop_i)
+                stop_o += (ntime - stop_i)
                 stop_i = ntime
-            spec_data_delay[ii,start_o:stop_o] = self.data.spec_data[ii,
+            if (stop_i > start_i) and (stop_o > start_o):
+                spec_data_delay[ii,start_o:stop_o] = self.data.spec_data[ii,
                     start_i:stop_i]
 
         rebin_factor_freq = 64
@@ -259,9 +260,10 @@ class Trigger(object):
                 start_o = -start_i
                 start_i = 0
             if stop_i > ntime:
-                stop_o -= (ntime - stop_i)
+                stop_o += (ntime - stop_i)
                 stop_i = ntime
-            spec_data_delay[ii,start_o:stop_o] = self.data.spec_data[ii,
+            if (stop_i > start_i) and (stop_o > start_o):
+                spec_data_delay[ii,start_o:stop_o] = self.data.spec_data[ii,
                     start_i:stop_i]
 
         rebin_factor_freq = 64
