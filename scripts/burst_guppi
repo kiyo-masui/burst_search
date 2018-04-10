@@ -119,6 +119,14 @@ parser.add_argument(
              " Wrap it in quotes to prevent your shell from expanding the"
              " glob.",
         )
+parser.add_argument(
+        '--passband',
+        type=float,
+        default=None,
+        nargs=2,
+        metavar=('min', 'max'),
+        help="Minium and maximum frequencies to search, in MHz (eg. '1200. 1600.')"
+        )
 
 
 def setup_searchers(filename, args):
@@ -142,6 +150,8 @@ def setup_searchers(filename, args):
         search_pars["max_dm"] = -1.9
     else:
         search_pars["max_dm"] = args.max_dm
+    if args.passband:
+        search_pars["passband"] = tuple(args.passband)
     search_pars["time_block"] = args.time_block
     search_pars["overlap"] = args.overlap
     search_pars["scrunch"] = args.time_rebin

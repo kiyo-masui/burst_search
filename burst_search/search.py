@@ -147,9 +147,11 @@ class Trigger(object):
         rebin_factors = [ 4**ii for ii in range(4) ]
 
         for ii, rfact in enumerate(rebin_factors):
-            spectrum_r = np.reshape(spectrum, (nfreq // rfact, rfact))
+            spectrum_r = spectrum[:(nfreq // rfact) * rfact]
+            freq_trunc = freq[:(nfreq // rfact) * rfact]
+            spectrum_r = np.reshape(spectrum_r, (nfreq // rfact, rfact))
             plt.plot(
-                freq[rfact//2::rfact],
+                freq_trunc[rfact//2::rfact],
                 np.mean(spectrum_r, 1),
                 colors[ii % len(colors)],
                 )
@@ -204,6 +206,7 @@ class Trigger(object):
 
         rebin_factor_freq = 64
         rebin_factor_time = 1
+        spec_data_delay = spec_data_delay[:(nfreq // rebin_factor_freq) * rebin_factor_freq]
         spec_data_delay.shape = (
                 nfreq // rebin_factor_freq,
                 rebin_factor_freq, 
@@ -268,6 +271,7 @@ class Trigger(object):
 
         rebin_factor_freq = 64
         rebin_factor_time = 1
+        spec_data_delay = spec_data_delay[:(nfreq // rebin_factor_freq) * rebin_factor_freq]
         spec_data_delay.shape = (
                 nfreq // rebin_factor_freq,
                 rebin_factor_freq,

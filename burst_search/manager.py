@@ -60,6 +60,7 @@ DEFAULT_PARAMETERS = {
         'simulate': False,
         'simulate_rate': 0.01,
         'simulate_fluence': 0.0002,
+        'passband': None,
         }
 
 
@@ -81,6 +82,7 @@ class Manager(object):
                 block=parameters['time_block'],
                 overlap=parameters['overlap'],
                 scrunch=parameters['scrunch'],
+                passband=parameters['passband'],
                 )
 
         # Store search parameters.

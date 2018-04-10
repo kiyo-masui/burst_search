@@ -6,7 +6,8 @@ class DataSource(object):
 
     # The Subclasses must implement the following.
 
-    def __init__(self, source=None, block=None, overlap=None, scrunch=1):
+    def __init__(self, source=None, block=None, overlap=None, scrunch=1,
+                 passband=None):
         """
         Parameters
         ----------
@@ -16,6 +17,8 @@ class DataSource(object):
             Target time block, approximate but lower limit.
         overlap : float
             Target overlapping of blocks, approximate but lower limit.
+        bandpass : tuple of 2 floats
+            Maximum and minimum frequency to supply.
 
         """
 
@@ -23,6 +26,7 @@ class DataSource(object):
         self._block = block
         self._overlap = overlap
         self._scrunch = scrunch
+        self._passband = passband
 
     def get_next_block_native(self):
         """Get the next block of data to process without applying time scrunch.
@@ -76,11 +80,11 @@ class DataSource(object):
 
     @property
     def freq0(self):
-        return self._freq0
+        return self.freq[0]
 
     @property
     def nfreq(self):
-        return self._nfreq
+        return len(self.freq)
 
     @property
     def mjd(self):
@@ -95,7 +99,21 @@ class DataSource(object):
 
     @property
     def freq(self):
-        return np.arange(self.nfreq, dtype=float) * self.delta_f + self.freq0
+        freq, f_slice = self._freq_native_and_slice()
+        return freq[f_slice]
+
+    def _freq_native_and_slice(self):
+        freq_native = np.arange(self._nfreq, dtype=float) * self.delta_f
+        freq_native += self._freq0
+        if self._passband:
+            inband = np.logical_and(freq_native > self._passband[0],
+                                    freq_native < self._passband[1])
+            inband, = np.nonzero(inband)
+            inband = np.s_[inband[0]:inband[-1] + 1]
+        else:
+            inband = np.s_[:]
+
+        return freq_native, inband
 
     def get_next_block(self):
         """Get the next block of data to process.
@@ -116,6 +134,8 @@ class DataSource(object):
 
         scrunch = self._scrunch
         t0, data_native = self.get_next_block_native()
+        _, f_slice = self._freq_native_and_slice()
+        data_native = data_native[f_slice]
         if scrunch == 1:
             return t0, data_native
         ntime_native = data_native.shape[1]
